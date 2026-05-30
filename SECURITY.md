@@ -9,7 +9,8 @@ decision before relying on it.
 
 | Version             | Supported           |
 |---------------------|---------------------|
-| `0.2.0-preview.2`+  | ✅ (latest preview)  |
+| `0.2.0-preview.3`+  | ✅ (latest preview)  |
+| `0.2.0-preview.2`   | ❌ (superseded)      |
 | `0.2.0-preview.1`   | ❌ (superseded)      |
 | `0.1.0-preview.*`   | ❌ (superseded)      |
 | anything older      | ❌                  |

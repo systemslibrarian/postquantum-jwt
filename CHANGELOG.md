@@ -10,6 +10,21 @@ versions.
 
 _No changes yet._
 
+## [0.2.0-preview.3] — 2026-05-30
+
+A **documentation release**. No code changes; same wire format, same crypto,
+same 57/57 tests. This release exists so the package on nuget.org carries
+the new adoption-focused docs.
+
+### Added
+
+- **ASP.NET Core 10 integration example** in `README.md`: DI registration of
+  `PqJwtValidator` as a singleton, a minimal fail-closed bearer middleware,
+  a protected minimal-API endpoint, and explicit notes on lifetime,
+  replay-cache scope in a cluster, `kid`-based rotation, and why the
+  standard `Microsoft.AspNetCore.Authentication.JwtBearer` handler can't
+  validate `ML-DSA-65` (so this middleware deliberately bypasses it).
+
 ## [0.2.0-preview.2] — 2026-05-30
 
 A defense-in-depth follow-up to `preview.1`, locking in items flagged by a
@@ -229,7 +244,8 @@ See [`KNOWN-GAPS.md`](KNOWN-GAPS.md). Highlights:
 - **Packages are not author-signed yet** (no code-signing certificate).
   nuget.org applies repository signing on push.
 
-[Unreleased]: https://github.com/systemslibrarian/postquantum-jwt/compare/v0.2.0-preview.2...HEAD
+[Unreleased]: https://github.com/systemslibrarian/postquantum-jwt/compare/v0.2.0-preview.3...HEAD
+[0.2.0-preview.3]: https://github.com/systemslibrarian/postquantum-jwt/releases/tag/v0.2.0-preview.3
 [0.2.0-preview.2]: https://github.com/systemslibrarian/postquantum-jwt/releases/tag/v0.2.0-preview.2
 [0.2.0-preview.1]: https://github.com/systemslibrarian/postquantum-jwt/releases/tag/v0.2.0-preview.1
 [0.1.0-preview.1]: https://github.com/systemslibrarian/postquantum-jwt/releases/tag/v0.1.0-preview.1
