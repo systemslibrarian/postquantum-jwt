@@ -53,7 +53,8 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          dotnet test -c Release --no-build --logger "console;verbosity=normal" | tee test-output.log
+          # Use minimal verbosity so the run prints a single-line "Passed! - Failed: N, Passed: N, Skipped: N, Total: N" summary, which is what the PQ-required check below parses.
+          dotnet test -c Release --no-build --logger "console;verbosity=minimal" | tee test-output.log
 
       # On Windows the runner has the native ML-KEM / ML-DSA primitives, so every
       # PqcFact test MUST run. If anything skipped, we are no longer proving the
@@ -63,8 +64,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          summary=$(grep -E 'Passed!|Failed!' test-output.log | tail -1)
+          summary=$(grep -E '^(Passed!|Failed!)' test-output.log | tail -1)
           echo "Test summary line: $summary"
+          if [[ -z "$summary" ]]; then
+            echo "::error::Could not locate the dotnet test summary line."
+            exit 1
+          fi
           skipped=$(echo "$summary" | grep -oE 'Skipped:[[:space:]]*[0-9]+' | grep -oE '[0-9]+' | tail -1)
           if [[ -z "$skipped" ]]; then
             echo "::error::Could not extract Skipped count from test output."
