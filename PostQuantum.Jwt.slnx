@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/PostQuantum.Jwt/PostQuantum.Jwt.csproj" />
+    <Project Path="src/PostQuantum.Jwt.AspNetCore/PostQuantum.Jwt.AspNetCore.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/PostQuantum.Jwt.Tests/PostQuantum.Jwt.Tests.csproj" />

@@ -10,6 +10,74 @@ versions.
 
 _No changes yet._
 
+## [0.3.0-preview.1] — 2026-05-30
+
+A **real-world adoption** release. v0.2 made the existing surface trustworthy;
+v0.3 makes it pleasant to wire into a real ASP.NET Core 10 app, makes it
+AOT-friendly, and adds the supply-chain signals a production-grade crypto
+package needs.
+
+### Added
+
+- **New companion package: `PostQuantum.Jwt.AspNetCore`.**
+  - `AddPqJwtBearer(…)` extensions on `AuthenticationBuilder` — mirrors the
+    shape of `AddJwtBearer` from `Microsoft.AspNetCore.Authentication.JwtBearer`,
+    so post-quantum tokens slot into the standard auth pipeline.
+  - `PqJwtBearerHandler` — fail-closed `AuthenticationHandler` that
+    delegates to `PqJwtValidator`. Bypasses `Microsoft.IdentityModel`,
+    which doesn't know `ML-DSA-65`.
+  - `PqJwtBearerOptions` — strongly-typed configuration with sensible
+    defaults (`NameClaimType="sub"`, `RoleClaimType="role"`).
+  - `IPqJwtKeyRing` + `HttpPqJwtKeyRing` — JWKS-equivalent key directory
+    fetched from a trusted HTTPS endpoint, cached in memory with
+    configurable refresh, AOT-safe (source-gen JSON), exclusively
+    accepting ML-DSA-65 entries.
+- **AOT/trim-safe API path.** `WithClaim<T>(name, value, JsonTypeInfo<T>)`
+  is a new source-gen-friendly overload alongside the existing
+  reflection-based `WithClaim(name, object?)`. The reflection overload now
+  carries `[RequiresUnreferencedCode]` and `[RequiresDynamicCode]` so AOT
+  consumers see one targeted warning. Primitive setters (`WithIssuer`,
+  `WithSubject`, `WithAudience`, `WithJwtId`, `WithExpiration`,
+  `WithLifetime`, `WithNotBefore`) bypass reflection internally and stay
+  trim-safe. Both projects declare `IsAotCompatible=true`.
+- **CycloneDX SBOM packed inside the `.nupkg`.** Every `dotnet pack` runs
+  the CycloneDX tool (if installed) and includes `bom.json` at the root
+  of the package, alongside the existing top-level release-artifact SBOM.
+- **Property-based tests** via FsCheck.Xunit: Base64Url involutive
+  round-trip, URL-safety of encoded output, custom-claim round-trips,
+  signature-tamper invariance, and X-Wing encapsulate/decapsulate
+  matching. Total test count: **68** (was 57).
+- **Linux PQ-required CI lane.** New `linux-pq-required` job installs
+  OpenSSL 3.5+ via `conda-forge`, runs the suite with `LD_LIBRARY_PATH`
+  pointed at it, and fails the run on any skipped test. Joins the
+  Windows lane as cross-platform proof that the ML-KEM / ML-DSA / X-Wing
+  paths actually executed in CI.
+- **Release workflow author-signing hook.** Optional
+  `NUGET_SIGNING_CERT` + `NUGET_SIGNING_CERT_PASSWORD` secrets on the
+  `nuget-publish` environment trigger `dotnet nuget sign` with a
+  DigiCert timestamp before push. Absent secrets log a notice and skip
+  signing — the package still ships under nuget.org's repository
+  signature.
+- **`PackageValidationBaselineVersion` infrastructure.** Wired in
+  conditionally (`-p:EnableBaselineValidation=true`) against
+  `0.2.0-preview.3`; flip the switch once that baseline is published to
+  nuget.org so future versions are checked for accidental API breaks.
+
+### Changed
+
+- The `pack` job in CI now packs both the main library and the AspNetCore
+  companion.
+- `pack-verify` CI installs the CycloneDX tool so the SBOM step runs on
+  every PR.
+
+### Documentation
+
+- README "What's new in 0.3.0-preview.1" reorganised to lead with the
+  preview.1 deltas, with the 0.2 trust line and 0.1 → 0.2 deltas
+  following.
+- README usage tour replaces the hand-rolled ASP.NET Core middleware with
+  the `AddPqJwtBearer(…)` call from the new companion.
+
 ## [0.2.0-preview.3] — 2026-05-30
 
 A **documentation release**. No code changes; same wire format, same crypto,
@@ -244,7 +312,8 @@ See [`KNOWN-GAPS.md`](KNOWN-GAPS.md). Highlights:
 - **Packages are not author-signed yet** (no code-signing certificate).
   nuget.org applies repository signing on push.
 
-[Unreleased]: https://github.com/systemslibrarian/postquantum-jwt/compare/v0.2.0-preview.3...HEAD
+[Unreleased]: https://github.com/systemslibrarian/postquantum-jwt/compare/v0.3.0-preview.1...HEAD
+[0.3.0-preview.1]: https://github.com/systemslibrarian/postquantum-jwt/releases/tag/v0.3.0-preview.1
 [0.2.0-preview.3]: https://github.com/systemslibrarian/postquantum-jwt/releases/tag/v0.2.0-preview.3
 [0.2.0-preview.2]: https://github.com/systemslibrarian/postquantum-jwt/releases/tag/v0.2.0-preview.2
 [0.2.0-preview.1]: https://github.com/systemslibrarian/postquantum-jwt/releases/tag/v0.2.0-preview.1

@@ -1,7 +1,9 @@
 name: Release
 
-# Publishes the NuGet package when a version tag (e.g. v0.2.0-preview.1) is pushed.
+# Publishes the NuGet packages when a version tag (e.g. v0.3.0-preview.1) is pushed.
 # Requires the NUGET_API_KEY secret on the 'nuget-publish' environment to push to nuget.org.
+# Optional NUGET_SIGNING_CERT (+ NUGET_SIGNING_CERT_PASSWORD) on the same environment
+# enables author code signing of the .nupkg before push.
 
 on:
   push:
@@ -42,19 +44,22 @@ jobs:
           fi
           echo "package_version=$csproj_version" >> "$GITHUB_OUTPUT"
 
+      - name: Install CycloneDX SBOM tool
+        run: dotnet tool install --global CycloneDX
+
       - name: Build (Release)
         run: dotnet build -c Release
 
       - name: Test (Release)
         run: dotnet test -c Release --no-build
 
-      - name: Pack
+      - name: Pack — main library
         run: dotnet pack src/PostQuantum.Jwt/PostQuantum.Jwt.csproj -c Release --no-build -o artifacts
 
-      - name: Install CycloneDX SBOM tool
-        run: dotnet tool install --global CycloneDX
+      - name: Pack — AspNetCore companion
+        run: dotnet pack src/PostQuantum.Jwt.AspNetCore/PostQuantum.Jwt.AspNetCore.csproj -c Release --no-build -o artifacts
 
-      - name: Generate CycloneDX SBOM (bom.json)
+      - name: Generate top-level CycloneDX SBOM (in addition to the per-nupkg one)
         run: |
           set -euo pipefail
           dotnet CycloneDX src/PostQuantum.Jwt/PostQuantum.Jwt.csproj \
@@ -74,7 +79,7 @@ jobs:
           cat artifacts/SHA256SUMS.txt
           echo "------------------------"
 
-      - name: Generate build-provenance attestation for the .nupkg
+      - name: Generate build-provenance attestation for the .nupkg files
         uses: actions/attest-build-provenance@v3
         with:
           subject-path: "artifacts/*.nupkg"
@@ -105,6 +110,8 @@ jobs:
       contents: read
     env:
       NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+      NUGET_SIGNING_CERT: ${{ secrets.NUGET_SIGNING_CERT }}
+      NUGET_SIGNING_CERT_PASSWORD: ${{ secrets.NUGET_SIGNING_CERT_PASSWORD }}
     steps:
       - name: Download package artifacts
         uses: actions/download-artifact@v5
@@ -119,11 +126,39 @@ jobs:
             exit 1
           fi
 
-      # NOTE: packages are NOT cryptographically author-signed yet (no code-signing
-      # certificate). NuGet.org applies repository signing on push. Author signing
-      # is tracked in KNOWN-GAPS.md. Build-provenance attestations (above) provide
-      # an interim transparency signal — anyone can verify with `gh attestation
-      # verify <nupkg> --repo systemslibrarian/postquantum-jwt`.
+      # Optional: author code-sign the .nupkg files when a code-signing cert is
+      # provided. If the secret is absent we log it and continue (with the
+      # repo-signing-only stance documented in KNOWN-GAPS.md). When the secret
+      # is present, the cert is materialised to a temp file, used by
+      # `dotnet nuget sign`, and the file is removed in `always()` cleanup.
+      - name: Author code-sign packages (if certificate available)
+        run: |
+          set -euo pipefail
+          if [ -z "${NUGET_SIGNING_CERT}" ]; then
+            echo "NUGET_SIGNING_CERT not set — packages will rely on nuget.org repository signing only."
+            echo "See KNOWN-GAPS.md for the rationale and roadmap."
+            exit 0
+          fi
+
+          cert_path=$(mktemp --suffix=.pfx)
+          # Cert is stored as base64 in the secret.
+          echo "$NUGET_SIGNING_CERT" | base64 -d > "$cert_path"
+          chmod 600 "$cert_path"
+
+          echo "Author signing artifacts/*.nupkg ..."
+          dotnet nuget sign artifacts/*.nupkg \
+              --certificate-path "$cert_path" \
+              --certificate-password "$NUGET_SIGNING_CERT_PASSWORD" \
+              --timestamper "http://timestamp.digicert.com" \
+              --overwrite
+
+          shred -u "$cert_path" || rm -f "$cert_path"
+          echo "::notice::Packages author-signed."
+
+      # NuGet.org also applies repository signing on push. Build-provenance
+      # attestations (in the pack job above) are an independent transparency
+      # signal — anyone can verify with `gh attestation verify <file>
+      # --repo systemslibrarian/postquantum-jwt`.
       - name: Push to NuGet
         run: >
           dotnet nuget push "artifacts/*.nupkg"

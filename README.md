@@ -11,7 +11,7 @@ Optionally encrypts with X-Wing (X25519 + ML-KEM-768) and AES-256-GCM. Built
 on the native .NET BCL post-quantum primitives. Fail-closed by design,
 small-surface, and honest about what it is.
 
-> **Status — `0.2.0-preview.3`. Preview software. Not for production use.**
+> **Status — `0.3.0-preview.1`. Preview software. Not for production use.**
 > The API may change before 1.0. The cryptographic construction has **not** been
 > independently audited. Read [`KNOWN-GAPS.md`](KNOWN-GAPS.md) before depending
 > on this for anything that matters.
@@ -21,7 +21,7 @@ small-surface, and honest about what it is.
 ## Table of contents
 
 - [Why](#why)
-- [What's new in 0.2.0-preview.3](#whats-new-in-020-preview1)
+- [What's new in 0.3.0-preview.1](#whats-new-in-020-preview1)
 - [Install](#install)
 - [60-second tour](#60-second-tour)
 - [Usage](#usage)
@@ -58,25 +58,52 @@ If either half stands, your token stands. That is the whole point.
 
 ---
 
-## What's new in 0.2.0-preview.3
+## What's new in 0.3.0-preview.1
 
-A **quality and trust** release line. No new public APIs in 0.2.x — every
-change makes the existing surface safer or easier to reason about, or makes
-adoption smoother. The changes below are stacked newest-first; the broader
-0.1 → 0.2 delta is at the bottom.
+A **real-world adoption** release. v0.2 made the existing surface trustworthy;
+v0.3 makes it pleasant to wire into a real ASP.NET Core 10 app, makes it
+AOT-friendly, and adds the supply-chain signals a production-grade crypto
+package needs. Changes are stacked newest-first.
 
-**New in preview.3** (real-world adoption docs)
+**New in v0.3.0-preview.1**
 
-- **ASP.NET Core 10 integration example.** A copy-paste-ready section in
-  [Usage → ASP.NET Core integration](#aspnet-core-integration): DI
-  registration of `PqJwtValidator` as a singleton, a minimal fail-closed
-  bearer middleware that bypasses the standard `JwtBearer` handler (which
-  doesn't know `ML-DSA-65`), a protected minimal-API endpoint, plus notes on
-  lifetime, replay-cache scope in a cluster, and `kid`-based rotation.
-- No code changes from `preview.2`. Same `57/57` tests, same wire format,
-  same crypto.
+- **New companion package `PostQuantum.Jwt.AspNetCore`.**
+  - `services.AddAuthentication().AddPqJwtBearer(...)` — mirrors the shape
+    of `AddJwtBearer` from `Microsoft.AspNetCore.Authentication.JwtBearer`,
+    so post-quantum tokens slot into the standard auth pipeline.
+  - `PqJwtBearerHandler` — fail-closed `AuthenticationHandler` that
+    delegates to `PqJwtValidator`. Bypasses `Microsoft.IdentityModel`, which
+    doesn't know `ML-DSA-65`.
+  - `IPqJwtKeyRing` + `HttpPqJwtKeyRing` — JWKS-equivalent: fetch a key
+    directory from a trusted HTTPS endpoint with configurable refresh,
+    in-memory cache, AOT-safe (source-gen JSON), single-suite enforcement.
+- **AOT/trim-safe API path.** New `WithClaim<T>(name, value, JsonTypeInfo<T>)`
+  overload alongside the existing reflection-based `WithClaim(name, object?)`.
+  The reflection overload carries `[RequiresUnreferencedCode]` and
+  `[RequiresDynamicCode]` so AOT publishers see one targeted warning;
+  primitive setters (`WithIssuer`, `WithSubject`, etc.) bypass reflection
+  internally and stay trim-safe. Both packages declare `IsAotCompatible=true`.
+- **CycloneDX SBOM packed inside the `.nupkg`.** `bom.json` lives at the
+  root of the package so consumers can inspect the dependency graph
+  directly from nuget.org.
+- **Property-based tests** via FsCheck.Xunit (Base64Url involutive
+  round-trip, signature-tamper invariance, etc.). Total: **68 tests**,
+  zero skips on PQ-capable hosts.
+- **Linux PQ-required CI lane.** New `linux-pq-required` job installs
+  OpenSSL 3.5+ via `conda-forge` and fails the run on any skipped test —
+  joining the Windows lane in proving the ML-KEM / ML-DSA / X-Wing paths
+  actually executed on every push, on both platforms.
+- **Release workflow author-signing hook.** Optional
+  `NUGET_SIGNING_CERT` + `NUGET_SIGNING_CERT_PASSWORD` secrets on the
+  `nuget-publish` GitHub Environment trigger `dotnet nuget sign` with a
+  DigiCert timestamp before push. Absent secrets log a notice and skip
+  signing — the package still ships under nuget.org's repository signature.
+- **API baseline infrastructure.** `PackageValidationBaselineVersion=0.2.0-preview.3`
+  is wired in conditionally — pass `-p:EnableBaselineValidation=true`
+  once the baseline is published to nuget.org and future versions are
+  checked for accidental API breaks against it.
 
-**New in preview.2** (second independent review pass)
+**New in v0.2.0-preview.3** (the previous release line, kept for reference)
 
 - **Fail-fast misconfiguration.** `PqJwtValidator`'s constructor now throws
   `ArgumentException` if neither `SignatureVerificationKey` nor
@@ -150,13 +177,13 @@ Full notes in [`CHANGELOG.md`](CHANGELOG.md).
 ## Install
 
 ```bash
-dotnet add package PostQuantum.Jwt --version 0.2.0-preview.3
+dotnet add package PostQuantum.Jwt --version 0.3.0-preview.1
 ```
 
 Or in a `.csproj`:
 
 ```xml
-<PackageReference Include="PostQuantum.Jwt" Version="0.2.0-preview.3" />
+<PackageReference Include="PostQuantum.Jwt" Version="0.3.0-preview.1" />
 ```
 
 **Runtime requirement:** the native ML-KEM / ML-DSA primitives need an OpenSSL
@@ -286,112 +313,100 @@ An unknown `kid`, a missing `jti`, or a replayed `jti` all fail closed.
 
 ### ASP.NET Core integration
 
-The standard `Microsoft.AspNetCore.Authentication.JwtBearer` handler delegates
-to `Microsoft.IdentityModel.Tokens.JsonWebTokenHandler`, which only knows the
-IANA-registered `alg` values — it has no path for `ML-DSA-65`. Until that
-changes, the cleanest integration in ASP.NET Core 10 is a small piece of
-middleware that calls `PqJwtValidator` directly. Register the validator as a
-singleton (it's immutable and thread-safe) and hand the resulting claims to
-the rest of the pipeline as a `ClaimsPrincipal`.
+Install the companion package and call `AddPqJwtBearer(...)` on the standard
+`AuthenticationBuilder` — the same shape as `AddJwtBearer` from
+`Microsoft.AspNetCore.Authentication.JwtBearer`, but routing through
+`PqJwtValidator` instead of the IdentityModel handler that can't speak
+`ML-DSA-65`.
+
+```bash
+dotnet add package PostQuantum.Jwt.AspNetCore --version 0.3.0-preview.1
+```
 
 ```csharp
-using System.Security.Claims;
 using System.Security.Cryptography;
-using System.Text.Json;
 using PostQuantum.Jwt;
+using PostQuantum.Jwt.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// 1) Register PqJwtValidator once for the lifetime of the app.
-builder.Services.AddSingleton<PqJwtValidator>(_ =>
-{
-    var keyBytes = Convert.FromBase64String(
-        builder.Configuration["Auth:VerificationKey"]
-            ?? throw new InvalidOperationException("Missing Auth:VerificationKey"));
-    var verificationKey = MLDsa.ImportMLDsaPublicKey(MLDsaAlgorithm.MLDsa65, keyBytes);
-
-    return new PqJwtValidator(new PqJwtValidationParameters
+builder.Services
+    .AddAuthentication(PqJwtBearerDefaults.AuthenticationScheme)
+    .AddPqJwtBearer(options =>
     {
-        SignatureVerificationKey = verificationKey,
-        ValidIssuer   = builder.Configuration["Auth:Issuer"],
-        ValidAudience = builder.Configuration["Auth:Audience"],
-        // Single-process replay defense. Swap to a Redis-backed
-        // IPqJwtReplayCache for a horizontally scaled deployment.
-        ReplayCache   = new InMemoryReplayCache(),
+        var keyBytes = Convert.FromBase64String(
+            builder.Configuration["Auth:VerificationKey"]
+                ?? throw new InvalidOperationException("Missing Auth:VerificationKey"));
+        options.ValidationParameters = new PqJwtValidationParameters
+        {
+            SignatureVerificationKey = MLDsa.ImportMLDsaPublicKey(
+                MLDsaAlgorithm.MLDsa65, keyBytes),
+            ValidIssuer   = builder.Configuration["Auth:Issuer"],
+            ValidAudience = builder.Configuration["Auth:Audience"],
+            // Single-process replay defense. Swap to a Redis-backed
+            // IPqJwtReplayCache for a horizontally scaled deployment.
+            ReplayCache   = new InMemoryReplayCache(),
+        };
     });
-});
+builder.Services.AddAuthorization();
 
 var app = builder.Build();
+app.UseAuthentication();
+app.UseAuthorization();
 
-// 2) Bearer middleware — minimal, fail-closed. A missing or invalid token
-//    leaves ctx.User unauthenticated; an explicitly malformed Bearer header
-//    returns 401 directly. This deliberately bypasses the standard JwtBearer
-//    handler because IdentityModel can't validate ML-DSA-65 signatures.
-app.Use(async (ctx, next) =>
+app.MapGet("/me", (HttpContext ctx) => new
 {
-    var auth = ctx.Request.Headers.Authorization.ToString();
-    const string prefix = "Bearer ";
-    if (!auth.StartsWith(prefix, StringComparison.Ordinal))
-    {
-        await next();
-        return;
-    }
-
-    var token = auth[prefix.Length..];
-    var validator = ctx.RequestServices.GetRequiredService<PqJwtValidator>();
-
-    try
-    {
-        var result = validator.Validate(token);
-        var claims = result.Claims
-            .Where(kv => kv.Value.ValueKind == JsonValueKind.String)
-            .Select(kv => new Claim(kv.Key, kv.Value.GetString()!))
-            .ToList();
-        ctx.User = new ClaimsPrincipal(new ClaimsIdentity(claims, authenticationType: "PqJwt"));
-    }
-    catch (PqJwtValidationException)
-    {
-        // Fail closed: tampered/expired/wrong-issuer tokens → 401, no fallback.
-        ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
-        return;
-    }
-
-    await next();
-});
-
-// 3) A protected endpoint. Any handler can read ctx.User.FindFirstValue("sub"),
-//    role, custom claims, etc. — they all came out of PqJwtValidator's
-//    fail-closed pipeline.
-app.MapGet("/me", (HttpContext ctx) =>
-{
-    if (!(ctx.User.Identity?.IsAuthenticated ?? false))
-    {
-        return Results.Unauthorized();
-    }
-    return Results.Ok(new
-    {
-        sub  = ctx.User.FindFirstValue("sub"),
-        role = ctx.User.FindFirstValue("role"),
-    });
-});
+    sub  = ctx.User.FindFirst("sub")?.Value,
+    role = ctx.User.FindFirst("role")?.Value,
+}).RequireAuthorization();
 
 app.Run();
 ```
 
-A few notes on the integration:
+That's the whole integration. The handler is fail-closed by construction
+(tampered / expired / wrong-issuer tokens produce
+`AuthenticateResult.Fail`), `RequireAuthorization()` returns 401 to
+unauthenticated callers, and standard `[Authorize(Roles = "...")]`
+attributes work against the `"role"` claim by default.
 
-- **Singleton lifetime.** `PqJwtValidator` is documented as thread-safe and
-  immutable; one instance for the app is correct.
-- **Replay cache scope.** `InMemoryReplayCache` is per-process. In a multi-node
-  deployment, implement `IPqJwtReplayCache` over Redis (or whatever your
-  cluster shares) so a token replayed on a different node is still rejected.
-- **`kid`-based rotation.** Swap `SignatureVerificationKey` for
-  `SignatureKeyResolver = kid => keyRing.TryGetValue(kid, ...)` once you
-  start rotating keys; the rest of the middleware stays identical.
-- **Don't mix with `AddAuthentication()`/`AddJwtBearer()`.** The standard
-  handler will try to parse the token's `alg` and fail. Either use this
-  middleware as your only auth path, or use it after explicitly disabling
-  the standard handler for the routes you want post-quantum-protected.
+**Key rotation across services.** Use `HttpPqJwtKeyRing` to fetch
+verification keys from a trusted HTTPS endpoint (the post-quantum
+analogue of JWKS):
+
+```csharp
+builder.Services.AddHttpClient<HttpPqJwtKeyRing>();
+builder.Services.AddSingleton(sp =>
+{
+    var http = sp.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(HttpPqJwtKeyRing));
+    return new HttpPqJwtKeyRing(http, new Uri(builder.Configuration["Auth:KeysEndpoint"]!));
+});
+
+builder.Services
+    .AddAuthentication(PqJwtBearerDefaults.AuthenticationScheme)
+    .AddPqJwtBearer(options =>
+    {
+        options.ValidationParameters = new PqJwtValidationParameters
+        {
+            // Resolved per token from the token's `kid` header.
+            SignatureKeyResolver = kid =>
+                builder.Services.BuildServiceProvider()
+                    .GetRequiredService<HttpPqJwtKeyRing>()
+                    .Resolve(kid),
+            ValidIssuer   = builder.Configuration["Auth:Issuer"],
+            ValidAudience = builder.Configuration["Auth:Audience"],
+        };
+    });
+```
+
+The expected key-directory document is JSON:
+`{ "keys": [ { "kid": "...", "alg": "ML-DSA-65", "key": "<base64>" }, ... ] }`.
+Entries with any other `alg` are ignored — the single-suite policy holds
+across services.
+
+**Don't `AddJwtBearer` alongside this.** The standard handler will try to
+parse the token's `alg` and fail. Either use `AddPqJwtBearer` as your
+only bearer auth, or restrict each scheme to specific routes with
+`[Authorize(AuthenticationSchemes = ...)]`.
 
 ---
 
@@ -497,7 +512,7 @@ remote-discovery story. Your application is responsible for the key ring; this
 library is just disciplined about asking for the right key when validating.
 
 **"Preview, not for production" — what that means operationally.** The wire
-format and public API are not stable yet. If you ship 0.2.0-preview.3 in a
+format and public API are not stable yet. If you ship 0.3.0-preview.1 in a
 service and a future release bumps to 0.3.0 with a wire-format change, you
 will be re-signing every active token (and possibly running a flag-day
 migration). For an internal service you control end-to-end this is
@@ -573,9 +588,9 @@ at a newer one:
 LD_LIBRARY_PATH=/path/to/openssl-3.5/lib dotnet test
 ```
 
-The full suite is **57 tests, zero skips** on a Windows 11 / .NET 10 host with
-native ML-KEM and ML-DSA support — and the Windows CI lane fails the run if
-any test skips.
+The full suite is **68 tests, zero skips** on a Windows 11 / .NET 10 host
+with native ML-KEM and ML-DSA support. Both the Windows and Linux CI lanes
+fail the run if any test skips.
 
 ---
 

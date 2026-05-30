@@ -5,7 +5,7 @@ unverified, and where the sharp edges are. Honesty over polish: if something is
 incomplete, it is listed here rather than glossed over. This file is part of the
 contract with anyone evaluating the library.
 
-Last reviewed for: `0.2.0-preview.3`.
+Last reviewed for: `0.3.0-preview.1`.
 
 ## Cryptography
 
@@ -62,26 +62,24 @@ Last reviewed for: `0.2.0-preview.3`.
 - **Native PQC requires OpenSSL 3.5+ (Linux) or a recent Windows.** Where
   ML-KEM / ML-DSA are unavailable, operations fail closed and the corresponding
   tests skip themselves with a stated reason.
-- **PQ coverage in CI is proven by the Windows lane only.** As of `0.2.0-preview.1`
-  the Windows CI lane runs the full suite **with zero skipped tests** and the
-  workflow fails the run if anything skips — so the post-quantum paths are
-  proven to execute on every push. The Linux lane is portability-only: if
-  `ubuntu-latest` ever lands without OpenSSL 3.5+, PQ tests will skip there
-  silently. A future improvement is a containerised Linux lane that pins
-  OpenSSL 3.5+ so PQ coverage is asserted on both operating systems.
-- **Packages are not author-signed.** The release workflow packs and (with
-  manual approval on the `nuget-publish` GitHub Environment) pushes to NuGet,
-  which applies repository signing. There is no author code-signing certificate
-  yet. As an interim transparency signal, every release emits a GitHub
-  build-provenance attestation for the `.nupkg`; verify with
-  `gh attestation verify <nupkg> --repo systemslibrarian/postquantum-jwt`.
-- **SBOM is generated and attested, but not yet packed inside the `.nupkg`.**
-  Starting with `0.2.0-preview.2` the release workflow emits a CycloneDX
-  SBOM (`bom.json`) covering the project's dependency graph, includes it in
-  `SHA256SUMS.txt`, and issues a separate GitHub build-provenance attestation
-  for it. The SBOM travels with the GitHub release artifacts, not inside the
-  `.nupkg` itself — consumers who need it should pull it from the workflow
-  run rather than relying on package contents.
+- **PQ coverage in CI is proven on Windows *and* Linux** as of
+  `0.3.0-preview.1`. The Windows lane runs natively; the Linux lane pins
+  OpenSSL 3.5+ via `conda-forge` and points `LD_LIBRARY_PATH` at it before
+  testing. Both lanes fail the run on any skipped test, so the
+  ML-KEM / ML-DSA / X-Wing paths are proven to execute on every push on
+  both platforms.
+- **Packages are not author-signed by default.** The release workflow has
+  an optional author-signing hook: if a `NUGET_SIGNING_CERT` secret is
+  present on the `nuget-publish` GitHub Environment, packages are signed
+  with `dotnet nuget sign` and a DigiCert timestamp before push. Until a
+  certificate is procured and that secret is populated, packages rely on
+  nuget.org's repository signature alone. Every release also emits GitHub
+  build-provenance attestations for the `.nupkg` and the SBOM — verify
+  with `gh attestation verify <file> --repo systemslibrarian/postquantum-jwt`.
+- **CycloneDX SBOM is packed inside the `.nupkg`** (in addition to being
+  uploaded as a release artifact and getting its own build-provenance
+  attestation). Consumers can inspect `bom.json` directly from the
+  package on nuget.org.
 
 ---
 

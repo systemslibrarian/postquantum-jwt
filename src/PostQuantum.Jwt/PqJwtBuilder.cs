@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -38,28 +39,28 @@ public sealed class PqJwtBuilder
     /// <summary>Sets the <c>iss</c> (issuer) claim.</summary>
     /// <param name="issuer">The issuer identifier.</param>
     /// <returns>This builder.</returns>
-    public PqJwtBuilder WithIssuer(string issuer) => WithClaim("iss", issuer);
+    public PqJwtBuilder WithIssuer(string issuer) => SetStringClaim("iss", issuer);
 
     /// <summary>Sets the <c>sub</c> (subject) claim.</summary>
     /// <param name="subject">The subject identifier.</param>
     /// <returns>This builder.</returns>
-    public PqJwtBuilder WithSubject(string subject) => WithClaim("sub", subject);
+    public PqJwtBuilder WithSubject(string subject) => SetStringClaim("sub", subject);
 
     /// <summary>Sets the <c>aud</c> (audience) claim.</summary>
     /// <param name="audience">The audience identifier.</param>
     /// <returns>This builder.</returns>
-    public PqJwtBuilder WithAudience(string audience) => WithClaim("aud", audience);
+    public PqJwtBuilder WithAudience(string audience) => SetStringClaim("aud", audience);
 
     /// <summary>Sets the <c>jti</c> (JWT ID) claim.</summary>
     /// <param name="jwtId">A unique token identifier.</param>
     /// <returns>This builder.</returns>
-    public PqJwtBuilder WithJwtId(string jwtId) => WithClaim("jti", jwtId);
+    public PqJwtBuilder WithJwtId(string jwtId) => SetStringClaim("jti", jwtId);
 
     /// <summary>Sets the <c>exp</c> (expiration) claim to an absolute time.</summary>
     /// <param name="expiresAt">When the token expires.</param>
     /// <returns>This builder.</returns>
     public PqJwtBuilder WithExpiration(DateTimeOffset expiresAt) =>
-        WithClaim("exp", expiresAt.ToUnixTimeSeconds());
+        SetInt64Claim("exp", expiresAt.ToUnixTimeSeconds());
 
     /// <summary>Sets <c>iat</c> to now and <c>exp</c> to now plus <paramref name="lifetime"/>.</summary>
     /// <param name="lifetime">How long the token should remain valid.</param>
@@ -69,7 +70,7 @@ public sealed class PqJwtBuilder
     {
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(lifetime, TimeSpan.Zero);
         var now = _timeProvider.GetUtcNow();
-        WithClaim("iat", now.ToUnixTimeSeconds());
+        SetInt64Claim("iat", now.ToUnixTimeSeconds());
         return WithExpiration(now + lifetime);
     }
 
@@ -77,12 +78,36 @@ public sealed class PqJwtBuilder
     /// <param name="notBefore">The earliest time the token is valid.</param>
     /// <returns>This builder.</returns>
     public PqJwtBuilder WithNotBefore(DateTimeOffset notBefore) =>
-        WithClaim("nbf", notBefore.ToUnixTimeSeconds());
+        SetInt64Claim("nbf", notBefore.ToUnixTimeSeconds());
+
+    // AOT-safe primitive setters used by the convenience methods above.
+    // They bypass JsonSerializer.SerializeToNode (which is reflection-based)
+    // and construct JsonValue nodes directly.
+    private PqJwtBuilder SetStringClaim(string name, string value)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(name);
+        _claims[name] = JsonValue.Create(value);
+        return this;
+    }
+
+    private PqJwtBuilder SetInt64Claim(string name, long value)
+    {
+        _claims[name] = JsonValue.Create(value);
+        return this;
+    }
 
     /// <summary>Sets an arbitrary claim. Pass <c>null</c> to remove a previously set claim.</summary>
     /// <param name="name">The claim name.</param>
     /// <param name="value">The claim value (any JSON-serializable object), or <c>null</c> to remove it.</param>
     /// <returns>This builder.</returns>
+    /// <remarks>
+    /// This overload uses reflection-based JSON serialization, so it is
+    /// <b>not</b> AOT/trim-safe. For trim-safe call sites use
+    /// <c>WithClaim&lt;T&gt;(name, value, JsonTypeInfo&lt;T&gt;)</c> with a
+    /// source-generated <c>JsonTypeInfo&lt;T&gt;</c>.
+    /// </remarks>
+    [RequiresUnreferencedCode("Calls System.Text.Json.JsonSerializer.SerializeToNode which may use reflection. Use WithClaim<T>(name, value, JsonTypeInfo<T>) in trimmed/AOT applications.")]
+    [RequiresDynamicCode("Calls System.Text.Json.JsonSerializer.SerializeToNode which may generate code at runtime. Use WithClaim<T>(name, value, JsonTypeInfo<T>) in AOT applications.")]
     public PqJwtBuilder WithClaim(string name, object? value)
     {
         ArgumentException.ThrowIfNullOrEmpty(name);
@@ -95,6 +120,25 @@ public sealed class PqJwtBuilder
             _claims[name] = JsonSerializer.SerializeToNode(value);
         }
 
+        return this;
+    }
+
+    /// <summary>
+    /// Sets an arbitrary claim using a source-generated
+    /// <c>JsonTypeInfo&lt;T&gt;</c>. AOT/trim-safe alternative to
+    /// <see cref="WithClaim(string, object?)"/>.
+    /// </summary>
+    /// <typeparam name="T">The claim value's type.</typeparam>
+    /// <param name="name">The claim name.</param>
+    /// <param name="value">The claim value.</param>
+    /// <param name="jsonTypeInfo">A source-generated type-info for <typeparamref name="T"/>.</param>
+    /// <returns>This builder.</returns>
+    public PqJwtBuilder WithClaim<T>(string name, T value, System.Text.Json.Serialization.Metadata.JsonTypeInfo<T> jsonTypeInfo)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(name);
+        ArgumentNullException.ThrowIfNull(jsonTypeInfo);
+        var json = JsonSerializer.Serialize(value, jsonTypeInfo);
+        _claims[name] = JsonNode.Parse(json);
         return this;
     }
 
