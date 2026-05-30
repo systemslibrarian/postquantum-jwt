@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/PostQuantum.Jwt/PostQuantum.Jwt.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/PostQuantum.Jwt.Tests/PostQuantum.Jwt.Tests.csproj" />
+  </Folder>
+</Solution>
