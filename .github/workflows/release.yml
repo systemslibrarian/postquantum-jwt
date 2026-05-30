@@ -1,0 +1,52 @@
+name: Release
+
+# Publishes the NuGet package when a version tag (e.g. v0.1.0-preview.1) is pushed.
+# Requires the NUGET_API_KEY repository secret to push to nuget.org.
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  pack-publish:
+    runs-on: ubuntu-latest
+    env:
+      NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history for deterministic SourceLink
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Build (Release)
+        run: dotnet build -c Release
+
+      - name: Test (Release)
+        run: dotnet test -c Release --no-build
+
+      - name: Pack
+        run: dotnet pack src/PostQuantum.Jwt/PostQuantum.Jwt.csproj -c Release --no-build -o artifacts
+
+      - name: Upload artifacts to the workflow run
+        uses: actions/upload-artifact@v4
+        with:
+          name: nuget-packages
+          path: artifacts/*.*nupkg
+
+      # NOTE: packages are NOT cryptographically author-signed yet (no code-signing
+      # certificate). NuGet.org applies repository signing on push. Author signing
+      # is tracked in KNOWN-GAPS.md.
+      - name: Push to NuGet
+        if: ${{ env.NUGET_API_KEY != '' }}
+        run: >
+          dotnet nuget push "artifacts/*.nupkg"
+          --api-key "$NUGET_API_KEY"
+          --source https://api.nuget.org/v3/index.json
+          --skip-duplicate

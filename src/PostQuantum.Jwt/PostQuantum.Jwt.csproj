@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>PostQuantum.Jwt</RootNamespace>
+    <AssemblyName>PostQuantum.Jwt</AssemblyName>
+  </PropertyGroup>
+
+  <!-- NuGet package metadata -->
+  <PropertyGroup>
+    <PackageId>PostQuantum.Jwt</PackageId>
+    <Version>0.1.0-preview.1</Version>
+    <Authors>Paul Clark</Authors>
+    <Description>Post-quantum hybrid JWT library for .NET 10. Combines X-Wing (X25519 + ML-KEM-768) key agreement with ML-DSA signatures, built on native BCL post-quantum primitives. Fail-closed, transparent, and honest about its security posture.</Description>
+    <PackageProjectUrl>https://github.com/systemslibrarian/postquantum-jwt</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/systemslibrarian/postquantum-jwt</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageTags>jwt;jose;post-quantum;pqc;ml-dsa;ml-kem;dilithium;kyber;x-wing;x25519;hybrid;cryptography;security</PackageTags>
+    <PackageReleaseNotes>0.1.0-preview.1: Initial preview. ML-DSA signed tokens and optional X-Wing + AES-256-GCM encryption. Preview API; not for production use. See KNOWN-GAPS.md.</PackageReleaseNotes>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+  </PropertyGroup>
+
+  <!-- Symbols + SourceLink for debuggable, reproducible packages -->
+  <PropertyGroup>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Only dependency: BouncyCastle, used solely for X25519 (classical half of
+         X-Wing) and SHA3-256 (the X-Wing combiner). ML-KEM-768 and ML-DSA come
+         from the native .NET BCL. See SECURITY.md for the full posture. -->
+    <PackageReference Include="BouncyCastle.Cryptography" Version="2.6.2" />
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="../../README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>

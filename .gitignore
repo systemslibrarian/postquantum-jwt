@@ -1,0 +1,25 @@
+# Build output
+bin/
+obj/
+artifacts/
+*.user
+
+# NuGet
+*.nupkg
+*.snupkg
+
+# Test output
+[Tt]est[Rr]esults/
+coverage*.json
+coverage*.xml
+*.coverage
+
+# IDE
+.vs/
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
