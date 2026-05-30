@@ -65,13 +65,13 @@ project, timelines are best-effort and stated honestly rather than promised.
 **X-Wing combiner.** The 32-byte shared secret is
 
 ```
-SHA3-256( label || ss_ML-KEM || ss_X25519 || ct_X25519 || pk_X25519 )
+SHA3-256( ss_ML-KEM || ss_X25519 || ct_X25519 || pk_X25519 || label )
 ```
 
-where `label` is the six bytes `0x5C 0x2E 0x2F 0x2F 0x5E 0x5C` (`\.//^\`), per
-`draft-connolly-cfrg-xwing-kem`. This shared secret is used directly as the
-AES-256-GCM key. The JWE protected header is bound as AES-GCM additional
-authenticated data (AAD).
+where `label` is the six bytes `0x5C 0x2E 0x2F 0x2F 0x5E 0x5C` (`\.//^\`)
+concatenated **last**, per `draft-connolly-cfrg-xwing-kem`. This shared secret
+is used directly as the AES-256-GCM key. The JWE protected header is bound as
+AES-GCM additional authenticated data (AAD).
 
 ## Dependency rationale
 

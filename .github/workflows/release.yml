@@ -1,7 +1,7 @@
 name: Release
 
 # Publishes the NuGet package when a version tag (e.g. v0.1.0-preview.1) is pushed.
-# Requires the NUGET_API_KEY repository secret to push to nuget.org.
+# Requires the NUGET_API_KEY secret on the 'nuget-publish' environment to push to nuget.org.
 
 on:
   push:
@@ -11,10 +11,10 @@ permissions:
   contents: write
 
 jobs:
-  pack-publish:
+  pack:
     runs-on: ubuntu-latest
-    env:
-      NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+    outputs:
+      package_version: ${{ steps.version.outputs.package_version }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -24,6 +24,18 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
+
+      - name: Resolve and verify package version against tag
+        id: version
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME#v}"
+          csproj_version=$(grep -oP '(?<=<Version>)[^<]+' src/PostQuantum.Jwt/PostQuantum.Jwt.csproj)
+          if [ "$tag" != "$csproj_version" ]; then
+            echo "::error::Tag version ($tag) does not match csproj <Version> ($csproj_version)."
+            exit 1
+          fi
+          echo "package_version=$csproj_version" >> "$GITHUB_OUTPUT"
 
       - name: Build (Release)
         run: dotnet build -c Release
@@ -39,12 +51,37 @@ jobs:
         with:
           name: nuget-packages
           path: artifacts/*.*nupkg
+          if-no-files-found: error
+
+  publish:
+    needs: pack
+    # Bind to a GitHub Environment so an approver can gate the actual push to
+    # nuget.org. Configure the 'nuget-publish' environment in repo settings and
+    # add NUGET_API_KEY there (not as a plain repo secret) to enforce review.
+    environment: nuget-publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+    steps:
+      - name: Download package artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: nuget-packages
+          path: artifacts
+
+      - name: Verify an API key is configured
+        run: |
+          if [ -z "${NUGET_API_KEY}" ]; then
+            echo "::error::NUGET_API_KEY is not set on the 'nuget-publish' environment."
+            exit 1
+          fi
 
       # NOTE: packages are NOT cryptographically author-signed yet (no code-signing
       # certificate). NuGet.org applies repository signing on push. Author signing
       # is tracked in KNOWN-GAPS.md.
       - name: Push to NuGet
-        if: ${{ env.NUGET_API_KEY != '' }}
         run: >
           dotnet nuget push "artifacts/*.nupkg"
           --api-key "$NUGET_API_KEY"

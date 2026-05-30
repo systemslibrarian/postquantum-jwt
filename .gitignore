@@ -23,3 +23,11 @@ coverage*.xml
 # OS
 .DS_Store
 Thumbs.db
+
+# Secrets — never commit API keys or signing material
+nuget.key.txt
+*.apikey
+*.key
+*.pem
+*.pfx
+*.snk
