@@ -7,11 +7,12 @@ decision before relying on it.
 
 ## Supported versions
 
-| Version           | Supported          |
-|-------------------|--------------------|
-| `0.2.0-preview.*` | ✅ (latest preview) |
-| `0.1.0-preview.*` | ❌ (superseded)     |
-| anything older    | ❌                 |
+| Version             | Supported           |
+|---------------------|---------------------|
+| `0.2.0-preview.2`+  | ✅ (latest preview)  |
+| `0.2.0-preview.1`   | ❌ (superseded)      |
+| `0.1.0-preview.*`   | ❌ (superseded)      |
+| anything older      | ❌                  |
 
 During the `0.x` series only the most recent preview receives fixes.
 
@@ -96,7 +97,7 @@ not (the native ML-KEM API is randomized — see [`KNOWN-GAPS.md`](KNOWN-GAPS.md
 Known limitations are tracked transparently there. Until a 1.0 release and an
 external review, treat this library as suitable for experimentation only.
 
-The fail-closed contract is locked in by **51 tests** (`dotnet test`), including
+The fail-closed contract is locked in by **57 tests** (`dotnet test`), including
 explicit checks for `alg: none` substitution, missing `alg`, header JSON
 corruption, payload that is not a JSON object, wrong content-encryption
 (`A128GCM` instead of `A256GCM`), tampered ciphertext, decryption with a

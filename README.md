@@ -11,7 +11,7 @@ Optionally encrypts with X-Wing (X25519 + ML-KEM-768) and AES-256-GCM. Built
 on the native .NET BCL post-quantum primitives. Fail-closed by design,
 small-surface, and honest about what it is.
 
-> **Status — `0.2.0-preview.1`. Preview software. Not for production use.**
+> **Status — `0.2.0-preview.2`. Preview software. Not for production use.**
 > The API may change before 1.0. The cryptographic construction has **not** been
 > independently audited. Read [`KNOWN-GAPS.md`](KNOWN-GAPS.md) before depending
 > on this for anything that matters.
@@ -21,7 +21,7 @@ small-surface, and honest about what it is.
 ## Table of contents
 
 - [Why](#why)
-- [What's new in 0.2.0-preview.1](#whats-new-in-020-preview1)
+- [What's new in 0.2.0-preview.2](#whats-new-in-020-preview1)
 - [Install](#install)
 - [60-second tour](#60-second-tour)
 - [Usage](#usage)
@@ -57,35 +57,59 @@ If either half stands, your token stands. That is the whole point.
 
 ---
 
-## What's new in 0.2.0-preview.1
+## What's new in 0.2.0-preview.2
 
-A **quality and trust** release. No new public APIs — every change makes the
-existing surface safer or easier to reason about.
+A **quality and trust** release line. No new public APIs in 0.2.x — every
+change makes the existing surface safer or easier to reason about. The
+changes below are what's new in `preview.2`; the broader 0.1 → 0.2 delta
+follows it.
 
-- **Test coverage more than doubled** (27 → 56 tests). New fail-closed locks
-  for `nbf` in the future, clock-skew tolerance bounds, multi-audience tokens,
-  `alg` confusion (`"none"` substitution), missing `alg`, malformed JSON
-  header, array-shaped payload, wrong content-encryption (`A128GCM` instead of
-  `A256GCM`), missing/wrong `cty` on encrypted tokens, tampered ciphertext,
-  decryption with the wrong private key, replay protection across encrypted
-  tokens, custom-claim round-trips, claim removal via `WithClaim(name, null)`,
-  `XWingPrivateKey` dispose semantics, length-correct-but-malformed X-Wing
-  public keys, negative `ClockSkew` configuration, and concurrent registration
-  in `InMemoryReplayCache`.
+**New in preview.2** (second independent review pass)
+
+- **Fail-fast misconfiguration.** `PqJwtValidator`'s constructor now throws
+  `ArgumentException` if neither `SignatureVerificationKey` nor
+  `SignatureKeyResolver` is configured — a security validator without a way
+  to obtain a verification key is misconfigured by definition, and that
+  should surface before the first token arrives, not after.
+- **Eager X-Wing public-key validation.** `XWingPublicKey.Import` now parses
+  the embedded ML-KEM-768 encapsulation key at ingestion. A length-correct
+  but structurally invalid key fails with `PqJwtException` on import rather
+  than later inside `XWing.Encapsulate`. Consumers handling untrusted key
+  input see a single exception boundary.
+- **SBOM (CycloneDX).** Every release now emits a `bom.json` covering the
+  project's dependency graph, includes it in `SHA256SUMS.txt`, and issues a
+  separate GitHub build-provenance attestation for it. The SBOM travels
+  with the GitHub release artifacts rather than packed inside the `.nupkg`.
+
+**The 0.1 → 0.2 delta, cumulative through `preview.2`**
+
+- **Test coverage more than doubled** (27 → 57 tests, zero skips on PQ-capable
+  hosts). New fail-closed locks for `nbf` in the future, clock-skew tolerance
+  bounds, multi-audience tokens, `alg` confusion (`"none"` substitution),
+  missing `alg`, malformed JSON header, array-shaped payload, wrong
+  content-encryption (`A128GCM` instead of `A256GCM`), missing/wrong `cty` on
+  encrypted tokens, tampered ciphertext, decryption with the wrong private
+  key, replay protection across encrypted tokens, custom-claim round-trips,
+  claim removal via `WithClaim(name, null)`, `XWingPrivateKey` dispose
+  semantics, length-correct-but-malformed X-Wing public keys, negative
+  `ClockSkew` configuration, validator-without-key configuration, and
+  concurrent registration in `InMemoryReplayCache`.
 
 - **Validator hardening.** Encrypted tokens now require `cty: JWT` on the
   outer header. The validator constructor refuses negative `ClockSkew`
-  values. The decrypted plaintext buffer is zeroed alongside the shared
-  secret. Malformed X-Wing public keys surface as `PqJwtException` rather
-  than leaking `CryptographicException` from the BCL.
+  values *and* validators with no verification key. The decrypted plaintext
+  buffer is zeroed alongside the shared secret. Malformed X-Wing public
+  keys surface as `PqJwtException` rather than leaking `CryptographicException`
+  from the BCL.
 
 - **Release transparency.** `scripts/check-version-sync.sh` asserts the
   version is identical across `.csproj`, README, and CHANGELOG, and runs in
-  CI on every push. The release workflow writes a `SHA256SUMS.txt` next to
-  the packages and emits a GitHub build-provenance attestation — any consumer
-  can run `gh attestation verify <nupkg> --repo systemslibrarian/postquantum-jwt`
-  to confirm an artifact came from this repo's release workflow. Release
-  steps and trust signals are documented in [`docs/RELEASE.md`](docs/RELEASE.md).
+  CI on every push. The release workflow writes a `SHA256SUMS.txt` covering
+  the `.nupkg`, `.snupkg`, and `bom.json`, and emits GitHub build-provenance
+  attestations for both the `.nupkg` and the SBOM — any consumer can run
+  `gh attestation verify <file> --repo systemslibrarian/postquantum-jwt` to
+  confirm an artifact came from this repo's release workflow. Release steps
+  and trust signals are documented in [`docs/RELEASE.md`](docs/RELEASE.md).
 
 - **Windows CI is now the PQ-required lane.** It fails the run if any test
   reports skipped, so the ML-KEM / ML-DSA / X-Wing paths are *proven* to run
@@ -114,13 +138,13 @@ Full notes in [`CHANGELOG.md`](CHANGELOG.md).
 ## Install
 
 ```bash
-dotnet add package PostQuantum.Jwt --version 0.2.0-preview.1
+dotnet add package PostQuantum.Jwt --version 0.2.0-preview.2
 ```
 
 Or in a `.csproj`:
 
 ```xml
-<PackageReference Include="PostQuantum.Jwt" Version="0.2.0-preview.1" />
+<PackageReference Include="PostQuantum.Jwt" Version="0.2.0-preview.2" />
 ```
 
 **Runtime requirement:** the native ML-KEM / ML-DSA primitives need an OpenSSL
@@ -352,7 +376,7 @@ remote-discovery story. Your application is responsible for the key ring; this
 library is just disciplined about asking for the right key when validating.
 
 **"Preview, not for production" — what that means operationally.** The wire
-format and public API are not stable yet. If you ship 0.2.0-preview.1 in a
+format and public API are not stable yet. If you ship 0.2.0-preview.2 in a
 service and a future release bumps to 0.3.0 with a wire-format change, you
 will be re-signing every active token (and possibly running a flag-day
 migration). For an internal service you control end-to-end this is
@@ -428,7 +452,7 @@ at a newer one:
 LD_LIBRARY_PATH=/path/to/openssl-3.5/lib dotnet test
 ```
 
-The full suite is **56 tests, zero skips** on a Windows 11 / .NET 10 host with
+The full suite is **57 tests, zero skips** on a Windows 11 / .NET 10 host with
 native ML-KEM and ML-DSA support — and the Windows CI lane fails the run if
 any test skips.
 

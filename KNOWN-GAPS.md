@@ -5,7 +5,7 @@ unverified, and where the sharp edges are. Honesty over polish: if something is
 incomplete, it is listed here rather than glossed over. This file is part of the
 contract with anyone evaluating the library.
 
-Last reviewed for: `0.2.0-preview.1`.
+Last reviewed for: `0.2.0-preview.2`.
 
 ## Cryptography
 
@@ -75,9 +75,13 @@ Last reviewed for: `0.2.0-preview.1`.
   yet. As an interim transparency signal, every release emits a GitHub
   build-provenance attestation for the `.nupkg`; verify with
   `gh attestation verify <nupkg> --repo systemslibrarian/postquantum-jwt`.
-- **No SBOM is generated for the package.** Cataloguing the package
-  contents and dependency tree as an SBOM (SPDX or CycloneDX) is a planned
-  release hardening item; the present build does not produce one.
+- **SBOM is generated and attested, but not yet packed inside the `.nupkg`.**
+  Starting with `0.2.0-preview.2` the release workflow emits a CycloneDX
+  SBOM (`bom.json`) covering the project's dependency graph, includes it in
+  `SHA256SUMS.txt`, and issues a separate GitHub build-provenance attestation
+  for it. The SBOM travels with the GitHub release artifacts, not inside the
+  `.nupkg` itself — consumers who need it should pull it from the workflow
+  run rather than relying on package contents.
 
 ---
 

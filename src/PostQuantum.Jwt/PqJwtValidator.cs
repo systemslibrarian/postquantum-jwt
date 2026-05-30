@@ -24,6 +24,13 @@ public sealed class PqJwtValidator
     /// <param name="parameters">Validation configuration.</param>
     /// <param name="timeProvider">Clock used for lifetime checks; defaults to <see cref="TimeProvider.System"/>.</param>
     /// <exception cref="ArgumentNullException"><paramref name="parameters"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException">
+    /// Neither <see cref="PqJwtValidationParameters.SignatureVerificationKey"/> nor
+    /// <see cref="PqJwtValidationParameters.SignatureKeyResolver"/> is configured.
+    /// A security validator without a way to obtain a verification key is
+    /// misconfigured by definition — rejecting that at construction time means
+    /// misconfiguration surfaces before the first token arrives.
+    /// </exception>
     /// <exception cref="ArgumentOutOfRangeException">
     /// <see cref="PqJwtValidationParameters.ClockSkew"/> is negative — negative skew
     /// is rejected up front so time-validation behaviour is never harder to reason
@@ -32,6 +39,13 @@ public sealed class PqJwtValidator
     public PqJwtValidator(PqJwtValidationParameters parameters, TimeProvider? timeProvider = null)
     {
         ArgumentNullException.ThrowIfNull(parameters);
+        if (parameters.SignatureVerificationKey is null && parameters.SignatureKeyResolver is null)
+        {
+            throw new ArgumentException(
+                "PqJwtValidationParameters requires SignatureVerificationKey or SignatureKeyResolver.",
+                nameof(parameters));
+        }
+
         ArgumentOutOfRangeException.ThrowIfLessThan(parameters.ClockSkew, TimeSpan.Zero);
         _parameters = parameters;
         _timeProvider = timeProvider ?? TimeProvider.System;
@@ -166,6 +180,7 @@ public sealed class PqJwtValidator
 
     private MLDsa ResolveVerificationKey(string? keyId)
     {
+        // The constructor already guarantees at least one of these is set.
         if (_parameters.SignatureKeyResolver is { } resolver)
         {
             return resolver(keyId)
@@ -173,9 +188,7 @@ public sealed class PqJwtValidator
                     $"No verification key was resolved for kid '{keyId}'.");
         }
 
-        return _parameters.SignatureVerificationKey
-            ?? throw new PqJwtException(
-                "PqJwtValidationParameters requires SignatureVerificationKey or SignatureKeyResolver.");
+        return _parameters.SignatureVerificationKey!;
     }
 
     private void EnforceReplayPolicy(Dictionary<string, JsonElement> claims)
