@@ -4,12 +4,20 @@
     <TargetFramework>net10.0</TargetFramework>
     <RootNamespace>PostQuantum.Jwt</RootNamespace>
     <AssemblyName>PostQuantum.Jwt</AssemblyName>
+    <!-- Trim/AOT awareness: most of the surface is trim-safe; the
+         WithClaim(string,object?) overload uses reflection-based JSON
+         serialization and is explicitly annotated with [RequiresUnreferencedCode]
+         + [RequiresDynamicCode]. Consumers publishing AOT will see one warning
+         pointing at that overload, and can switch to the source-gen
+         WithClaim<T>(name, value, JsonTypeInfo<T>) overload to silence it. -->
+    <IsTrimmable>true</IsTrimmable>
+    <IsAotCompatible>true</IsAotCompatible>
   </PropertyGroup>
 
   <!-- NuGet package metadata -->
   <PropertyGroup>
     <PackageId>PostQuantum.Jwt</PackageId>
-    <Version>0.2.0-preview.3</Version>
+    <Version>0.3.0-preview.1</Version>
     <Title>PostQuantum.Jwt — post-quantum hybrid JWTs for .NET</Title>
     <Authors>Paul Clark</Authors>
     <Description>Post-quantum hybrid JWT library for .NET 10. Signs tokens with ML-DSA-65 (FIPS 204) and optionally encrypts them with X-Wing (X25519 + ML-KEM-768) hybrid key agreement plus AES-256-GCM. Built on the native .NET BCL post-quantum primitives, fail-closed by design, and honest about its security posture. Preview release — not for production use.</Description>
@@ -19,7 +27,7 @@
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageTags>jwt;jose;jwe;post-quantum;pqc;ml-dsa;ml-kem;dilithium;kyber;x-wing;x25519;sha3;hybrid;cryptography;security;fips-203;fips-204;net10</PackageTags>
-    <PackageReleaseNotes>0.2.0-preview.3: Documentation release. Adds a complete, copy-paste-ready ASP.NET Core 10 integration example to the README — DI registration of PqJwtValidator as a singleton, minimal bearer middleware that fails closed, a protected minimal-API endpoint, plus notes on lifetime, replay-cache scope, kid-based key rotation, and why this bypasses the standard JwtBearer handler (Microsoft.IdentityModel doesn't know ML-DSA-65). No code changes; 57/57 tests still pass, zero skips. Full notes: https://github.com/systemslibrarian/postquantum-jwt/blob/main/CHANGELOG.md — known limitations: https://github.com/systemslibrarian/postquantum-jwt/blob/main/KNOWN-GAPS.md.</PackageReleaseNotes>
+    <PackageReleaseNotes>0.3.0-preview.1: Real-world adoption release. New companion package PostQuantum.Jwt.AspNetCore brings AddPqJwtBearer(...) and an HTTP-fetched key ring so post-quantum JWT validation slots into the standard ASP.NET Core auth pipeline. AOT/trim-safe annotations on the reflection-using WithClaim(object?) overload plus an AOT-safe WithClaim&lt;T&gt;(JsonTypeInfo&lt;T&gt;) overload. CycloneDX SBOM now packed inside the .nupkg. Property-based tests on top of the deterministic suite (68 tests total). Containerised Linux PQ-required CI lane (OpenSSL 3.5+ via conda-forge) joins the Windows lane in proving the cryptographic paths run in CI. Release workflow has an optional author-signing hook (NUGET_SIGNING_CERT). Full notes: https://github.com/systemslibrarian/postquantum-jwt/blob/main/CHANGELOG.md — known limitations: https://github.com/systemslibrarian/postquantum-jwt/blob/main/KNOWN-GAPS.md.</PackageReleaseNotes>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
     <Copyright>Copyright © Paul Clark</Copyright>
     <NeutralLanguage>en-US</NeutralLanguage>
@@ -33,6 +41,11 @@
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
     <EnablePackageValidation>true</EnablePackageValidation>
+    <!-- API-surface baseline check. Opt-in via `-p:EnableBaselineValidation=true`
+         once 0.2.0-preview.3 is on nuget.org; until then the pack would fail
+         because the baseline package can't be resolved. Local builds and the
+         default CI runs deliberately leave this off. -->
+    <PackageValidationBaselineVersion Condition="'$(EnableBaselineValidation)' == 'true'">0.2.0-preview.3</PackageValidationBaselineVersion>
   </PropertyGroup>
 
   <ItemGroup>
@@ -48,5 +61,35 @@
     <None Include="../../LICENSE" Pack="true" PackagePath="\" />
     <None Include="../../CHANGELOG.md" Pack="true" PackagePath="\" />
   </ItemGroup>
+
+  <!-- Generate a CycloneDX SBOM (bom.json) inside the package on every Pack.
+       Requires the `dotnet-CycloneDX` global tool (one-time install via
+       `dotnet tool install` with the `global` flag and id `CycloneDX`).
+       If the tool isn't present (e.g. on a fresh dev machine that hasn't
+       installed it yet), pack continues without the SBOM rather than
+       failing; the release workflow installs the tool unconditionally,
+       so CI always produces the SBOM.
+
+       The bom.json is added to the package via an in-target ItemGroup
+       because $(IntermediateOutputPath)bom.json doesn't exist at the time
+       a static <None Include> would be evaluated. -->
+  <Target Name="GenerateCycloneDxSbom"
+          BeforeTargets="GenerateNuspec;_GetPackageFiles"
+          Condition="'$(IsPackable)' != 'false'">
+    <Exec Command="dotnet CycloneDX &quot;$(MSBuildProjectFullPath)&quot; --output &quot;$(IntermediateOutputPath.TrimEnd('\').TrimEnd('/'))&quot; --filename bom.json --json"
+          IgnoreExitCode="true"
+          ContinueOnError="WarnAndContinue">
+      <Output TaskParameter="ExitCode" PropertyName="_CycloneDxExitCode" />
+    </Exec>
+    <Message Importance="high"
+             Text="CycloneDX SBOM not generated (tool missing or failed, exit=$(_CycloneDxExitCode)). Install with: `dotnet tool install` (global, id=CycloneDX)."
+             Condition="'$(_CycloneDxExitCode)' != '0'" />
+    <ItemGroup Condition="Exists('$(IntermediateOutputPath)bom.json')">
+      <None Include="$(IntermediateOutputPath)bom.json" Pack="true" PackagePath="\" />
+    </ItemGroup>
+    <Message Importance="high"
+             Text="CycloneDX SBOM packed into .nupkg at /bom.json"
+             Condition="Exists('$(IntermediateOutputPath)bom.json')" />
+  </Target>
 
 </Project>
