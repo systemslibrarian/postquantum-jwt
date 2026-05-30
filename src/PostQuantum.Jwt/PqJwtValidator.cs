@@ -152,7 +152,7 @@ public sealed class PqJwtValidator
                 "PqJwtValidationParameters requires SignatureVerificationKey or SignatureKeyResolver.");
     }
 
-    private void EnforceReplayPolicy(IReadOnlyDictionary<string, JsonElement> claims)
+    private void EnforceReplayPolicy(Dictionary<string, JsonElement> claims)
     {
         if (_parameters.ReplayCache is not { } cache)
         {
@@ -223,14 +223,14 @@ public sealed class PqJwtValidator
         }
     }
 
-    private void ValidateClaims(IReadOnlyDictionary<string, JsonElement> claims)
+    private void ValidateClaims(Dictionary<string, JsonElement> claims)
     {
         ValidateLifetime(claims);
         ValidateIssuer(claims);
         ValidateAudience(claims);
     }
 
-    private void ValidateLifetime(IReadOnlyDictionary<string, JsonElement> claims)
+    private void ValidateLifetime(Dictionary<string, JsonElement> claims)
     {
         if (!_parameters.ValidateLifetime)
         {
@@ -258,7 +258,7 @@ public sealed class PqJwtValidator
         }
     }
 
-    private void ValidateIssuer(IReadOnlyDictionary<string, JsonElement> claims)
+    private void ValidateIssuer(Dictionary<string, JsonElement> claims)
     {
         if (_parameters.ValidIssuer is null)
         {
@@ -276,7 +276,7 @@ public sealed class PqJwtValidator
         }
     }
 
-    private void ValidateAudience(IReadOnlyDictionary<string, JsonElement> claims)
+    private void ValidateAudience(Dictionary<string, JsonElement> claims)
     {
         if (_parameters.ValidAudience is null)
         {
@@ -312,7 +312,7 @@ public sealed class PqJwtValidator
     }
 
     private static bool TryGetUnixTime(
-        IReadOnlyDictionary<string, JsonElement> claims, string name, out DateTimeOffset value)
+        Dictionary<string, JsonElement> claims, string name, out DateTimeOffset value)
     {
         if (claims.TryGetValue(name, out var element) &&
             element.ValueKind == JsonValueKind.Number &&

@@ -1,5 +1,11 @@
 # PostQuantum.Jwt
 
+[![NuGet](https://img.shields.io/nuget/vpre/PostQuantum.Jwt?label=nuget&color=blue)](https://www.nuget.org/packages/PostQuantum.Jwt)
+[![Downloads](https://img.shields.io/nuget/dt/PostQuantum.Jwt?color=blue)](https://www.nuget.org/packages/PostQuantum.Jwt)
+[![CI](https://github.com/systemslibrarian/postquantum-jwt/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/systemslibrarian/postquantum-jwt/actions/workflows/ci.yml)
+[![.NET](https://img.shields.io/badge/.NET-10.0-512BD4)](https://dotnet.microsoft.com/)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+
 A post-quantum **hybrid** JWT library for .NET 10.
 
 PostQuantum.Jwt issues and validates JSON Web Tokens whose security rests on a
@@ -17,6 +23,25 @@ provide. See [Security posture](#security-posture) for the honest details.
 > The API will change. The cryptographic construction has **not** been
 > independently audited. Read [`KNOWN-GAPS.md`](KNOWN-GAPS.md) before relying on
 > anything here.
+
+---
+
+## Table of contents
+
+- [Why hybrid?](#why-hybrid)
+- [Install](#install)
+- [Quick start](#quick-start)
+- [Usage](#usage)
+  - [Sign and validate a token (ML-DSA-65)](#sign-and-validate-a-token-ml-dsa-65)
+  - [Sign *and* encrypt a token (X-Wing + AES-256-GCM)](#sign-and-encrypt-a-token-x-wing--aes-256-gcm)
+  - [Key rotation (`kid`) and replay protection (`jti`)](#key-rotation-kid-and-replay-protection-jti)
+- [Token format](#token-format)
+- [Public API at a glance](#public-api-at-a-glance)
+- [Security posture](#security-posture)
+- [Compatibility](#compatibility)
+- [Building from source](#building-from-source)
+- [Contributing](#contributing)
+- [License](#license)
 
 ---
 
@@ -41,10 +66,48 @@ both risks at once:
 dotnet add package PostQuantum.Jwt --version 0.1.0-preview.1
 ```
 
+Or in a `.csproj`:
+
+```xml
+<PackageReference Include="PostQuantum.Jwt" Version="0.1.0-preview.1" />
+```
+
 **Runtime requirement:** the native ML-KEM / ML-DSA primitives require an
 OpenSSL build that exposes them — **OpenSSL 3.5 or later** on Linux, or a
 recent Windows. PostQuantum.Jwt fails closed with a clear error where they are
 unavailable rather than silently falling back to weaker crypto.
+
+---
+
+## Quick start
+
+The smallest end-to-end example: generate a signing key, mint a token, and
+validate it.
+
+```csharp
+using System.Security.Cryptography;
+using PostQuantum.Jwt;
+
+using var signingKey = MLDsa.GenerateKey(MLDsaAlgorithm.MLDsa65);
+using var verificationKey = MLDsa.ImportMLDsaPublicKey(
+    MLDsaAlgorithm.MLDsa65, signingKey.ExportMLDsaPublicKey());
+
+string token = new PqJwtBuilder()
+    .WithSubject("user-123")
+    .WithLifetime(TimeSpan.FromMinutes(30))
+    .SignWith(signingKey)
+    .Build();
+
+var result = new PqJwtValidator(new PqJwtValidationParameters
+{
+    SignatureVerificationKey = verificationKey,
+}).Validate(token);
+
+Console.WriteLine(result.Subject); // user-123
+```
+
+Anything wrong with the token — bad signature, tampering, expiry, claim
+mismatch — throws `PqJwtValidationException`. There is no "best-effort" result.
 
 ---
 
@@ -152,6 +215,25 @@ PostQuantum.Jwt uses JOSE-style compact serialization:
 These algorithm identifiers are **not** registered with IANA — see
 [Security posture](#security-posture).
 
+Full wire-format and combiner details are in [`docs/design.md`](docs/design.md).
+
+---
+
+## Public API at a glance
+
+| Type                            | Purpose                                                                  |
+|---------------------------------|--------------------------------------------------------------------------|
+| `PqJwtBuilder`                  | Fluent builder for signed (3-part) or signed-then-encrypted (5-part) tokens. |
+| `PqJwtValidator`                | Fail-closed validator. Thread-safe and reusable.                         |
+| `PqJwtValidationParameters`     | Validation configuration: keys, issuer/audience, lifetime, replay cache. |
+| `PqJwtValidationResult`         | The validated claims; only returned when every check passed.             |
+| `PqJwtAlgorithms`               | Canonical `alg`/`enc` identifiers (e.g. `ML-DSA-65`, `X-Wing`, `A256GCM`). |
+| `PqJwtException`                | Misconfiguration / usage error.                                          |
+| `PqJwtValidationException`      | Token failed validation (subclass of `PqJwtException`).                  |
+| `IPqJwtReplayCache`             | Optional `jti` replay-detection hook.                                    |
+| `InMemoryReplayCache`           | Default single-process replay cache (use a distributed store in clusters). |
+| `XWingPrivateKey` / `…PublicKey` | X-Wing hybrid KEM keys; `Generate()`, `Import()`, `Export()`.            |
+
 ---
 
 ## Security posture
@@ -191,6 +273,17 @@ Full detail lives in [`SECURITY.md`](SECURITY.md) and
 
 ---
 
+## Compatibility
+
+| Surface | Supported |
+|---|---|
+| Target framework | `net10.0` |
+| Languages | C# 13 (any CLS-consuming language; the assembly is `[CLSCompliant(false)]` because the public surface exposes raw `byte[]` key material). |
+| Operating system | Windows, Linux, macOS — anywhere .NET 10 + an OpenSSL build that exposes ML-KEM / ML-DSA runs. On Linux that's **OpenSSL 3.5 or later**. |
+| AOT / trimming | Not yet validated. The library uses `System.Text.Json` reflection paths; expect to need source-generated contexts before publishing AOT. |
+
+---
+
 ## Building from source
 
 ```bash
@@ -201,6 +294,30 @@ dotnet test
 Tests that exercise the native post-quantum primitives **skip themselves** (with
 a clear reason) on hosts that lack ML-KEM / ML-DSA support, and run fully where
 OpenSSL 3.5+ is present.
+
+If you're on a Linux box whose system OpenSSL predates 3.5, point the runtime
+at a newer one:
+
+```bash
+LD_LIBRARY_PATH=/path/to/openssl-3.5/lib dotnet test
+```
+
+---
+
+## Contributing
+
+Issues and pull requests are welcome. Before opening a PR:
+
+1. Run `dotnet build` and `dotnet test` — both must be green, with **zero
+   warnings** (the build treats compiler warnings as errors).
+2. Keep the discipline in [`CLAUDE.md`](CLAUDE.md): honesty over polish,
+   fail-closed always, no rolled-your-own crypto, native BCL first.
+3. Security-sensitive changes should land alongside a test that locks in the
+   fail-closed behavior.
+
+**Reporting a vulnerability:** please **do not** open a public issue. Use
+GitHub's *Report a vulnerability* button on the repository, or follow the
+process in [`SECURITY.md`](SECURITY.md).
 
 ---
 

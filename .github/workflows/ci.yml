@@ -11,7 +11,11 @@ permissions:
 
 jobs:
   build-test:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 
@@ -27,11 +31,37 @@ jobs:
         run: dotnet build -c Release --no-restore
 
       # The native ML-KEM / ML-DSA primitives require OpenSSL 3.5+. Stock GitHub
-      # runners may ship an older OpenSSL, in which case the post-quantum tests
-      # SKIP THEMSELVES (with a reason) rather than fail — see the test summary.
+      # runners may ship an older OpenSSL on Linux, in which case the post-quantum
+      # tests SKIP THEMSELVES (with a reason) rather than fail — see the test summary.
       # This step records what the runner actually supports for transparency.
       - name: Report OpenSSL version
+        if: runner.os == 'Linux'
         run: openssl version
 
       - name: Test (Release)
         run: dotnet test -c Release --no-build --logger "console;verbosity=normal"
+
+  pack-verify:
+    # Make sure the package itself builds cleanly on every PR — catches metadata
+    # regressions long before a release tag is pushed.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Pack (Release)
+        run: dotnet pack src/PostQuantum.Jwt/PostQuantum.Jwt.csproj -c Release -o artifacts
+
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nuget-packages-${{ github.sha }}
+          path: artifacts/*.*nupkg
+          if-no-files-found: error
+          retention-days: 14
