@@ -5,7 +5,7 @@ unverified, and where the sharp edges are. Honesty over polish: if something is
 incomplete, it is listed here rather than glossed over. This file is part of the
 contract with anyone evaluating the library.
 
-Last reviewed for: `0.2.0-preview.2`.
+Last reviewed for: `0.2.0-preview.3`.
 
 ## Cryptography
 

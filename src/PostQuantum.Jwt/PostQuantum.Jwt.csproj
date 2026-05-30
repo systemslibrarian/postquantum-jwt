@@ -9,7 +9,7 @@
   <!-- NuGet package metadata -->
   <PropertyGroup>
     <PackageId>PostQuantum.Jwt</PackageId>
-    <Version>0.2.0-preview.2</Version>
+    <Version>0.2.0-preview.3</Version>
     <Title>PostQuantum.Jwt — post-quantum hybrid JWTs for .NET</Title>
     <Authors>Paul Clark</Authors>
     <Description>Post-quantum hybrid JWT library for .NET 10. Signs tokens with ML-DSA-65 (FIPS 204) and optionally encrypts them with X-Wing (X25519 + ML-KEM-768) hybrid key agreement plus AES-256-GCM. Built on the native .NET BCL post-quantum primitives, fail-closed by design, and honest about its security posture. Preview release — not for production use.</Description>
@@ -19,7 +19,7 @@
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageTags>jwt;jose;jwe;post-quantum;pqc;ml-dsa;ml-kem;dilithium;kyber;x-wing;x25519;sha3;hybrid;cryptography;security;fips-203;fips-204;net10</PackageTags>
-    <PackageReleaseNotes>0.2.0-preview.2: Defense-in-depth follow-up to preview.1, locking in a second pass of independent review. Eager verification-key validation at validator construction (was deferred to first Validate call) and eager ML-KEM-768 parsing at XWingPublicKey.Import (was deferred to encapsulation) — both fail-fast on misconfiguration / malformed input rather than at processing time. SBOM (CycloneDX, bom.json) now generated and attested by the release workflow alongside the existing SHA-256 transparency hashes and build-provenance attestations for the .nupkg. Test suite now 57/57, zero skips on PQ-capable hosts. Full notes: https://github.com/systemslibrarian/postquantum-jwt/blob/main/CHANGELOG.md — known limitations: https://github.com/systemslibrarian/postquantum-jwt/blob/main/KNOWN-GAPS.md.</PackageReleaseNotes>
+    <PackageReleaseNotes>0.2.0-preview.3: Documentation release. Adds a complete, copy-paste-ready ASP.NET Core 10 integration example to the README — DI registration of PqJwtValidator as a singleton, minimal bearer middleware that fails closed, a protected minimal-API endpoint, plus notes on lifetime, replay-cache scope, kid-based key rotation, and why this bypasses the standard JwtBearer handler (Microsoft.IdentityModel doesn't know ML-DSA-65). No code changes; 57/57 tests still pass, zero skips. Full notes: https://github.com/systemslibrarian/postquantum-jwt/blob/main/CHANGELOG.md — known limitations: https://github.com/systemslibrarian/postquantum-jwt/blob/main/KNOWN-GAPS.md.</PackageReleaseNotes>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
     <Copyright>Copyright © Paul Clark</Copyright>
     <NeutralLanguage>en-US</NeutralLanguage>
