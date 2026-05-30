@@ -10,6 +10,129 @@ versions.
 
 _No changes yet._
 
+## [0.2.0-preview.1] — 2026-05-30
+
+A **quality and trust** release. No new public APIs — the focus is making the
+existing surface trustworthy and the docs accurate. Backwards-compatible at the
+source level with `0.1.0-preview.1` for any consumer that was already using it.
+
+### Changed
+
+- **Build is now zero warnings.** Tightened five private helper signatures in
+  `PqJwtValidator` from `IReadOnlyDictionary<…>` to the concrete
+  `Dictionary<…>` to clear CA1859; public surface is unchanged
+  (`PqJwtValidationResult.Claims` remains `IReadOnlyDictionary`).
+- **`EnablePackageValidation`** is now on in the library `.csproj`, so future
+  versions are checked for accidental API breaks before publish.
+- **`LICENSE` and `CHANGELOG.md`** are now packed alongside `README.md` inside
+  the `.nupkg` so consumers see them in the nuget.org package details.
+- **CI/release workflows** updated to action versions on Node.js 24
+  (`actions/checkout@v5`, `actions/setup-dotnet@v5`,
+  `actions/upload-artifact@v5`, `actions/download-artifact@v5`).
+
+### Security hardening
+
+- **Encrypted tokens now require `cty: JWT`** on the outer header. The builder
+  always emits it; the validator now refuses encrypted tokens that don't
+  declare it. Closes the "structurally unexpected nested content" gap an
+  external reviewer flagged.
+- **`PqJwtValidator` constructor rejects a negative `ClockSkew`** with
+  `ArgumentOutOfRangeException`, so time-validation behavior is never harder
+  to reason about than the documented contract.
+- **Decrypted plaintext buffer is zeroed** after UTF-8 decoding, alongside the
+  shared secret. The resulting `string` still lives in managed memory beyond
+  our control, but the intermediate byte buffer no longer does.
+- **Malformed X-Wing public keys surface as `PqJwtException`.** A
+  length-correct but structurally invalid ML-KEM-768 encapsulation key inside
+  a public key used to leak `CryptographicException` from the BCL during
+  encryption; it now becomes a clear `PqJwtException` with an explanatory
+  message, locked in by a test.
+
+### Documentation
+
+- **README rewritten**: 60-second tour up front, a "What's new in
+  0.2.0-preview.1" section, an explicit comparison vs.
+  `System.IdentityModel.Tokens.Jwt`, and a new "Operational tradeoffs" section
+  covering token size, when to encrypt, replay protection in clusters, and what
+  "preview" means in practice.
+- **SECURITY.md** updated to reflect the broader test coverage and call out
+  the specific fail-closed paths now locked by tests.
+- **KNOWN-GAPS.md** reviewed for accuracy under 0.2.
+- **`docs/RELEASE.md`** added — a short, honest release checklist describing
+  what CI enforces, what humans review, and which provenance signals each
+  release carries (and which are still missing).
+
+### CI / release hygiene
+
+- **`scripts/check-version-sync.sh`** asserts that the version is identical
+  across `.csproj`, both README install snippets, and the CHANGELOG heading.
+  Runs as a separate CI job, and as a step in the release workflow.
+- **Windows CI lane is now PQ-required.** It still tests the full suite, but
+  fails the run if any test reports skipped — proving the ML-KEM / ML-DSA /
+  X-Wing paths actually executed in CI rather than relying on local
+  verification alone. The Linux lane stays portability-only.
+- **SHA-256 transparency.** The release workflow writes a
+  `SHA256SUMS.txt` alongside the `.nupkg` and `.snupkg` and uploads it as a
+  workflow artifact.
+- **GitHub build-provenance attestations.** The release workflow now emits a
+  signed attestation for the `.nupkg` via
+  `actions/attest-build-provenance@v3`. Anyone can verify with
+  `gh attestation verify <nupkg> --repo systemslibrarian/postquantum-jwt`.
+
+### Added
+
+- **Test suite expanded from 27 → 56 tests** (more than doubled). New
+  fail-closed locks include:
+  - `nbf` in the future is rejected; `nbf` within the 60s clock skew is
+    accepted.
+  - `exp` within the 60s clock skew is accepted (the skew window actually
+    works, on both sides).
+  - Multi-audience tokens: array `aud` claim with a matching entry passes,
+    without a matching entry fails.
+  - `alg: none` substitution in the header is rejected before any signature
+    verification runs.
+  - Header missing the `alg` field is rejected.
+  - Header that is not valid JSON is rejected.
+  - Payload that is a JSON array (not an object) is rejected, even with a
+    valid signature over it.
+  - Encrypted tokens advertising the wrong content-encryption (`A128GCM`) are
+    rejected.
+  - Decrypting an encrypted token with a different recipient's private key is
+    rejected with an authentication-tag-mismatch error.
+  - Tampering with the AES-GCM ciphertext segment is rejected.
+  - Replay protection applies to encrypted tokens, not just signed-only ones.
+  - Custom JSON-valued claims (arrays, ints, bools) round-trip through
+    `WithClaim`.
+  - `WithClaim(name, null)` removes a previously set claim.
+  - `XWingPrivateKey` throws `ObjectDisposedException` after `Dispose()`; the
+    double-dispose case is safe; `Export()` round-trips byte-for-byte through
+    `Import()`.
+  - `XWingPrivateKey.ImportSeed` rejects seeds of any length other than 32 bytes.
+  - Empty token strings, four-segment tokens, signing with an ML-DSA-44 key,
+    non-positive lifetimes, and empty `kid` values are all refused at the
+    earliest possible point.
+  - Encrypted tokens whose outer header omits `cty` or carries a non-`JWT`
+    `cty` are rejected.
+  - Length-correct but structurally invalid X-Wing public keys surface as
+    `PqJwtException`, not as a leaking `CryptographicException`.
+  - `InMemoryReplayCache` registers each unique `jti` **exactly once** under
+    concurrent load — a parallel-stress test asserts the contract holds.
+
+### Fixed
+
+- **`SECURITY.md` combiner formula.** The prose had the X-Wing label first; the
+  code and the IETF draft put it **last**. The text now matches the
+  implementation (`SHA3-256(ss_M ‖ ss_X ‖ ct_X ‖ pk_X ‖ label)`).
+
+### Documentation
+
+- **README rewritten**: 60-second tour up front, a "What's new in
+  0.2.0-preview.1" section, a direct comparison vs.
+  `System.IdentityModel.Tokens.Jwt` with explicit "use it / use this" guidance.
+- **SECURITY.md** updated to reflect the broader test coverage and to call out
+  which fail-closed paths are now explicitly locked by tests.
+- **KNOWN-GAPS.md** reviewed for accuracy under 0.2.
+
 ## [0.1.0-preview.1] — 2026-05-30
 
 Initial public preview.
@@ -67,7 +190,8 @@ See [`KNOWN-GAPS.md`](KNOWN-GAPS.md). Highlights:
 - **Packages are not author-signed yet** (no code-signing certificate).
   nuget.org applies repository signing on push.
 
-[Unreleased]: https://github.com/systemslibrarian/postquantum-jwt/compare/v0.1.0-preview.1...HEAD
+[Unreleased]: https://github.com/systemslibrarian/postquantum-jwt/compare/v0.2.0-preview.1...HEAD
+[0.2.0-preview.1]: https://github.com/systemslibrarian/postquantum-jwt/releases/tag/v0.2.0-preview.1
 [0.1.0-preview.1]: https://github.com/systemslibrarian/postquantum-jwt/releases/tag/v0.1.0-preview.1
 
 ---

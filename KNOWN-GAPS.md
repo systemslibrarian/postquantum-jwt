@@ -5,7 +5,7 @@ unverified, and where the sharp edges are. Honesty over polish: if something is
 incomplete, it is listed here rather than glossed over. This file is part of the
 contract with anyone evaluating the library.
 
-Last reviewed for: `0.1.0-preview.1`.
+Last reviewed for: `0.2.0-preview.1`.
 
 ## Cryptography
 
@@ -62,14 +62,22 @@ Last reviewed for: `0.1.0-preview.1`.
 - **Native PQC requires OpenSSL 3.5+ (Linux) or a recent Windows.** Where
   ML-KEM / ML-DSA are unavailable, operations fail closed and the corresponding
   tests skip themselves with a stated reason.
-- **CI does not yet guarantee a post-quantum-capable runner.** The GitHub Actions
-  CI builds and tests on `ubuntu-latest`; if that runner's OpenSSL predates 3.5,
-  the post-quantum tests (including the X-Wing KATs) **skip** rather than run.
-  Until the pipeline pins an OpenSSL 3.5+ environment, treat green CI as covering
-  the non-PQC paths plus whatever the runner supports.
-- **Packages are not author-signed.** The release workflow packs and (optionally)
-  pushes to NuGet, which applies repository signing. There is no code-signing
-  certificate, so packages are not cryptographically *author*-signed yet.
+- **PQ coverage in CI is proven by the Windows lane only.** As of `0.2.0-preview.1`
+  the Windows CI lane runs the full suite **with zero skipped tests** and the
+  workflow fails the run if anything skips — so the post-quantum paths are
+  proven to execute on every push. The Linux lane is portability-only: if
+  `ubuntu-latest` ever lands without OpenSSL 3.5+, PQ tests will skip there
+  silently. A future improvement is a containerised Linux lane that pins
+  OpenSSL 3.5+ so PQ coverage is asserted on both operating systems.
+- **Packages are not author-signed.** The release workflow packs and (with
+  manual approval on the `nuget-publish` GitHub Environment) pushes to NuGet,
+  which applies repository signing. There is no author code-signing certificate
+  yet. As an interim transparency signal, every release emits a GitHub
+  build-provenance attestation for the `.nupkg`; verify with
+  `gh attestation verify <nupkg> --repo systemslibrarian/postquantum-jwt`.
+- **No SBOM is generated for the package.** Cataloguing the package
+  contents and dependency tree as an SBOM (SPDX or CycloneDX) is a planned
+  release hardening item; the present build does not produce one.
 
 ---
 

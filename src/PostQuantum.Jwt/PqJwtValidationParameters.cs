@@ -43,18 +43,25 @@ public sealed class PqJwtValidationParameters
     /// <summary>If set, the token's <c>aud</c> claim must contain this value.</summary>
     public string? ValidAudience { get; init; }
 
-    /// <summary>Whether to enforce <c>exp</c> / <c>nbf</c>. Defaults to <see langword="true"/>.</summary>
+    /// <summary>
+    /// Whether to enforce <c>exp</c> / <c>nbf</c>. Defaults to <see langword="true"/>.
+    /// When set to <see langword="false"/>, lifetime checks (including
+    /// <see cref="RequireExpiration"/>) are skipped entirely.
+    /// </summary>
     public bool ValidateLifetime { get; init; } = true;
 
     /// <summary>
     /// Whether a token must carry an <c>exp</c> claim. Defaults to <see langword="true"/>;
-    /// a token without an expiry is rejected.
+    /// a token without an expiry is rejected. Has no effect when
+    /// <see cref="ValidateLifetime"/> is <see langword="false"/>.
     /// </summary>
     public bool RequireExpiration { get; init; } = true;
 
     /// <summary>
     /// Tolerance applied to <c>exp</c> / <c>nbf</c> comparisons to absorb clock
-    /// differences between issuer and validator. Defaults to 60 seconds.
+    /// differences between issuer and validator. Defaults to 60 seconds. The value
+    /// must be non-negative; the <see cref="PqJwtValidator"/> constructor rejects
+    /// a negative skew.
     /// </summary>
     public TimeSpan ClockSkew { get; init; } = TimeSpan.FromSeconds(60);
 }

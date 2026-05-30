@@ -1,6 +1,6 @@
 name: Release
 
-# Publishes the NuGet package when a version tag (e.g. v0.1.0-preview.1) is pushed.
+# Publishes the NuGet package when a version tag (e.g. v0.2.0-preview.1) is pushed.
 # Requires the NUGET_API_KEY secret on the 'nuget-publish' environment to push to nuget.org.
 
 on:
@@ -9,6 +9,8 @@ on:
 
 permissions:
   contents: write
+  id-token: write       # for GitHub OIDC-backed build provenance attestations
+  attestations: write   # for the attest-build-provenance action
 
 jobs:
   pack:
@@ -16,14 +18,17 @@ jobs:
     outputs:
       package_version: ${{ steps.version.outputs.package_version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0 # full history for deterministic SourceLink
 
       - name: Set up .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           global-json-file: global.json
+
+      - name: Check version is in sync across csproj/README/CHANGELOG
+        run: bash scripts/check-version-sync.sh
 
       - name: Resolve and verify package version against tag
         id: version
@@ -46,11 +51,26 @@ jobs:
       - name: Pack
         run: dotnet pack src/PostQuantum.Jwt/PostQuantum.Jwt.csproj -c Release --no-build -o artifacts
 
+      - name: Compute SHA-256 of artifacts for transparency
+        run: |
+          set -euo pipefail
+          (cd artifacts && sha256sum *.nupkg *.snupkg | tee SHA256SUMS.txt)
+          echo "---- SHA256SUMS.txt ----"
+          cat artifacts/SHA256SUMS.txt
+          echo "------------------------"
+
+      - name: Generate build-provenance attestation for the .nupkg
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: "artifacts/*.nupkg"
+
       - name: Upload artifacts to the workflow run
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: nuget-packages
-          path: artifacts/*.*nupkg
+          path: |
+            artifacts/*.*nupkg
+            artifacts/SHA256SUMS.txt
           if-no-files-found: error
 
   publish:
@@ -66,7 +86,7 @@ jobs:
       NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
     steps:
       - name: Download package artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: nuget-packages
           path: artifacts
@@ -80,7 +100,9 @@ jobs:
 
       # NOTE: packages are NOT cryptographically author-signed yet (no code-signing
       # certificate). NuGet.org applies repository signing on push. Author signing
-      # is tracked in KNOWN-GAPS.md.
+      # is tracked in KNOWN-GAPS.md. Build-provenance attestations (above) provide
+      # an interim transparency signal — anyone can verify with `gh attestation
+      # verify <nupkg> --repo systemslibrarian/postquantum-jwt`.
       - name: Push to NuGet
         run: >
           dotnet nuget push "artifacts/*.nupkg"
