@@ -9,7 +9,7 @@
   <!-- NuGet package metadata -->
   <PropertyGroup>
     <PackageId>PostQuantum.Jwt</PackageId>
-    <Version>0.1.0-preview.1</Version>
+    <Version>0.2.0-preview.1</Version>
     <Title>PostQuantum.Jwt — post-quantum hybrid JWTs for .NET</Title>
     <Authors>Paul Clark</Authors>
     <Description>Post-quantum hybrid JWT library for .NET 10. Signs tokens with ML-DSA-65 (FIPS 204) and optionally encrypts them with X-Wing (X25519 + ML-KEM-768) hybrid key agreement plus AES-256-GCM. Built on the native .NET BCL post-quantum primitives, fail-closed by design, and honest about its security posture. Preview release — not for production use.</Description>
@@ -19,7 +19,7 @@
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageTags>jwt;jose;jwe;post-quantum;pqc;ml-dsa;ml-kem;dilithium;kyber;x-wing;x25519;sha3;hybrid;cryptography;security;fips-203;fips-204;net10</PackageTags>
-    <PackageReleaseNotes>0.1.0-preview.1: Initial preview. ML-DSA-65 signed tokens and optional X-Wing (X25519 + ML-KEM-768) + AES-256-GCM encryption. Built on native .NET 10 post-quantum primitives. Fail-closed validation, kid-based key resolution, jti replay cache. Preview API; not for production use. Full notes: https://github.com/systemslibrarian/postquantum-jwt/blob/main/CHANGELOG.md — known limitations: https://github.com/systemslibrarian/postquantum-jwt/blob/main/KNOWN-GAPS.md.</PackageReleaseNotes>
+    <PackageReleaseNotes>0.2.0-preview.1: Quality, documentation, and test-coverage release. No new public APIs — the focus is making the existing surface trustworthy. Expanded edge-case test suite (malformed headers, alg confusion, wrong content-type, multi-audience, nbf, replay across decryption, dispose semantics). README rewritten with a What's New section and a direct comparison vs System.IdentityModel.Tokens.Jwt. SECURITY.md and KNOWN-GAPS.md refreshed. CI/release workflows updated to action versions on Node 24. Full notes: https://github.com/systemslibrarian/postquantum-jwt/blob/main/CHANGELOG.md — known limitations: https://github.com/systemslibrarian/postquantum-jwt/blob/main/KNOWN-GAPS.md.</PackageReleaseNotes>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
     <Copyright>Copyright © Paul Clark</Copyright>
     <NeutralLanguage>en-US</NeutralLanguage>

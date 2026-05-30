@@ -1,16 +1,17 @@
 # Security Policy
 
-PostQuantum.Jwt is **preview software** (`0.1.0-preview.x`). It is not yet
+PostQuantum.Jwt is **preview software** (`0.x.y-preview.z`). It is not yet
 suitable for production use and has not been independently audited. This
 document states the security model honestly so you can make an informed
 decision before relying on it.
 
 ## Supported versions
 
-| Version            | Supported          |
-|--------------------|--------------------|
-| `0.1.0-preview.*`  | ✅ (latest preview) |
-| anything older     | ❌                 |
+| Version           | Supported          |
+|-------------------|--------------------|
+| `0.2.0-preview.*` | ✅ (latest preview) |
+| `0.1.0-preview.*` | ❌ (superseded)     |
+| anything older    | ❌                 |
 
 During the `0.x` series only the most recent preview receives fixes.
 
@@ -94,6 +95,13 @@ validated against the official known-answer vectors; the encapsulation path is
 not (the native ML-KEM API is randomized — see [`KNOWN-GAPS.md`](KNOWN-GAPS.md)).
 Known limitations are tracked transparently there. Until a 1.0 release and an
 external review, treat this library as suitable for experimentation only.
+
+The fail-closed contract is locked in by **51 tests** (`dotnet test`), including
+explicit checks for `alg: none` substitution, missing `alg`, header JSON
+corruption, payload that is not a JSON object, wrong content-encryption
+(`A128GCM` instead of `A256GCM`), tampered ciphertext, decryption with a
+different recipient key, replay across encrypted tokens, and `nbf`/`exp` skew
+boundaries. If a future change weakens any of these, the suite goes red.
 
 ---
 

@@ -10,6 +10,16 @@ permissions:
   contents: read
 
 jobs:
+  version-sync:
+    # Fail fast if the package version drifts across csproj, README, and CHANGELOG.
+    # A crypto package leaking inconsistent version strings is a trust signal we
+    # never want to send.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Check version is in sync across csproj/README/CHANGELOG
+        run: bash scripts/check-version-sync.sh
+
   build-test:
     strategy:
       fail-fast: false
@@ -17,10 +27,10 @@ jobs:
         os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           global-json-file: global.json
 
@@ -32,26 +42,52 @@ jobs:
 
       # The native ML-KEM / ML-DSA primitives require OpenSSL 3.5+. Stock GitHub
       # runners may ship an older OpenSSL on Linux, in which case the post-quantum
-      # tests SKIP THEMSELVES (with a reason) rather than fail — see the test summary.
-      # This step records what the runner actually supports for transparency.
+      # tests SKIP THEMSELVES (with a reason) rather than fail. The Linux lane is
+      # therefore "portability + non-PQ paths"; cryptographic assurance lives in
+      # the Windows lane below, which asserts zero skips.
       - name: Report OpenSSL version
         if: runner.os == 'Linux'
         run: openssl version
 
       - name: Test (Release)
-        run: dotnet test -c Release --no-build --logger "console;verbosity=normal"
+        shell: bash
+        run: |
+          set -o pipefail
+          dotnet test -c Release --no-build --logger "console;verbosity=normal" | tee test-output.log
+
+      # On Windows the runner has the native ML-KEM / ML-DSA primitives, so every
+      # PqcFact test MUST run. If anything skipped, we are no longer proving the
+      # cryptographic paths in CI — fail the job.
+      - name: Require zero skipped tests on Windows (PQ paths must run)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          summary=$(grep -E 'Passed!|Failed!' test-output.log | tail -1)
+          echo "Test summary line: $summary"
+          skipped=$(echo "$summary" | grep -oE 'Skipped:[[:space:]]*[0-9]+' | grep -oE '[0-9]+' | tail -1)
+          if [[ -z "$skipped" ]]; then
+            echo "::error::Could not extract Skipped count from test output."
+            exit 1
+          fi
+          if [[ "$skipped" -ne 0 ]]; then
+            echo "::error::Windows CI lane is the PQ-required lane; $skipped test(s) skipped."
+            echo "This usually means the ML-KEM/ML-DSA primitives weren't available to the runner."
+            exit 1
+          fi
+          echo "PQ-required check passed: 0 skipped tests on Windows."
 
   pack-verify:
     # Make sure the package itself builds cleanly on every PR — catches metadata
     # regressions long before a release tag is pushed.
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
       - name: Set up .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           global-json-file: global.json
 
@@ -59,7 +95,7 @@ jobs:
         run: dotnet pack src/PostQuantum.Jwt/PostQuantum.Jwt.csproj -c Release -o artifacts
 
       - name: Upload package artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: nuget-packages-${{ github.sha }}
           path: artifacts/*.*nupkg

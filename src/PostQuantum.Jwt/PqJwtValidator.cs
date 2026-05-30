@@ -23,9 +23,16 @@ public sealed class PqJwtValidator
     /// <summary>Creates a validator.</summary>
     /// <param name="parameters">Validation configuration.</param>
     /// <param name="timeProvider">Clock used for lifetime checks; defaults to <see cref="TimeProvider.System"/>.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="parameters"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// <see cref="PqJwtValidationParameters.ClockSkew"/> is negative — negative skew
+    /// is rejected up front so time-validation behaviour is never harder to reason
+    /// about than the documented contract.
+    /// </exception>
     public PqJwtValidator(PqJwtValidationParameters parameters, TimeProvider? timeProvider = null)
     {
         ArgumentNullException.ThrowIfNull(parameters);
+        ArgumentOutOfRangeException.ThrowIfLessThan(parameters.ClockSkew, TimeSpan.Zero);
         _parameters = parameters;
         _timeProvider = timeProvider ?? TimeProvider.System;
     }
@@ -70,6 +77,16 @@ public sealed class PqJwtValidator
                 $"Unsupported content-encryption algorithm '{header.Encryption}'; expected '{PqJwtAlgorithms.Aes256Gcm}'.");
         }
 
+        // The builder always emits cty=JWT for encrypted (nested) tokens; require it on
+        // the validator side too so a producer can't ship an encrypted blob that
+        // *happens* to decrypt to something signed-JWT-shaped but was labelled as some
+        // other content type.
+        if (!string.Equals(header.ContentType, PqJwtAlgorithms.TokenType, StringComparison.Ordinal))
+        {
+            throw new PqJwtValidationException(
+                $"Encrypted token must declare 'cty' = '{PqJwtAlgorithms.TokenType}'; got '{header.ContentType ?? "<missing>"}'.");
+        }
+
         var innerJws = Decrypt(parts, header, _parameters.DecryptionKey);
 
         // The decrypted content is itself a signed JWT; validate it fully.
@@ -94,19 +111,24 @@ public sealed class PqJwtValidator
             throw new PqJwtValidationException("Token key-agreement material is malformed.", ex);
         }
 
+        byte[]? plaintext = null;
         try
         {
             var nonce = Base64Url.Decode(parts[2]);
             var ciphertext = Base64Url.Decode(parts[3]);
             var tag = Base64Url.Decode(parts[4]);
             var aad = Encoding.ASCII.GetBytes(parts[0]);
-            var plaintext = new byte[ciphertext.Length];
+            plaintext = new byte[ciphertext.Length];
 
             using (var gcm = new AesGcm(sharedSecret, tag.Length))
             {
                 gcm.Decrypt(nonce, ciphertext, tag, plaintext, aad);
             }
 
+            // The decoded string still lives in managed memory beyond our control,
+            // but zeroing the intermediate byte buffer shortens one plaintext
+            // copy's lifetime to a few microseconds — consistent with the rest of
+            // the project's key-material hygiene discipline.
             return Encoding.UTF8.GetString(plaintext);
         }
         catch (Exception ex) when (ex is CryptographicException or FormatException or ArgumentException)
@@ -117,6 +139,10 @@ public sealed class PqJwtValidator
         finally
         {
             CryptographicOperations.ZeroMemory(sharedSecret);
+            if (plaintext is not null)
+            {
+                CryptographicOperations.ZeroMemory(plaintext);
+            }
         }
     }
 
