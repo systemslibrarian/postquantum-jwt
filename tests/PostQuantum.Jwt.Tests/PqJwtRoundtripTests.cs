@@ -175,10 +175,15 @@ public sealed class PqJwtRoundtripTests
         Assert.Contains("signing key", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
-    [Fact]
+    [PqcFact]
     public void Malformed_token_is_rejected()
     {
-        var parameters = new PqJwtValidationParameters { ValidateLifetime = false };
+        using var signingKey = TestKeys.NewSigningKey();
+        var parameters = new PqJwtValidationParameters
+        {
+            SignatureVerificationKey = TestKeys.PublicKeyOf(signingKey),
+            ValidateLifetime = false,
+        };
         Assert.Throws<PqJwtValidationException>(
             () => new PqJwtValidator(parameters).Validate("only.two"));
     }

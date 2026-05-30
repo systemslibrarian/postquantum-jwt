@@ -131,13 +131,18 @@ public sealed class PqJwtEdgeCaseTests
         Assert.Contains("'alg'", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
-    [Fact]
+    [PqcFact]
     public void Header_with_invalid_json_is_rejected_as_validation_failure()
     {
         var goodSegment = ToBase64Url("{}"u8);
         var token = $"{ToBase64Url("not json"u8)}.{goodSegment}.{goodSegment}";
 
-        var parameters = new PqJwtValidationParameters { ValidateLifetime = false };
+        using var signingKey = TestKeys.NewSigningKey();
+        var parameters = new PqJwtValidationParameters
+        {
+            SignatureVerificationKey = TestKeys.PublicKeyOf(signingKey),
+            ValidateLifetime = false,
+        };
         Assert.Throws<PqJwtValidationException>(() => new PqJwtValidator(parameters).Validate(token));
     }
 
@@ -394,32 +399,35 @@ public sealed class PqJwtEdgeCaseTests
         Assert.Contains("cty", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
-    [Fact]
+    [PqcFact]
     public void Negative_clock_skew_is_rejected_at_construction_time()
     {
+        using var signingKey = TestKeys.NewSigningKey();
         var parameters = new PqJwtValidationParameters
         {
+            SignatureVerificationKey = TestKeys.PublicKeyOf(signingKey),
             ClockSkew = TimeSpan.FromSeconds(-1),
         };
         Assert.Throws<ArgumentOutOfRangeException>(() => new PqJwtValidator(parameters));
     }
 
-    [PqcFact]
-    public void Encrypted_token_with_length_correct_but_garbage_public_key_fails_with_PqJwtException()
+    [Fact]
+    public void Validator_without_a_verification_key_or_resolver_throws_at_construction()
     {
-        using var signingKey = TestKeys.NewSigningKey();
+        var parameters = new PqJwtValidationParameters();
+        var ex = Assert.Throws<ArgumentException>(() => new PqJwtValidator(parameters));
+        Assert.Contains("SignatureVerificationKey", ex.Message, StringComparison.Ordinal);
+    }
 
-        // 1216 random bytes: passes XWingPublicKey.Import's length check, fails
-        // the ML-KEM-768 encapsulation-key parse inside XWing.Encapsulate.
+    [PqcFact]
+    public void Length_correct_but_structurally_invalid_X_Wing_public_key_fails_at_Import()
+    {
+        // 1216 random bytes — passes the length check, must fail the ML-KEM-768
+        // parse that XWingPublicKey.Import now runs eagerly.
         var garbage = new byte[XWingPublicKey.EncodedLength];
         new Random(42).NextBytes(garbage);
-        var badPublic = XWingPublicKey.Import(garbage);
 
-        var ex = Assert.Throws<PqJwtException>(() => new PqJwtBuilder()
-            .WithLifetime(TimeSpan.FromMinutes(5))
-            .SignWith(signingKey)
-            .EncryptFor(badPublic)
-            .Build());
+        var ex = Assert.Throws<PqJwtException>(() => XWingPublicKey.Import(garbage));
         Assert.Contains("ML-KEM-768", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -452,17 +460,27 @@ public sealed class PqJwtEdgeCaseTests
         }
     }
 
-    [Fact]
+    [PqcFact]
     public void Empty_token_string_is_rejected()
     {
-        var validator = new PqJwtValidator(new PqJwtValidationParameters { ValidateLifetime = false });
+        using var signingKey = TestKeys.NewSigningKey();
+        var validator = new PqJwtValidator(new PqJwtValidationParameters
+        {
+            SignatureVerificationKey = TestKeys.PublicKeyOf(signingKey),
+            ValidateLifetime = false,
+        });
         Assert.Throws<ArgumentException>(() => validator.Validate(""));
     }
 
-    [Fact]
+    [PqcFact]
     public void Token_with_four_segments_is_rejected()
     {
-        var validator = new PqJwtValidator(new PqJwtValidationParameters { ValidateLifetime = false });
+        using var signingKey = TestKeys.NewSigningKey();
+        var validator = new PqJwtValidator(new PqJwtValidationParameters
+        {
+            SignatureVerificationKey = TestKeys.PublicKeyOf(signingKey),
+            ValidateLifetime = false,
+        });
         Assert.Throws<PqJwtValidationException>(() => validator.Validate("a.b.c.d"));
     }
 

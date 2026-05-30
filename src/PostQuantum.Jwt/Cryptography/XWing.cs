@@ -39,10 +39,11 @@ internal static class XWing
     {
         ArgumentNullException.ThrowIfNull(recipient);
 
-        // ML-KEM-768 half (native BCL). Wrap parse failures in PqJwtException so
-        // callers see one exception family — XWingPublicKey.Import accepts on length
-        // alone, so a structurally wrong key is detected here.
-        using var mlKem = ImportMlKemEncapsulationKey(recipient.MlKemEncapsulationKey);
+        // ML-KEM-768 half (native BCL). XWingPublicKey.Import has already parsed
+        // and rejected structurally invalid keys, so this re-import is the
+        // straight-line happy path.
+        using var mlKem = MLKem.ImportEncapsulationKey(
+            MLKemAlgorithm.MLKem768, recipient.MlKemEncapsulationKey);
         mlKem.Encapsulate(out var mlKemCiphertext, out var mlKemSecret);
 
         // X25519 half (ephemeral key, BouncyCastle).
@@ -94,19 +95,6 @@ internal static class XWing
         CryptographicOperations.ZeroMemory(mlKemSecret);
         CryptographicOperations.ZeroMemory(x25519Secret);
         return sharedSecret;
-    }
-
-    private static MLKem ImportMlKemEncapsulationKey(byte[] encoded)
-    {
-        try
-        {
-            return MLKem.ImportEncapsulationKey(MLKemAlgorithm.MLKem768, encoded);
-        }
-        catch (CryptographicException ex)
-        {
-            throw new PqJwtException(
-                "Invalid X-Wing public key: ML-KEM-768 encapsulation key is malformed.", ex);
-        }
     }
 
     private static byte[] X25519Agree(X25519PrivateKeyParameters privateKey, X25519PublicKeyParameters publicKey)

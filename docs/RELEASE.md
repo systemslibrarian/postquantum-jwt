@@ -50,8 +50,12 @@ the un-boxed items are a human review.
    - run `scripts/check-version-sync.sh`
    - verify the tag (`v<version>`) matches `<Version>` in the `.csproj`
    - build + test
-   - `dotnet pack` and write `artifacts/SHA256SUMS.txt`
-   - emit a GitHub build-provenance attestation for the `.nupkg`
+   - `dotnet pack` and generate a CycloneDX SBOM (`bom.json`) for the
+     project's dependency graph
+   - write `artifacts/SHA256SUMS.txt` covering the `.nupkg`, `.snupkg`,
+     and `bom.json`
+   - emit GitHub build-provenance attestations for **both** the `.nupkg`
+     and the SBOM
    - wait on the `nuget-publish` GitHub Environment for manual approval
 4. **Approve** the deployment in the GitHub Actions UI when ready. The
    workflow's `publish` job pushes to nuget.org with the API key stored on
@@ -78,7 +82,6 @@ Be honest about what is missing:
 
 - **Author code signing.** No author-issued code-signing certificate yet.
   nuget.org applies its own repository signing on push.
-- **SBOM.** Not generated. Tracked in `KNOWN-GAPS.md`.
 - **Reproducible bit-for-bit rebuild from source.** The build is deterministic
   (`Deterministic=true`, `EmbedUntrackedSources=true`, `ContinuousIntegrationBuild=true`)
   but no third party has independently rebuilt and compared hashes.

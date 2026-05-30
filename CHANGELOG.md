@@ -10,6 +10,45 @@ versions.
 
 _No changes yet._
 
+## [0.2.0-preview.2] — 2026-05-30
+
+A defense-in-depth follow-up to `preview.1`, locking in items flagged by a
+second independent review pass (the Gemini memo) on top of the first
+(chatgpt memo). Still no new public capabilities.
+
+### Changed (breaking — but only for misconfigured callers)
+
+- **`PqJwtValidator(parameters, …)` now throws `ArgumentException` at
+  construction time** if neither `SignatureVerificationKey` nor
+  `SignatureKeyResolver` is configured. Previously this surfaced as
+  `PqJwtException` on the first `Validate(…)` call. Callers that were
+  already configuring a key are unaffected; callers that were constructing
+  a "schema-only" validator without a key need to supply one (any valid
+  ML-DSA-65 key works for structural-failure tests).
+- **`XWingPublicKey.Import(…)` now parses the embedded ML-KEM-768
+  encapsulation key at ingestion** and throws `PqJwtException` for a
+  length-correct but structurally invalid key. Previously the parse was
+  deferred to `XWing.Encapsulate(…)` and surfaced when the key was
+  *used*. The thrown exception type is the same, just earlier.
+
+### Added
+
+- **CycloneDX SBOM in the release pipeline.** The release workflow now
+  generates `bom.json` for the project's dependency graph (currently
+  `BouncyCastle.Cryptography` plus the build-time `Microsoft.SourceLink.*`
+  family), includes it in `SHA256SUMS.txt`, and issues a separate GitHub
+  build-provenance attestation for it.
+- **Test for the new fail-fast misconfiguration path** (`Validator_without_a_verification_key_or_resolver_throws_at_construction`).
+  Total test count: **57**, zero skips on PQ-capable hosts.
+
+### Internal
+
+- Removed the now-redundant `ImportMlKemEncapsulationKey` wrapper in
+  `XWing` — `XWingPublicKey.Import` is the single point of structural
+  validation.
+- Simplified `ResolveVerificationKey` to drop the runtime check that the
+  constructor now enforces.
+
 ## [0.2.0-preview.1] — 2026-05-30
 
 A **quality and trust** release. No new public APIs — the focus is making the
@@ -190,7 +229,8 @@ See [`KNOWN-GAPS.md`](KNOWN-GAPS.md). Highlights:
 - **Packages are not author-signed yet** (no code-signing certificate).
   nuget.org applies repository signing on push.
 
-[Unreleased]: https://github.com/systemslibrarian/postquantum-jwt/compare/v0.2.0-preview.1...HEAD
+[Unreleased]: https://github.com/systemslibrarian/postquantum-jwt/compare/v0.2.0-preview.2...HEAD
+[0.2.0-preview.2]: https://github.com/systemslibrarian/postquantum-jwt/releases/tag/v0.2.0-preview.2
 [0.2.0-preview.1]: https://github.com/systemslibrarian/postquantum-jwt/releases/tag/v0.2.0-preview.1
 [0.1.0-preview.1]: https://github.com/systemslibrarian/postquantum-jwt/releases/tag/v0.1.0-preview.1
 

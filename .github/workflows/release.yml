@@ -51,10 +51,25 @@ jobs:
       - name: Pack
         run: dotnet pack src/PostQuantum.Jwt/PostQuantum.Jwt.csproj -c Release --no-build -o artifacts
 
+      - name: Install CycloneDX SBOM tool
+        run: dotnet tool install --global CycloneDX
+
+      - name: Generate CycloneDX SBOM (bom.json)
+        run: |
+          set -euo pipefail
+          dotnet CycloneDX src/PostQuantum.Jwt/PostQuantum.Jwt.csproj \
+              --output artifacts \
+              --filename bom.json \
+              --json
+          echo "---- SBOM head ----"
+          head -c 1024 artifacts/bom.json
+          echo
+          echo "-------------------"
+
       - name: Compute SHA-256 of artifacts for transparency
         run: |
           set -euo pipefail
-          (cd artifacts && sha256sum *.nupkg *.snupkg | tee SHA256SUMS.txt)
+          (cd artifacts && sha256sum *.nupkg *.snupkg bom.json | tee SHA256SUMS.txt)
           echo "---- SHA256SUMS.txt ----"
           cat artifacts/SHA256SUMS.txt
           echo "------------------------"
@@ -64,12 +79,18 @@ jobs:
         with:
           subject-path: "artifacts/*.nupkg"
 
+      - name: Generate build-provenance attestation for the SBOM
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: "artifacts/bom.json"
+
       - name: Upload artifacts to the workflow run
         uses: actions/upload-artifact@v5
         with:
           name: nuget-packages
           path: |
             artifacts/*.*nupkg
+            artifacts/bom.json
             artifacts/SHA256SUMS.txt
           if-no-files-found: error
 
