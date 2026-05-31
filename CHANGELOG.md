@@ -8,7 +8,23 @@ versions.
 
 ## [Unreleased]
 
-_No changes yet._
+### Changed
+
+- **`PostQuantum.Jwt.AspNetCore` is now marked as superseded by
+  `PostQuantum.AspNetCore`** ([new repo](https://github.com/systemslibrarian/postquantum-aspnetcore)).
+  The new package shares this library as its engine — tokens minted
+  under either validate in the other — but ships under a cleaner name,
+  a dedicated release cadence, a richer event surface
+  (`OnMessageReceived` / `OnTokenValidated` /
+  `OnAuthenticationFailed` / `OnChallenge`), hosted-service key-ring
+  warmup, full SignalR support, and a 40-test integration suite. The
+  csproj `<Description>` and `<PackageReleaseNotes>` for
+  `PostQuantum.Jwt.AspNetCore` now lead with the supersession notice
+  so nuget.org search results reflect the change at the next package
+  push. New consumers should adopt `PostQuantum.AspNetCore`
+  directly. The legacy companion will continue to receive **critical
+  fixes only** through 1.0; no new features. Migration guide:
+  [`postquantum-aspnetcore/docs/MIGRATION.md`](https://github.com/systemslibrarian/postquantum-aspnetcore/blob/main/docs/MIGRATION.md).
 
 ## [0.3.0-preview.1] — 2026-05-30
 
