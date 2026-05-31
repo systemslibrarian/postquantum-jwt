@@ -54,20 +54,42 @@ public sealed class PqJwtValidator
     /// <summary>Validates a compact token and returns its claims.</summary>
     /// <param name="token">The compact-serialized token.</param>
     /// <returns>The validated result.</returns>
-    /// <exception cref="PqJwtValidationException">The token failed any validation check.</exception>
-    /// <exception cref="PqJwtException">The validator is misconfigured for this token.</exception>
+    /// <exception cref="PqJwtValidationException">The token failed any validation check, including those caused by malformed Base64, malformed JSON, or malformed key material in the token's payload.</exception>
+    /// <exception cref="PqJwtException">The validator is misconfigured for this token (e.g. an encrypted token arrived but no decryption key was supplied).</exception>
     public PqJwtValidationResult Validate(string token)
     {
         ArgumentException.ThrowIfNullOrEmpty(token);
 
-        var parts = token.Split('.');
-        return parts.Length switch
+        try
         {
-            SignedPartCount => ValidateSigned(parts, wasEncrypted: false),
-            EncryptedPartCount => ValidateEncrypted(parts),
-            _ => throw new PqJwtValidationException(
-                $"Malformed token: expected {SignedPartCount} or {EncryptedPartCount} segments, got {parts.Length}."),
-        };
+            var parts = token.Split('.');
+            return parts.Length switch
+            {
+                SignedPartCount => ValidateSigned(parts, wasEncrypted: false),
+                EncryptedPartCount => ValidateEncrypted(parts),
+                _ => throw new PqJwtValidationException(
+                    $"Malformed token: expected {SignedPartCount} or {EncryptedPartCount} segments, got {parts.Length}."),
+            };
+        }
+        catch (PqJwtException)
+        {
+            // PqJwtException and its subclass PqJwtValidationException
+            // are the documented fail-closed types — pass through unchanged.
+            throw;
+        }
+        catch (Exception ex) when (ex is FormatException or CryptographicException or JsonException)
+        {
+            // Known leak families from deeper layers: Base64 parsing
+            // (FormatException), JSON parsing (System.Text.Json.JsonException),
+            // and primitive crypto material checks (CryptographicException).
+            // Adversarial inputs can drive any of these out of the validator;
+            // the fail-closed contract says "every validation failure becomes
+            // PqJwtValidationException" — so we wrap them with the original
+            // as inner exception for diagnostics.
+            throw new PqJwtValidationException(
+                "Token failed validation due to malformed structure or invalid cryptographic material.",
+                ex);
+        }
     }
 
     private PqJwtValidationResult ValidateEncrypted(string[] parts)

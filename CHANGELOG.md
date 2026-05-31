@@ -8,6 +8,21 @@ versions.
 
 ## [Unreleased]
 
+### Fixed (correctness)
+
+- **`PqJwtValidator.Validate` now wraps Base64/JSON/crypto-material
+  parsing failures in `PqJwtValidationException`** instead of letting
+  `FormatException`, `JsonException`, or `CryptographicException` leak
+  to callers. Adversarial inputs that drove parsers deeper in the stack
+  used to surface as those raw types — consumers that caught only
+  `PqJwtException` saw a 500 instead of a 401. The fix is purely
+  additive: the new outer exception carries the original as
+  `InnerException` so diagnostics aren't lost. Found by SharpFuzz +
+  in-process fuzz testing in the `PostQuantum.AspNetCore` repo. Two
+  new tests in `PqJwtEdgeCaseTests` lock the new contract; the existing
+  68 tests pass unchanged. **Total: 70 tests, zero skips on
+  PQ-capable hosts.**
+
 ### Changed
 
 - **`PostQuantum.Jwt.AspNetCore` is now marked as superseded by

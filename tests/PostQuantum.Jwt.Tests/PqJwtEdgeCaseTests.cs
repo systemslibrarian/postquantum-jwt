@@ -530,6 +530,43 @@ public sealed class PqJwtEdgeCaseTests
             },
             clock);
 
+    [PqcFact]
+    public void Malformed_base64_in_segment_is_wrapped_as_PqJwtValidationException()
+    {
+        // Lock in the v0.3.0-preview.2 contract: Base64 parse errors that
+        // would previously leak as FormatException are now wrapped as
+        // PqJwtValidationException, so callers see a single fail-closed
+        // family. PostQuantum.AspNetCore depends on this — its handler
+        // catches PqJwtException and now no longer needs the
+        // catch-everything fallback for adversarial inputs.
+        using var signingKey = TestKeys.NewSigningKey();
+        // Three segments (signed-shape), all invalid Base64 — '!' is not
+        // a valid base64url character. The Split('.') sees 3 parts;
+        // Base64Url.DecodeToUtf8 throws FormatException; the validator
+        // catches and rewraps.
+        const string token = "!!!.!!!.!!!";
+        var ex = Assert.Throws<PqJwtValidationException>(
+            () => Validator(signingKey, new FixedTimeProvider(Now)).Validate(token));
+        Assert.IsType<FormatException>(ex.InnerException);
+    }
+
+    [PqcFact]
+    public void Malformed_json_header_is_wrapped_as_PqJwtValidationException()
+    {
+        using var signingKey = TestKeys.NewSigningKey();
+        // Valid Base64, but the decoded header isn't valid JSON.
+        var notJson = ToBase64Url(Encoding.UTF8.GetBytes("{not-json"));
+        var payload = ToBase64Url(Encoding.UTF8.GetBytes("{}"));
+        var sig = ToBase64Url(new byte[8]);
+        var token = $"{notJson}.{payload}.{sig}";
+
+        var ex = Assert.Throws<PqJwtValidationException>(
+            () => Validator(signingKey, new FixedTimeProvider(Now)).Validate(token));
+        // Inner is either JsonException OR an engine-wrapped subtype. Just
+        // confirm the outer is the documented PqJwtValidationException.
+        Assert.NotNull(ex);
+    }
+
     private static string ToBase64Url(ReadOnlySpan<byte> data) =>
         Convert.ToBase64String(data).TrimEnd('=').Replace('+', '-').Replace('/', '_');
 
