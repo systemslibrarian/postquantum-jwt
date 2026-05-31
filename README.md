@@ -313,7 +313,23 @@ An unknown `kid`, a missing `jti`, or a replayed `jti` all fail closed.
 
 ### ASP.NET Core integration
 
-Install the companion package and call `AddPqJwtBearer(...)` on the standard
+> **`PostQuantum.Jwt.AspNetCore` is superseded by
+> [`PostQuantum.AspNetCore`](https://github.com/systemslibrarian/postquantum-aspnetcore).**
+> Same engine (this library), cleaner naming, dedicated release cadence,
+> richer event-hook surface (`OnMessageReceived` / `OnTokenValidated` /
+> `OnAuthenticationFailed` / `OnChallenge`), hosted-service key-ring
+> warmup, full SignalR support, and a 40-test integration suite. Tokens
+> minted by either package validate in the other. New consumers should
+> adopt `PostQuantum.AspNetCore` directly. The old companion will
+> continue to receive critical fixes through 1.0 but no new features.
+>
+> **Migration guide:**
+> [`postquantum-aspnetcore/docs/MIGRATION.md`](https://github.com/systemslibrarian/postquantum-aspnetcore/blob/main/docs/MIGRATION.md)
+> — diff-style, mostly an `AddPqJwtBearer` → `AddPostQuantumJwtBearer`
+> rename plus a scheme-name change.
+
+The legacy companion's shape, for reference: install the companion
+package and call `AddPqJwtBearer(...)` on the standard
 `AuthenticationBuilder` — the same shape as `AddJwtBearer` from
 `Microsoft.AspNetCore.Authentication.JwtBearer`, but routing through
 `PqJwtValidator` instead of the IdentityModel handler that can't speak
