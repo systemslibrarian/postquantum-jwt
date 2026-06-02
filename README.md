@@ -11,7 +11,28 @@ Optionally encrypts with X-Wing (X25519 + ML-KEM-768) and AES-256-GCM. Built
 on the native .NET BCL post-quantum primitives. Fail-closed by design,
 small-surface, and honest about what it is.
 
-> **Status — `0.3.0-preview.1`. Preview software. Not for production use.**
+> ### Read this first — these tokens are intentionally non-interoperable
+>
+> PostQuantum.Jwt uses `alg = ML-DSA-65` and (optionally) `enc = X-Wing` /
+> `cty = JWT` with `A256GCM`. **None of these identifiers are registered
+> with IANA.** Tokens produced by this library will **not** validate in
+> `System.IdentityModel.Tokens.Jwt`, `jose-jwt`, `node-jose`,
+> `python-jose`, Auth0/Okta SDKs, or any other generic JWT tooling — and
+> they will not until IANA registers post-quantum JOSE identifiers (a
+> process this project does not control).
+>
+> This is the right library only when **you own both the issuer and every
+> verifier** (closed system, internal service-to-service, your own
+> mobile/desktop client, or a system you are bridging behind an
+> interop-translating gateway). If you need a JWT that an arbitrary
+> third-party stack can validate today, use
+> `System.IdentityModel.Tokens.Jwt` with a NIST-approved classical
+> algorithm instead — and revisit post-quantum once IANA-registered PQ
+> identifiers and standards-track JOSE PQ profiles exist. See
+> [Compared to System.IdentityModel.Tokens.Jwt](#compared-to-systemidentitymodeltokensjwt)
+> for the side-by-side.
+
+> **Status — `1.0.0-preview.1`. Preview software. Not for production use.**
 > The API may change before 1.0. The cryptographic construction has **not** been
 > independently audited. Read [`KNOWN-GAPS.md`](KNOWN-GAPS.md) before depending
 > on this for anything that matters.
@@ -177,13 +198,13 @@ Full notes in [`CHANGELOG.md`](CHANGELOG.md).
 ## Install
 
 ```bash
-dotnet add package PostQuantum.Jwt --version 0.3.0-preview.1
+dotnet add package PostQuantum.Jwt --version 1.0.0-preview.1
 ```
 
 Or in a `.csproj`:
 
 ```xml
-<PackageReference Include="PostQuantum.Jwt" Version="0.3.0-preview.1" />
+<PackageReference Include="PostQuantum.Jwt" Version="1.0.0-preview.1" />
 ```
 
 **Runtime requirement:** the native ML-KEM / ML-DSA primitives need an OpenSSL
@@ -311,6 +332,15 @@ var validator = new PqJwtValidator(new PqJwtValidationParameters
 
 An unknown `kid`, a missing `jti`, or a replayed `jti` all fail closed.
 
+> **Replay protection is OFF unless you wire a cache.** If
+> `PqJwtValidationParameters.ReplayCache` is `null`, tokens carrying a
+> `jti` are accepted but never registered — the same token may be replayed
+> indefinitely. This is intentional for very-short-lived service-to-service
+> tokens, but for any other deployment set
+> `PqJwtValidationParameters.RequireReplayProtection = true` so the
+> validator constructor throws at startup if a cache is missing. The flag
+> fails closed; it does not silently downgrade behavior.
+
 ### ASP.NET Core integration
 
 > **`PostQuantum.Jwt.AspNetCore` is superseded by
@@ -336,7 +366,7 @@ package and call `AddPqJwtBearer(...)` on the standard
 `ML-DSA-65`.
 
 ```bash
-dotnet add package PostQuantum.Jwt.AspNetCore --version 0.3.0-preview.1
+dotnet add package PostQuantum.Jwt.AspNetCore --version 1.0.0-preview.1
 ```
 
 ```csharp

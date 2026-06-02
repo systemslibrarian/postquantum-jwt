@@ -28,8 +28,27 @@ public sealed class PqJwtValidationParameters
     /// <summary>
     /// Optional replay-detection hook keyed on <c>jti</c>. When set, a token must
     /// carry a <c>jti</c> and must not have been seen before, or validation fails.
+    /// <para>
+    /// <b>When unset, replay protection is OFF.</b> Tokens carrying a <c>jti</c>
+    /// are accepted but never registered, so the same token may be replayed
+    /// indefinitely. This is the documented default for the no-replay use
+    /// case. Set <see cref="RequireReplayProtection"/> = <see langword="true"/>
+    /// to fail-closed at validator construction when no cache is supplied —
+    /// recommended for any deployment where forgetting to wire a cache would
+    /// be a security regression.
+    /// </para>
     /// </summary>
     public IPqJwtReplayCache? ReplayCache { get; init; }
+
+    /// <summary>
+    /// When <see langword="true"/>, the <see cref="PqJwtValidator"/> constructor
+    /// throws <see cref="ArgumentException"/> if <see cref="ReplayCache"/> is
+    /// <see langword="null"/>. Defaults to <see langword="false"/>, preserving
+    /// the historical opt-in default — but turning it on means an operator who
+    /// forgets to wire a cache sees the misconfiguration at startup rather
+    /// than as a silent missing defense at runtime.
+    /// </summary>
+    public bool RequireReplayProtection { get; init; }
 
     /// <summary>
     /// The X-Wing private key used to decrypt encrypted (5-part) tokens. Required

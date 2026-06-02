@@ -9,12 +9,13 @@ decision before relying on it.
 
 | Version             | Supported           |
 |---------------------|---------------------|
-| `0.3.0-preview.1`+  | ✅ (latest preview)  |
+| `1.0.0-preview.1`+  | ✅ (latest preview)  |
+| `0.3.0-preview.*`   | ❌ (superseded)      |
 | `0.2.0-preview.*`   | ❌ (superseded)      |
 | `0.1.0-preview.*`   | ❌ (superseded)      |
 | anything older      | ❌                  |
 
-During the `0.x` series only the most recent preview receives fixes.
+During the `1.0.0-preview.*` series only the most recent preview receives fixes.
 
 ## Reporting a vulnerability
 
