@@ -287,7 +287,26 @@ public sealed class PqJwtValidator
                 PqJwtFailureReason.MissingJwtId, "Replay protection is enabled but the token has no 'jti' claim.");
         }
 
-        var expiresAt = TryGetUnixTime(claims, "exp", out var exp) ? exp : DateTimeOffset.MaxValue;
+        // Determine the cache expiry from exp. A present-but-malformed exp is
+        // rejected here too (not just in ValidateLifetime, which the caller may have
+        // disabled) so a malformed exp can never be cached as DateTimeOffset.MaxValue
+        // — an entry that would otherwise never be pruned. An absent exp still maps
+        // to MaxValue: that requires deliberately running replay protection on tokens
+        // without expiration (RequireExpiration off), and only those entries persist.
+        DateTimeOffset expiresAt;
+        switch (GetUnixTime(claims, "exp", out var exp))
+        {
+            case TimeClaim.Present:
+                expiresAt = exp;
+                break;
+            case TimeClaim.Malformed:
+                throw new PqJwtValidationException(
+                    PqJwtFailureReason.MalformedTimeClaim, "Token 'exp' claim is not an integer Unix time.");
+            default:
+                expiresAt = DateTimeOffset.MaxValue;
+                break;
+        }
+
         if (!cache.TryRegister(jwtId, expiresAt))
         {
             throw new PqJwtValidationException(
@@ -364,24 +383,44 @@ public sealed class PqJwtValidator
         var now = _timeProvider.GetUtcNow();
         var skew = _parameters.ClockSkew;
 
-        if (TryGetUnixTime(claims, "exp", out var exp))
+        switch (GetUnixTime(claims, "exp", out var exp))
         {
-            if (now > exp + skew)
-            {
+            case TimeClaim.Present:
+                if (now > exp + skew)
+                {
+                    throw new PqJwtValidationException(
+                        PqJwtFailureReason.Expired, $"Token expired at {exp:O}.");
+                }
+
+                break;
+            case TimeClaim.Malformed:
                 throw new PqJwtValidationException(
-                    PqJwtFailureReason.Expired, $"Token expired at {exp:O}.");
-            }
-        }
-        else if (_parameters.RequireExpiration)
-        {
-            throw new PqJwtValidationException(
-                PqJwtFailureReason.MissingExpiration, "Token is missing the required 'exp' claim.");
+                    PqJwtFailureReason.MalformedTimeClaim, "Token 'exp' claim is not an integer Unix time.");
+            case TimeClaim.Absent:
+                if (_parameters.RequireExpiration)
+                {
+                    throw new PqJwtValidationException(
+                        PqJwtFailureReason.MissingExpiration, "Token is missing the required 'exp' claim.");
+                }
+
+                break;
         }
 
-        if (TryGetUnixTime(claims, "nbf", out var nbf) && now < nbf - skew)
+        switch (GetUnixTime(claims, "nbf", out var nbf))
         {
-            throw new PqJwtValidationException(
-                PqJwtFailureReason.NotYetValid, $"Token is not valid before {nbf:O}.");
+            case TimeClaim.Present:
+                if (now < nbf - skew)
+                {
+                    throw new PqJwtValidationException(
+                        PqJwtFailureReason.NotYetValid, $"Token is not valid before {nbf:O}.");
+                }
+
+                break;
+            case TimeClaim.Malformed:
+                throw new PqJwtValidationException(
+                    PqJwtFailureReason.MalformedTimeClaim, "Token 'nbf' claim is not an integer Unix time.");
+            case TimeClaim.Absent:
+                break;
         }
     }
 
@@ -440,19 +479,33 @@ public sealed class PqJwtValidator
         }
     }
 
-    private static bool TryGetUnixTime(
+    private enum TimeClaim
+    {
+        Absent,     // the claim is not present
+        Malformed,  // present, but not an integer Unix time (string, fraction, array, …)
+        Present,    // present and a valid integer Unix time
+    }
+
+    // Tri-state so callers can distinguish "absent" from "present but malformed".
+    // A present-but-malformed exp/nbf must be REJECTED (fail-closed), never silently
+    // treated as absent — otherwise a malformed exp becomes an immortal token and a
+    // malformed nbf bypasses the not-before check.
+    private static TimeClaim GetUnixTime(
         Dictionary<string, JsonElement> claims, string name, out DateTimeOffset value)
     {
-        if (claims.TryGetValue(name, out var element) &&
-            element.ValueKind == JsonValueKind.Number &&
-            element.TryGetInt64(out var seconds))
+        value = default;
+        if (!claims.TryGetValue(name, out var element))
         {
-            value = DateTimeOffset.FromUnixTimeSeconds(seconds);
-            return true;
+            return TimeClaim.Absent;
         }
 
-        value = default;
-        return false;
+        if (element.ValueKind == JsonValueKind.Number && element.TryGetInt64(out var seconds))
+        {
+            value = DateTimeOffset.FromUnixTimeSeconds(seconds);
+            return TimeClaim.Present;
+        }
+
+        return TimeClaim.Malformed;
     }
 
     // Records a fail-closed rejection on the metric. A PqJwtValidationException
@@ -484,6 +537,7 @@ public sealed class PqJwtValidator
         PqJwtFailureReason.KeyAgreementMalformed => "key_agreement_malformed",
         PqJwtFailureReason.DecryptionFailed => "decryption_failed",
         PqJwtFailureReason.InnerNotSigned => "inner_not_signed",
+        PqJwtFailureReason.MalformedTimeClaim => "malformed_time_claim",
         PqJwtFailureReason.Expired => "expired",
         PqJwtFailureReason.NotYetValid => "not_yet_valid",
         PqJwtFailureReason.MissingExpiration => "missing_exp",

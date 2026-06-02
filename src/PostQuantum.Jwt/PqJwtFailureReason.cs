@@ -49,6 +49,9 @@ public enum PqJwtFailureReason
     /// <summary>The decrypted content of an encrypted token was not a signed JWT.</summary>
     InnerNotSigned,
 
+    /// <summary>An <c>exp</c> or <c>nbf</c> claim was present but not an integer Unix time (e.g. a string or fractional number).</summary>
+    MalformedTimeClaim,
+
     /// <summary>The token's <c>exp</c> is in the past (beyond the allowed clock skew).</summary>
     Expired,
 
