@@ -1,0 +1,11 @@
+# Keep the ACR build-context upload small. The playground Dockerfile only COPYs
+# src/PostQuantum.Jwt, Directory.Build.props, samples/Shared, samples/PqJwtPlayground.
+**/bin/
+**/obj/
+.git/
+.github/
+articles/
+artifacts/
+docs/
+templates/
+tests/

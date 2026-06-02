@@ -14,11 +14,16 @@ HTTPS URL with scale-to-zero so an idle demo costs almost nothing.
 
 ```bash
 # Install / update the CLI extension and register providers (once per subscription)
-az extension add --name containerapp --upgrade
-az provider register --namespace Microsoft.App
-az provider register --namespace Microsoft.OperationalInsights
 az login
+az extension add --name containerapp --upgrade
+az provider register --namespace Microsoft.ContainerRegistry --wait
+az provider register --namespace Microsoft.App --wait
+az provider register --namespace Microsoft.OperationalInsights --wait
 ```
+
+> On a brand-new subscription these providers aren't registered yet, so ACR /
+> Container App creation fails with `MissingSubscriptionRegistration` until the
+> `register` commands above complete (`--wait` blocks until they do).
 
 ## Option 1 — one command from local source (fastest)
 
