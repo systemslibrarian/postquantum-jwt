@@ -7,6 +7,17 @@ Both packages in this repository have been raised from `0.3.0-preview.1` to
 new algorithm suite, no algorithm agility. The `preview.N` suffix continues
 to carry the "not independently audited" caveat; the leading `1.0` does not.
 
+## Update — 1.0.0-preview.2 (2026-06-02)
+
+Both packages were raised again, `1.0.0-preview.1` → `1.0.0-preview.2`, in the
+same exact lockstep. This is an **additive** preview (validation metrics +
+`PqJwtFailureReason` typed reasons; the crypto core and fail-closed behavior are
+unchanged), plus the new `PostQuantum.Jwt.Templates` package, which pins
+`PostQuantum.Jwt = 1.0.0-preview.2`. `scripts/check-version-sync.sh` now also
+guards the template package version and its scaffolded `PackageReference`s, so
+all version strings — both packages, README, CHANGELOG, and the templates — stay
+in lockstep.
+
 ## Changes applied
 
 ### Version strings

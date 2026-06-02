@@ -59,6 +59,11 @@ jobs:
       - name: Pack — AspNetCore companion
         run: dotnet pack src/PostQuantum.Jwt.AspNetCore/PostQuantum.Jwt.AspNetCore.csproj -c Release --no-build -o artifacts
 
+      # The template package compiles nothing of its own (it bundles content), so
+      # it is not part of the solution `dotnet build` above — pack it directly.
+      - name: Pack — dotnet new templates
+        run: dotnet pack templates/PostQuantum.Jwt.Templates.csproj -c Release -o artifacts
+
       - name: Generate top-level CycloneDX SBOM (in addition to the per-nupkg one)
         run: |
           set -euo pipefail

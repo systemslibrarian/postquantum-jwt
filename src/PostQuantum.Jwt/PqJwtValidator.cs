@@ -1,3 +1,5 @@
+using System.Diagnostics.Metrics;
+using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -16,6 +18,22 @@ public sealed class PqJwtValidator
 {
     private const int SignedPartCount = 3;
     private const int EncryptedPartCount = 5;
+
+    // -- Observability -------------------------------------------------------
+    // Emitted via System.Diagnostics.Metrics so consumers can wire OpenTelemetry
+    // (or any IMeterListener) without the library taking a telemetry dependency.
+    // The meter NAME is stable API; treat it as part of the contract. The failure
+    // `reason` tag is a closed, bounded-cardinality vocabulary derived from the
+    // strongly-typed PqJwtFailureReason — never the token, claims, or key material.
+    private static readonly string MeterVersion = ResolveMeterVersion();
+
+    private static readonly Meter Meter = new("PostQuantum.Jwt", MeterVersion);
+
+    private static readonly Counter<long> ValidationsTotal =
+        Meter.CreateCounter<long>(
+            "pqjwt.validations",
+            unit: "{validation}",
+            description: "Total token validations, tagged outcome=success|failure (and reason on failure).");
 
     private readonly PqJwtValidationParameters _parameters;
     private readonly TimeProvider _timeProvider;
@@ -76,18 +94,27 @@ public sealed class PqJwtValidator
         try
         {
             var parts = token.Split('.');
-            return parts.Length switch
+            var result = parts.Length switch
             {
                 SignedPartCount => ValidateSigned(parts, wasEncrypted: false),
                 EncryptedPartCount => ValidateEncrypted(parts),
                 _ => throw new PqJwtValidationException(
+                    PqJwtFailureReason.MalformedToken,
                     $"Malformed token: expected {SignedPartCount} or {EncryptedPartCount} segments, got {parts.Length}."),
             };
+
+            // Reached only after every check has passed (fail-closed: we never
+            // arrive here on a rejected token).
+            ValidationsTotal.Add(1, new KeyValuePair<string, object?>("outcome", "success"));
+            return result;
         }
-        catch (PqJwtException)
+        catch (PqJwtException ex)
         {
-            // PqJwtException and its subclass PqJwtValidationException
-            // are the documented fail-closed types — pass through unchanged.
+            // PqJwtException and its subclass PqJwtValidationException are the
+            // documented fail-closed types — pass through unchanged, but record
+            // the failure first. A PqJwtValidationException carries its own typed
+            // Reason; a plain PqJwtException is operator misconfiguration.
+            RecordFailure(ex);
             throw;
         }
         catch (Exception ex) when (ex is FormatException or CryptographicException or JsonException)
@@ -97,9 +124,18 @@ public sealed class PqJwtValidator
             // and primitive crypto material checks (CryptographicException).
             // Adversarial inputs can drive any of these out of the validator;
             // the fail-closed contract says "every validation failure becomes
-            // PqJwtValidationException" — so we wrap them with the original
-            // as inner exception for diagnostics.
+            // PqJwtValidationException" — so we wrap them with the original as
+            // inner exception, deriving the reason from the leaked type (not its
+            // message), and record the failure before rethrowing.
+            var reason = ex switch
+            {
+                FormatException => PqJwtFailureReason.MalformedEncoding,
+                JsonException => PqJwtFailureReason.MalformedJson,
+                _ => PqJwtFailureReason.CryptographicMaterial, // CryptographicException
+            };
+            RecordFailureTag(ReasonTag(reason));
             throw new PqJwtValidationException(
+                reason,
                 "Token failed validation due to malformed structure or invalid cryptographic material.",
                 ex);
         }
@@ -117,12 +153,14 @@ public sealed class PqJwtValidator
         if (!string.Equals(header.Algorithm, PqJwtAlgorithms.XWing, StringComparison.Ordinal))
         {
             throw new PqJwtValidationException(
+                PqJwtFailureReason.AlgorithmNotAccepted,
                 $"Unsupported key-agreement algorithm '{header.Algorithm}'; expected '{PqJwtAlgorithms.XWing}'.");
         }
 
         if (!string.Equals(header.Encryption, PqJwtAlgorithms.Aes256Gcm, StringComparison.Ordinal))
         {
             throw new PqJwtValidationException(
+                PqJwtFailureReason.AlgorithmNotAccepted,
                 $"Unsupported content-encryption algorithm '{header.Encryption}'; expected '{PqJwtAlgorithms.Aes256Gcm}'.");
         }
 
@@ -133,6 +171,7 @@ public sealed class PqJwtValidator
         if (!string.Equals(header.ContentType, PqJwtAlgorithms.TokenType, StringComparison.Ordinal))
         {
             throw new PqJwtValidationException(
+                PqJwtFailureReason.InvalidHeader,
                 $"Encrypted token must declare 'cty' = '{PqJwtAlgorithms.TokenType}'; got '{header.ContentType ?? "<missing>"}'.");
         }
 
@@ -142,7 +181,8 @@ public sealed class PqJwtValidator
         var innerParts = innerJws.Split('.');
         if (innerParts.Length != SignedPartCount)
         {
-            throw new PqJwtValidationException("Decrypted content is not a signed JWT.");
+            throw new PqJwtValidationException(
+                PqJwtFailureReason.InnerNotSigned, "Decrypted content is not a signed JWT.");
         }
 
         return ValidateSigned(innerParts, wasEncrypted: true);
@@ -157,7 +197,8 @@ public sealed class PqJwtValidator
         }
         catch (Exception ex) when (ex is FormatException or PqJwtException)
         {
-            throw new PqJwtValidationException("Token key-agreement material is malformed.", ex);
+            throw new PqJwtValidationException(
+                PqJwtFailureReason.KeyAgreementMalformed, "Token key-agreement material is malformed.", ex);
         }
 
         byte[]? plaintext = null;
@@ -183,7 +224,8 @@ public sealed class PqJwtValidator
         catch (Exception ex) when (ex is CryptographicException or FormatException or ArgumentException)
         {
             // A bad tag, tampered ciphertext, or wrong key all land here. Fail closed.
-            throw new PqJwtValidationException("Token decryption failed (authentication tag mismatch).", ex);
+            throw new PqJwtValidationException(
+                PqJwtFailureReason.DecryptionFailed, "Token decryption failed (authentication tag mismatch).", ex);
         }
         finally
         {
@@ -201,6 +243,7 @@ public sealed class PqJwtValidator
         if (!string.Equals(header.Algorithm, PqJwtAlgorithms.MLDsa65, StringComparison.Ordinal))
         {
             throw new PqJwtValidationException(
+                PqJwtFailureReason.AlgorithmNotAccepted,
                 $"Unsupported or disallowed signature algorithm '{header.Algorithm}'; expected '{PqJwtAlgorithms.MLDsa65}'.");
         }
 
@@ -220,6 +263,7 @@ public sealed class PqJwtValidator
         {
             return resolver(keyId)
                 ?? throw new PqJwtValidationException(
+                    PqJwtFailureReason.UnknownKeyId,
                     $"No verification key was resolved for kid '{keyId}'.");
         }
 
@@ -239,13 +283,15 @@ public sealed class PqJwtValidator
 
         if (string.IsNullOrEmpty(jwtId))
         {
-            throw new PqJwtValidationException("Replay protection is enabled but the token has no 'jti' claim.");
+            throw new PqJwtValidationException(
+                PqJwtFailureReason.MissingJwtId, "Replay protection is enabled but the token has no 'jti' claim.");
         }
 
         var expiresAt = TryGetUnixTime(claims, "exp", out var exp) ? exp : DateTimeOffset.MaxValue;
         if (!cache.TryRegister(jwtId, expiresAt))
         {
-            throw new PqJwtValidationException($"Token replay detected for jti '{jwtId}'.");
+            throw new PqJwtValidationException(
+                PqJwtFailureReason.ReplayDetected, $"Token replay detected for jti '{jwtId}'.");
         }
     }
 
@@ -258,13 +304,15 @@ public sealed class PqJwtValidator
         }
         catch (FormatException ex)
         {
-            throw new PqJwtValidationException("Token signature is not valid base64url.", ex);
+            throw new PqJwtValidationException(
+                PqJwtFailureReason.SignatureMalformed, "Token signature is not valid base64url.", ex);
         }
 
         var signingInput = Encoding.ASCII.GetBytes($"{parts[0]}.{parts[1]}");
         if (!verificationKey.VerifyData(signingInput, signature))
         {
-            throw new PqJwtValidationException("Token signature verification failed.");
+            throw new PqJwtValidationException(
+                PqJwtFailureReason.SignatureMismatch, "Token signature verification failed.");
         }
     }
 
@@ -277,14 +325,16 @@ public sealed class PqJwtValidator
         }
         catch (Exception ex) when (ex is FormatException or JsonException)
         {
-            throw new PqJwtValidationException("Token payload is not valid JSON.", ex);
+            throw new PqJwtValidationException(
+                PqJwtFailureReason.MalformedJson, "Token payload is not valid JSON.", ex);
         }
 
         using (document)
         {
             if (document.RootElement.ValueKind != JsonValueKind.Object)
             {
-                throw new PqJwtValidationException("Token payload is not a JSON object.");
+                throw new PqJwtValidationException(
+                    PqJwtFailureReason.MalformedPayload, "Token payload is not a JSON object.");
             }
 
             var claims = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
@@ -318,17 +368,20 @@ public sealed class PqJwtValidator
         {
             if (now > exp + skew)
             {
-                throw new PqJwtValidationException($"Token expired at {exp:O}.");
+                throw new PqJwtValidationException(
+                    PqJwtFailureReason.Expired, $"Token expired at {exp:O}.");
             }
         }
         else if (_parameters.RequireExpiration)
         {
-            throw new PqJwtValidationException("Token is missing the required 'exp' claim.");
+            throw new PqJwtValidationException(
+                PqJwtFailureReason.MissingExpiration, "Token is missing the required 'exp' claim.");
         }
 
         if (TryGetUnixTime(claims, "nbf", out var nbf) && now < nbf - skew)
         {
-            throw new PqJwtValidationException($"Token is not valid before {nbf:O}.");
+            throw new PqJwtValidationException(
+                PqJwtFailureReason.NotYetValid, $"Token is not valid before {nbf:O}.");
         }
     }
 
@@ -346,6 +399,7 @@ public sealed class PqJwtValidator
         if (!string.Equals(issuer, _parameters.ValidIssuer, StringComparison.Ordinal))
         {
             throw new PqJwtValidationException(
+                PqJwtFailureReason.IssuerMismatch,
                 $"Token issuer '{issuer}' does not match the expected issuer.");
         }
     }
@@ -359,7 +413,8 @@ public sealed class PqJwtValidator
 
         if (!claims.TryGetValue("aud", out var aud) || !AudienceContains(aud, _parameters.ValidAudience))
         {
-            throw new PqJwtValidationException("Token audience does not include the expected audience.");
+            throw new PqJwtValidationException(
+                PqJwtFailureReason.AudienceMismatch, "Token audience does not include the expected audience.");
         }
     }
 
@@ -398,5 +453,60 @@ public sealed class PqJwtValidator
 
         value = default;
         return false;
+    }
+
+    // Records a fail-closed rejection on the metric. A PqJwtValidationException
+    // carries its own strongly-typed Reason (set at the throw site); a plain
+    // PqJwtException is operator misconfiguration, not a token-level rejection.
+    private static void RecordFailure(PqJwtException ex) =>
+        RecordFailureTag(ex is PqJwtValidationException v ? ReasonTag(v.Reason) : "misconfigured");
+
+    private static void RecordFailureTag(string reasonTag) =>
+        ValidationsTotal.Add(
+            1,
+            new KeyValuePair<string, object?>("outcome", "failure"),
+            new KeyValuePair<string, object?>("reason", reasonTag));
+
+    // Maps the typed reason to a stable, snake_case metric tag. Switching over the
+    // enum (not parsing a message) means a new reason that forgets a tag is a
+    // compile-visible omission the PqJwtMetricsTests completeness test also locks.
+    internal static string ReasonTag(PqJwtFailureReason reason) => reason switch
+    {
+        PqJwtFailureReason.MalformedToken => "malformed_token",
+        PqJwtFailureReason.MalformedEncoding => "malformed_encoding",
+        PqJwtFailureReason.MalformedJson => "malformed_json",
+        PqJwtFailureReason.MalformedPayload => "malformed_payload",
+        PqJwtFailureReason.InvalidHeader => "invalid_header",
+        PqJwtFailureReason.AlgorithmNotAccepted => "algorithm_not_accepted",
+        PqJwtFailureReason.SignatureMalformed => "signature_malformed",
+        PqJwtFailureReason.SignatureMismatch => "signature_mismatch",
+        PqJwtFailureReason.UnknownKeyId => "unknown_kid",
+        PqJwtFailureReason.KeyAgreementMalformed => "key_agreement_malformed",
+        PqJwtFailureReason.DecryptionFailed => "decryption_failed",
+        PqJwtFailureReason.InnerNotSigned => "inner_not_signed",
+        PqJwtFailureReason.Expired => "expired",
+        PqJwtFailureReason.NotYetValid => "not_yet_valid",
+        PqJwtFailureReason.MissingExpiration => "missing_exp",
+        PqJwtFailureReason.IssuerMismatch => "issuer_mismatch",
+        PqJwtFailureReason.AudienceMismatch => "audience_mismatch",
+        PqJwtFailureReason.MissingJwtId => "missing_jti",
+        PqJwtFailureReason.ReplayDetected => "replay_detected",
+        PqJwtFailureReason.CryptographicMaterial => "crypto_material",
+        _ => "other",
+    };
+
+    // The meter version tracks the package version (AssemblyInformationalVersion,
+    // minus any +build-metadata suffix SourceLink appends).
+    private static string ResolveMeterVersion()
+    {
+        var info = typeof(PqJwtValidator).Assembly
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+        if (string.IsNullOrEmpty(info))
+        {
+            return typeof(PqJwtValidator).Assembly.GetName().Version?.ToString() ?? "unknown";
+        }
+
+        var plus = info.IndexOf('+', StringComparison.Ordinal);
+        return plus >= 0 ? info[..plus] : info;
     }
 }

@@ -1,0 +1,17 @@
+<Solution>
+  <Folder Name="/library/">
+    <Project Path="../src/PostQuantum.Jwt/PostQuantum.Jwt.csproj" />
+    <Project Path="../src/PostQuantum.Jwt.AspNetCore/PostQuantum.Jwt.AspNetCore.csproj" />
+  </Folder>
+  <Folder Name="/samples/">
+    <Project Path="ConsoleDemo/ConsoleDemo.csproj" />
+    <Project Path="DistributedReplayCache/DistributedReplayCache.csproj" />
+    <Project Path="PqJwtPlayground/PqJwtPlayground.csproj" />
+    <Project Path="RefreshTokenDemo/RefreshTokenDemo.csproj" />
+    <Project Path="Shared/Pq.Samples.Shared.csproj" />
+    <Project Path="SpecByExample/SpecByExample.csproj" />
+    <Project Path="TestingSupport/TestingSupport.csproj" />
+    <Project Path="VerifierDemo/VerifierDemo.csproj" />
+    <Project Path="WebApiDemo/WebApiDemo.csproj" />
+  </Folder>
+</Solution>

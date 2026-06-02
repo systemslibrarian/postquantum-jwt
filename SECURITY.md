@@ -1,15 +1,17 @@
 # Security Policy
 
-PostQuantum.Jwt is **preview software** (`0.x.y-preview.z`). It is not yet
-suitable for production use and has not been independently audited. This
-document states the security model honestly so you can make an informed
-decision before relying on it.
+PostQuantum.Jwt is **preview software** (`1.0.0-preview.N`). It is not yet
+suitable for production use and has not been independently audited. The leading
+`1.0` denotes the maturity of the design, not a stable release — the `preview.N`
+suffix means the API may still change before the stable `1.0.0`. This document
+states the security model honestly so you can make an informed decision before
+relying on it.
 
 ## Supported versions
 
 | Version             | Supported           |
 |---------------------|---------------------|
-| `1.0.0-preview.1`+  | ✅ (latest preview)  |
+| `1.0.0-preview.2`+  | ✅ (latest preview)  |
 | `0.3.0-preview.*`   | ❌ (superseded)      |
 | `0.2.0-preview.*`   | ❌ (superseded)      |
 | `0.1.0-preview.*`   | ❌ (superseded)      |
@@ -88,6 +90,21 @@ exclusively for:
 We deliberately did **not** hand-roll X25519. Rolling your own elliptic-curve
 arithmetic is exactly the kind of risk this project exists to avoid. ML-KEM-768
 and ML-DSA-65 use the native, FIPS-validated BCL implementations.
+
+## Telemetry and data handling
+
+The library performs **no logging and no network I/O** of its own, and collects
+no telemetry. The only signal it emits is an opt-in metric (the
+`pqjwt.validations` counter on the `System.Diagnostics.Metrics` meter
+`PostQuantum.Jwt`); nothing is recorded unless *you* attach a meter listener.
+
+That metric is designed to be safe to export: its only tags are `outcome`
+(`success`/`failure`) and a coarse, closed-vocabulary `reason` derived from the
+typed `PqJwtFailureReason`. It **never** includes the token, claim values, `jti`,
+issuer/audience values, or any key material. Validation failures surfaced through
+the optional ASP.NET Core handler log the exception (its message and reason),
+never the token or key bytes — keep `Authorization`/`Cookie` headers out of your
+own request logs (see `samples/SECURE-USAGE.md` §8).
 
 ## Honesty statement
 

@@ -1,0 +1,24 @@
+<Project>
+
+  <!--
+    Sample-specific build settings. Imports the repo-wide Directory.Build.props
+    (LangVersion, Nullable, ImplicitUsings, TreatWarningsAsErrors, deterministic
+    builds) and then relaxes the rules that only make sense for the shipped
+    library:
+
+      * GenerateDocumentationFile — samples are illustrative apps, not a
+        documented public API, so we don't require XML doc comments (CS1591).
+      * IsPackable=false — samples are never published as NuGet packages.
+
+    Samples still build with warnings-as-errors so they stay honest and current.
+  -->
+
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+
+  <PropertyGroup>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <IsPackable>false</IsPackable>
+    <IsPublishable>true</IsPublishable>
+  </PropertyGroup>
+
+</Project>

@@ -5,7 +5,7 @@ unverified, and where the sharp edges are. Honesty over polish: if something is
 incomplete, it is listed here rather than glossed over. This file is part of the
 contract with anyone evaluating the library.
 
-Last reviewed for: `1.0.0-preview.1`.
+Last reviewed for: `1.0.0-preview.2`.
 
 ## Cryptography
 
@@ -40,7 +40,8 @@ Last reviewed for: `1.0.0-preview.1`.
 
 - **Non-standard JOSE identifiers.** `alg`/`enc` values (`ML-DSA-65`, `X-Wing`,
   `A256GCM` over a nested JWT) are not IANA-registered. Tokens will **not**
-  validate in standard JWT tooling, and the wire format may change before 1.0.
+  validate in standard JWT tooling, and the wire format may change before the
+  stable `1.0.0`.
 - **Replay protection is opt-in and only as strong as the cache you provide.**
   `IPqJwtReplayCache` + the bundled `InMemoryReplayCache` enforce single-use
   `jti` when configured, but the in-memory cache is single-process and does not
@@ -61,7 +62,7 @@ Last reviewed for: `1.0.0-preview.1`.
 ## API & lifecycle
 
 - **Preview API.** Public types and method signatures may change without notice
-  until 1.0.
+  between previews, until the stable `1.0.0`.
 - **No streaming / large-payload API.** Everything operates on in-memory
   `string` / `byte[]`.
 - **No DI / `IServiceCollection` integration, no ASP.NET Core authentication

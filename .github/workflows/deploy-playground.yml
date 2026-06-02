@@ -1,0 +1,60 @@
+# Build the PqJwtPlayground image with ACR and deploy it to Azure Container Apps
+# on every push to main that touches the playground or the library source.
+#
+# Place this file at: .github/workflows/deploy-playground.yml  (repo root)
+#
+# Required repository secrets:
+#   AZURE_CREDENTIALS  - JSON from: az ad sp create-for-rbac --sdk-auth \
+#                          --role contributor --scopes /subscriptions/<SUB>/resourceGroups/pqjwt-demos
+#   ACR_NAME           - e.g. pqjwtdemoacr
+#
+# Assumes the resource group (pqjwt-demos), ACR, and container app
+# (pqjwt-playground) already exist - create them once via samples/PqJwtPlayground/DEPLOY.md.
+#
+# To God be the glory - 1 Corinthians 10:31.
+
+name: Deploy Playground
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "samples/PqJwtPlayground/**"
+      - "src/PostQuantum.Jwt/**"
+      - "samples/Shared/**"
+      - ".github/workflows/deploy-playground.yml"
+  workflow_dispatch:
+
+env:
+  RESOURCE_GROUP: pqjwt-demos
+  APP_NAME: pqjwt-playground
+  IMAGE_NAME: pqjwt-playground
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Build image in ACR (repo root as context)
+        run: |
+          TAG="${GITHUB_SHA::8}"
+          az acr build \
+            --registry "${{ secrets.ACR_NAME }}" \
+            --image "${IMAGE_NAME}:${TAG}" \
+            --image "${IMAGE_NAME}:latest" \
+            --file samples/PqJwtPlayground/Dockerfile \
+            .
+
+      - name: Update Container App to new image
+        run: |
+          TAG="${GITHUB_SHA::8}"
+          az containerapp update \
+            --name "${APP_NAME}" \
+            --resource-group "${RESOURCE_GROUP}" \
+            --image "${{ secrets.ACR_NAME }}.azurecr.io/${IMAGE_NAME}:${TAG}"

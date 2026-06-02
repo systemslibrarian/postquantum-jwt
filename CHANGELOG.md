@@ -3,10 +3,44 @@
 All notable changes to PostQuantum.Jwt are documented in this file. The format
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
-once it reaches `1.0.0`. Preview releases (`0.x`) may break the API between
-versions.
+from the stable `1.0.0` onward. Pre-release `1.0.0-preview.*` builds may break
+the API between previews.
 
 ## [Unreleased]
+
+## [1.0.0-preview.2] — 2026-06-02
+
+An **additive** release. The crypto core, public algorithm surface, and
+fail-closed validation behavior are **unchanged** — no new suite, no algorithm
+agility. This release adds observability, a typed failure taxonomy, and the
+runnable samples/templates ecosystem.
+
+### Added
+
+- **Validation metrics.** `PqJwtValidator` emits a `pqjwt.validations` counter on
+  a `System.Diagnostics.Metrics` meter named `PostQuantum.Jwt`, tagged
+  `outcome=success|failure` and, on failure, a coarse `reason`. Opt in with
+  OpenTelemetry or any meter listener — no new dependency. The `reason` is a
+  closed, bounded-cardinality vocabulary and **never** carries token contents,
+  claim values, or key material. The meter name is stable API.
+- **`PqJwtFailureReason` enum** and **`PqJwtValidationException.Reason`** property
+  (plus reason-carrying constructors). Callers and the metric categorize a
+  rejection from a typed value instead of parsing the exception message.
+- **Runnable samples** under `samples/` (console, ASP.NET Core API, verifier,
+  Blazor playground, refresh-token rotation, distributed replay cache, testing
+  support, spec-by-example) with a `samples/PostQuantum.Jwt.Samples.slnx`
+  solution and a CI compile gate.
+- **`PostQuantum.Jwt.Templates`** `dotnet new` template package
+  (`pqjwt-webapi`, `pqjwt-console`).
+- **Expanded hardening docs** — `samples/SECURE-USAGE.md` and
+  `samples/HARDENING-CHECKLIST.md` map common JWT attacks to the library's
+  defenses and the metric `reason` that surfaces each.
+
+### Changed
+
+- Internal: every fail-closed throw site (including `JoseHeader` parsing) now
+  carries a typed `PqJwtFailureReason`. No behavior change — control flow and
+  rejection conditions are identical.
 
 ## [1.0.0-preview.1] — 2026-06-01
 
@@ -417,7 +451,8 @@ See [`KNOWN-GAPS.md`](KNOWN-GAPS.md). Highlights:
 - **Packages are not author-signed yet** (no code-signing certificate).
   nuget.org applies repository signing on push.
 
-[Unreleased]: https://github.com/systemslibrarian/postquantum-jwt/compare/v1.0.0-preview.1...HEAD
+[Unreleased]: https://github.com/systemslibrarian/postquantum-jwt/compare/v1.0.0-preview.2...HEAD
+[1.0.0-preview.2]: https://github.com/systemslibrarian/postquantum-jwt/compare/v1.0.0-preview.1...v1.0.0-preview.2
 [1.0.0-preview.1]: https://github.com/systemslibrarian/postquantum-jwt/releases/tag/v1.0.0-preview.1
 [0.3.0-preview.1]: https://github.com/systemslibrarian/postquantum-jwt/releases/tag/v0.3.0-preview.1
 [0.2.0-preview.3]: https://github.com/systemslibrarian/postquantum-jwt/releases/tag/v0.2.0-preview.3

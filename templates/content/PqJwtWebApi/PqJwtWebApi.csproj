@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>PqJwtWebApi</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="PostQuantum.Jwt" Version="1.0.0-preview.2" />
+    <PackageReference Include="PostQuantum.Jwt.AspNetCore" Version="1.0.0-preview.2" />
+  </ItemGroup>
+
+</Project>

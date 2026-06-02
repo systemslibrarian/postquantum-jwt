@@ -8,6 +8,14 @@ namespace PostQuantum.Jwt;
 /// </summary>
 public sealed class PqJwtValidationException : PqJwtException
 {
+    /// <summary>
+    /// A coarse, non-sensitive categorization of why validation failed. Lets
+    /// callers branch on the failure category without parsing <see cref="System.Exception.Message"/>.
+    /// Defaults to <see cref="PqJwtFailureReason.Unspecified"/> when constructed
+    /// without a reason.
+    /// </summary>
+    public PqJwtFailureReason Reason { get; }
+
     /// <summary>Initializes a new instance of the <see cref="PqJwtValidationException"/> class.</summary>
     public PqJwtValidationException()
     {
@@ -26,5 +34,24 @@ public sealed class PqJwtValidationException : PqJwtException
     public PqJwtValidationException(string message, Exception innerException)
         : base(message, innerException)
     {
+    }
+
+    /// <summary>Initializes a new instance of the <see cref="PqJwtValidationException"/> class.</summary>
+    /// <param name="reason">The category of failure.</param>
+    /// <param name="message">A description of why validation failed.</param>
+    public PqJwtValidationException(PqJwtFailureReason reason, string message)
+        : base(message)
+    {
+        Reason = reason;
+    }
+
+    /// <summary>Initializes a new instance of the <see cref="PqJwtValidationException"/> class.</summary>
+    /// <param name="reason">The category of failure.</param>
+    /// <param name="message">A description of why validation failed.</param>
+    /// <param name="innerException">The underlying cause.</param>
+    public PqJwtValidationException(PqJwtFailureReason reason, string message, Exception innerException)
+        : base(message, innerException)
+    {
+        Reason = reason;
     }
 }

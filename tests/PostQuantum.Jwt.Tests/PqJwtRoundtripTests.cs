@@ -76,7 +76,8 @@ public sealed class PqJwtRoundtripTests
         parts[2] = parts[2][..^1] + (parts[2][^1] == 'A' ? 'B' : 'A');
         var tampered = string.Join('.', parts);
 
-        Assert.Throws<PqJwtValidationException>(() => Validator(signingKey, clock).Validate(tampered));
+        var ex = Assert.Throws<PqJwtValidationException>(() => Validator(signingKey, clock).Validate(tampered));
+        Assert.Equal(PqJwtFailureReason.SignatureMismatch, ex.Reason);
     }
 
     [PqcFact]
@@ -97,7 +98,10 @@ public sealed class PqJwtRoundtripTests
         var parts = token.Split('.');
         var forged = $"{parts[0]}.{forgedPayload}.{parts[2]}";
 
-        Assert.Throws<PqJwtValidationException>(() => Validator(signingKey, clock).Validate(forged));
+        // Editing a single claim byte breaks the ML-DSA signature: a privilege-
+        // escalation forgery surfaces as a signature mismatch, not a degraded result.
+        var ex = Assert.Throws<PqJwtValidationException>(() => Validator(signingKey, clock).Validate(forged));
+        Assert.Equal(PqJwtFailureReason.SignatureMismatch, ex.Reason);
     }
 
     [PqcFact]
