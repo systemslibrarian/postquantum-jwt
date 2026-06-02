@@ -9,11 +9,17 @@ documentation exactly — for a cryptographic library that is the bare minimum.
 Run this list before pushing the version tag. CI enforces the boxed items;
 the un-boxed items are a human review.
 
-- [ ] **Bump `<Version>`** in `src/PostQuantum.Jwt/PostQuantum.Jwt.csproj`.
-- [x] **Version strings are in sync** across `.csproj`, `README.md` (the
-      `dotnet add package` snippet *and* the `<PackageReference>` snippet), and
-      `CHANGELOG.md` heading. Enforced by `scripts/check-version-sync.sh`,
-      which runs on every push, pull request, and release tag.
+- [ ] **Bump `<Version>`** in lockstep across all four packages:
+      `src/PostQuantum.Jwt`, `src/PostQuantum.Jwt.AspNetCore`,
+      `templates/PostQuantum.Jwt.Templates`, and
+      `src/Analyzers/PostQuantum.Jwt.Analyzers` — plus the `PostQuantum.Jwt*`
+      `<PackageReference>`s inside the scaffolded template content.
+- [x] **Version strings are in sync** across the library `.csproj`, `README.md`
+      (the `dotnet add package` snippet *and* the `<PackageReference>` snippet),
+      the `CHANGELOG.md` heading, the templates package + its scaffolded content
+      references, and the analyzers package. Enforced by
+      `scripts/check-version-sync.sh`, which runs on every push, pull request,
+      and release tag.
 - [ ] **CHANGELOG.md** has a section for the new version that describes
       `Added` / `Changed` / `Fixed` / `Security` deltas honestly. Update the
       `[Unreleased]` and `[<version>]` compare-links at the bottom.
@@ -31,9 +37,12 @@ the un-boxed items are a human review.
       skipped tests**. The CI Windows lane fails the run if any PqcFact
       reports skipped — Linux skips are allowed only because some runners
       lack OpenSSL 3.5+; cryptographic assurance lives in the Windows lane.
-- [x] **`dotnet pack`** produces both `.nupkg` and `.snupkg` and the local
-      consumer round-trip (install into a fresh `dotnet new console` from a
-      local feed and exercise sign / sign+encrypt / fail-closed) passes.
+- [x] **`dotnet pack`** produces all four packages — `PostQuantum.Jwt` and
+      `PostQuantum.Jwt.AspNetCore` (each with a `.snupkg` symbols package),
+      `PostQuantum.Jwt.Templates` (a `dotnet new` content package), and
+      `PostQuantum.Jwt.Analyzers` (an analyzers-only package) — and the local
+      consumer round-trip (install into a fresh project from a local feed and
+      exercise sign / sign+encrypt / fail-closed) passes.
 - [ ] **Manual smoke** — install the freshly packed `.nupkg` into a throwaway
       project and exercise the README's quick-start. Catches packaging-only
       regressions that don't show up in the in-repo tests.
@@ -50,8 +59,10 @@ the un-boxed items are a human review.
    - run `scripts/check-version-sync.sh`
    - verify the tag (`v<version>`) matches `<Version>` in the `.csproj`
    - build + test
-   - `dotnet pack` and generate a CycloneDX SBOM (`bom.json`) for the
-     project's dependency graph
+   - `dotnet pack` **all four** packages (`PostQuantum.Jwt`,
+     `PostQuantum.Jwt.AspNetCore`, `PostQuantum.Jwt.Templates`,
+     `PostQuantum.Jwt.Analyzers`) and generate a CycloneDX SBOM (`bom.json`) for
+     the library's dependency graph
    - write `artifacts/SHA256SUMS.txt` covering the `.nupkg`, `.snupkg`,
      and `bom.json`
    - emit GitHub build-provenance attestations for **both** the `.nupkg`

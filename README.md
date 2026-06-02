@@ -86,8 +86,8 @@ If either half stands, your token stands. That is the whole point.
 
 An **additive** release — the crypto core, public algorithm surface, and
 fail-closed behavior are **unchanged** (no new suite, no algorithm agility). It
-adds observability and a typed failure taxonomy, plus the runnable samples and
-templates that grow the ecosystem.
+adds observability and a typed failure taxonomy, plus the runnable samples,
+templates, and compile-time analyzers that grow the ecosystem.
 
 - **Validation metrics.** The validator emits a `pqjwt.validations` counter on a
   `System.Diagnostics.Metrics` meter named `PostQuantum.Jwt`, tagged
@@ -104,6 +104,11 @@ templates that grow the ecosystem.
 - **Expanded hardening guidance** — `samples/SECURE-USAGE.md` and
   `samples/HARDENING-CHECKLIST.md` now map common JWT attacks to the library's
   defenses and the metric `reason` that surfaces each.
+- **Compile-time analyzers** — a new opt-in `PostQuantum.Jwt.Analyzers` package
+  enforces the architecture in your IDE/build: **PQJWT001** forbids inspecting a
+  token's header fields and **PQJWT002** flags per-call validator construction.
+  Plus an AI semantic-audit prompt. See
+  [`docs/SECURITY-AUDIT-TOOLS.md`](docs/SECURITY-AUDIT-TOOLS.md).
 
 ## What's new in 1.0.0-preview.1
 

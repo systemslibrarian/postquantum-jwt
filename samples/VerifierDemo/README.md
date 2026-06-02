@@ -34,6 +34,10 @@ dotnet run    # reads ISSUER_KEYS_URL, defaults to http://localhost:5080/.well-k
 - No signing key lives in this process — only public verification keys it fetched.
 - The key ring refreshes every 30s here so rotation is visible quickly in a demo;
   use a longer interval in production.
+- The `http://localhost` key URL works only because it's loopback —
+  `HttpPqJwtKeyRing` **rejects a non-loopback `http://` endpoint** (the key
+  directory is the trust root). In production point `ISSUER_KEYS_URL` at an
+  `https://` URL.
 - Preview software, not audited; non-IANA identifiers; non-interoperable tokens.
 
 ---
