@@ -1,0 +1,61 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Roslyn analyzer package that enforces PostQuantum.Jwt's architectural boundaries
+    in CONSUMER code (see docs/SECURITY-AUDIT-TOOLS.md):
+      * PQJWT001 (Error)   — token header fields (alg/jwk/jku/x5u/x5c) must not be inspected.
+      * PQJWT002 (Warning) — reuse a single PqJwtValidator instead of constructing per call.
+
+    Shipped as a SEPARATE, opt-in package (a DevelopmentDependency): consumers add
+      <PackageReference Include="PostQuantum.Jwt.Analyzers" PrivateAssets="all" />
+    It is intentionally NOT applied to this library's own build — the library
+    legitimately reads `alg` from the header it parses internally.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <!-- Package metadata -->
+  <PropertyGroup>
+    <PackageId>PostQuantum.Jwt.Analyzers</PackageId>
+    <Version>1.0.0-preview.2</Version>
+    <Title>PostQuantum.Jwt analyzers — compile-time architecture enforcement</Title>
+    <Authors>Paul Clark</Authors>
+    <Description>Roslyn analyzers for PostQuantum.Jwt: PQJWT001 forbids inspecting JOSE header fields (alg/jwk/jku/x5u/x5c) — the verification key comes from a trusted key ring, never the token — and PQJWT002 flags per-call PqJwtValidator construction. Add with PrivateAssets="all". Preview release — not for production use.</Description>
+    <PackageProjectUrl>https://github.com/systemslibrarian/postquantum-jwt</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/systemslibrarian/postquantum-jwt</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageTags>roslyn;analyzer;jwt;post-quantum;pqc;ml-dsa;security;net</PackageTags>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+    <Copyright>Copyright © Paul Clark</Copyright>
+    <NeutralLanguage>en-US</NeutralLanguage>
+    <!-- Analyzer-only package: ships no runtime assembly, doesn't flow transitively. -->
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <DevelopmentDependency>true</DevelopmentDependency>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.11.0" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="3.11.0" PrivateAssets="all" />
+  </ItemGroup>
+
+  <!-- Release-tracking files (RS2008) describing PQJWT001/PQJWT002. -->
+  <ItemGroup>
+    <AdditionalFiles Include="AnalyzerReleases.Shipped.md" />
+    <AdditionalFiles Include="AnalyzerReleases.Unshipped.md" />
+  </ItemGroup>
+
+  <!-- Pack the analyzer assembly + README into the standard analyzer path. -->
+  <ItemGroup>
+    <None Include="$(OutputPath)\$(AssemblyName).dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>

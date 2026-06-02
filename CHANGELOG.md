@@ -35,6 +35,13 @@ runnable samples/templates ecosystem.
 - **Expanded hardening docs** — `samples/SECURE-USAGE.md` and
   `samples/HARDENING-CHECKLIST.md` map common JWT attacks to the library's
   defenses and the metric `reason` that surfaces each.
+- **`PostQuantum.Jwt.Analyzers`** — a new opt-in Roslyn analyzer package for
+  compile-time enforcement of the architecture: **PQJWT001** (error) forbids
+  reading a JOSE header field (`alg`/`jwk`/`jku`/`x5u`/`x5c`) from `System.Text.Json`,
+  and **PQJWT002** (warning) flags per-call `new PqJwtValidator(...).Validate(...)`.
+  Both are semantic (type-aware) to avoid false positives. Add with
+  `PrivateAssets="all"`. See `docs/SECURITY-AUDIT-TOOLS.md` and
+  `docs/PQ-JWT-AUDIT-PROMPT.md` (an AI semantic-audit prompt).
 
 ### Changed
 

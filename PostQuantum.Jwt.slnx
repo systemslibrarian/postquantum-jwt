@@ -3,7 +3,11 @@
     <Project Path="src/PostQuantum.Jwt/PostQuantum.Jwt.csproj" />
     <Project Path="src/PostQuantum.Jwt.AspNetCore/PostQuantum.Jwt.AspNetCore.csproj" />
   </Folder>
+  <Folder Name="/analyzers/">
+    <Project Path="src/Analyzers/PostQuantum.Jwt.Analyzers/PostQuantum.Jwt.Analyzers.csproj" />
+  </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/PostQuantum.Jwt.Tests/PostQuantum.Jwt.Tests.csproj" />
+    <Project Path="tests/PostQuantum.Jwt.Analyzers.Tests/PostQuantum.Jwt.Analyzers.Tests.csproj" />
   </Folder>
 </Solution>
