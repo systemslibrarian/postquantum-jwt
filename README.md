@@ -553,7 +553,10 @@ current source (CI builds the whole sample solution on every push).
 > language *why* a tampered or expired token is rejected — all in your browser, no
 > install. (It's hosted scale-to-zero to keep costs near nothing, so the first
 > request after it's been idle can take up to a minute to wake; reload if needed.)
-> Every *other* sample is source you clone and run locally — browse them all in
+> New to it? The
+> [how-to guide](https://github.com/systemslibrarian/postquantum-jwt/blob/main/samples/PqJwtPlayground/USING.md)
+> walks through building, validating, and *breaking* a token. Every *other* sample
+> is source you clone and run locally — browse them all in
 > [`samples/`](https://github.com/systemslibrarian/postquantum-jwt/tree/main/samples).
 
 | Sample | Shows |

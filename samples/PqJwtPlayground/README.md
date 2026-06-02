@@ -3,6 +3,8 @@
 A browser UI for building and validating post-quantum JWTs in real time, built
 to *teach* — not just to demo the happy path.
 
+**Using the live site?** See **[USING.md](USING.md)** for a short how-to.
+
 ## Features
 
 - **Build**: set sub/iss/aud, lifetime, and custom claims; toggle X-Wing
