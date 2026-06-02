@@ -11,7 +11,7 @@ relying on it.
 
 | Version             | Supported           |
 |---------------------|---------------------|
-| `1.0.0-preview.2`+  | ✅ (latest preview)  |
+| `1.0.0-preview.3`+  | ✅ (latest preview)  |
 | `0.3.0-preview.*`   | ❌ (superseded)      |
 | `0.2.0-preview.*`   | ❌ (superseded)      |
 | `0.1.0-preview.*`   | ❌ (superseded)      |

@@ -32,7 +32,7 @@ small-surface, and honest about what it is.
 > [Compared to System.IdentityModel.Tokens.Jwt](#compared-to-systemidentitymodeltokensjwt)
 > for the side-by-side.
 
-> **Status — `1.0.0-preview.2`. Preview software. Not for production use.**
+> **Status — `1.0.0-preview.3`. Preview software. Not for production use.**
 > The API may change between previews, before the stable `1.0.0`. The
 > cryptographic construction has **not** been
 > independently audited. Read [`KNOWN-GAPS.md`](KNOWN-GAPS.md) before depending
@@ -43,7 +43,7 @@ small-surface, and honest about what it is.
 ## Table of contents
 
 - [Why](#why)
-- [What's new in 1.0.0-preview.2](#whats-new-in-100-preview2)
+- [What's new in 1.0.0-preview.3](#whats-new-in-100-preview3)
 - [Install](#install)
 - [60-second tour](#60-second-tour)
 - [Usage](#usage)
@@ -81,6 +81,20 @@ once:
 If either half stands, your token stands. That is the whole point.
 
 ---
+
+## What's new in 1.0.0-preview.3
+
+A **docs and packaging** refresh — the library binary is **identical** to
+`preview.2` (no code change). It exists so the package pages point where they should:
+
+- **Live playground — https://pqjwt.systemslibrarian.dev** — build, validate, and
+  *break* a post-quantum token in your browser, with a
+  [how-to guide](https://github.com/systemslibrarian/postquantum-jwt/blob/main/samples/PqJwtPlayground/USING.md).
+- **Sample links are now absolute URLs**, so they resolve on the NuGet package
+  page, not only on GitHub.
+- **Sample Dockerfiles fixed** to bring OpenSSL 3.5 (the Azure Linux base ships
+  only 3.3.5 — too old for ML-DSA/ML-KEM, so the containers had started but
+  failed closed on every token op).
 
 ## What's new in 1.0.0-preview.2
 
@@ -281,13 +295,13 @@ Full notes in [`CHANGELOG.md`](CHANGELOG.md).
 ## Install
 
 ```bash
-dotnet add package PostQuantum.Jwt --version 1.0.0-preview.2
+dotnet add package PostQuantum.Jwt --version 1.0.0-preview.3
 ```
 
 Or in a `.csproj`:
 
 ```xml
-<PackageReference Include="PostQuantum.Jwt" Version="1.0.0-preview.2" />
+<PackageReference Include="PostQuantum.Jwt" Version="1.0.0-preview.3" />
 ```
 
 **Runtime requirement:** the native ML-KEM / ML-DSA primitives need an OpenSSL
@@ -449,7 +463,7 @@ package and call `AddPqJwtBearer(...)` on the standard
 `ML-DSA-65`.
 
 ```bash
-dotnet add package PostQuantum.Jwt.AspNetCore --version 1.0.0-preview.2
+dotnet add package PostQuantum.Jwt.AspNetCore --version 1.0.0-preview.3
 ```
 
 ```csharp
