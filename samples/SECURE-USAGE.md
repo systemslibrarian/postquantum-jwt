@@ -89,6 +89,14 @@ Set `ValidIssuer` and `ValidAudience`. They stop a token minted for one service
 from being accepted by another — free if you're single-service today, essential
 the day you aren't.
 
+The same applies *within* a service: if you mint more than one **kind** of token
+(say an access token and an email-verification or step-up token), give each a
+distinct `ValidAudience` (or a purpose claim you check) so one can't be presented
+where another is expected — token-type confusion. The validator proves a token is
+authentic and its claims are valid; deciding it's the *right kind of token for
+this endpoint* is your check. Keeping refresh tokens opaque (not PqJwts, §3) means
+they can't be replayed as access tokens at all.
+
 ## 5. Turn on replay protection where one-time use matters
 
 For tokens that should be used once (e.g. a sensitive action), set
@@ -156,7 +164,11 @@ var token = new PqJwtBuilder()
 This is an application-level control the library *enables* (it's just a claim) but
 does not enforce for you. It's worth the complexity for high-value sessions; for
 most apps, §2 (in-memory) + §3 (short-lived + refresh) + §8 already cover the
-common theft paths.
+common theft paths. The standardized forms of this "sender-constrained token"
+idea are **DPoP** (RFC 9449) and **mTLS-bound** tokens; this library doesn't
+implement either, but the fingerprint-claim approach above achieves the same goal
+(a stolen token is useless without the matching client secret) within a single
+issuer/verifier you control.
 
 ---
 
