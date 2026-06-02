@@ -1,10 +1,11 @@
 # PostQuantum.Jwt WebApiDemo
 #
-# IMPORTANT: the native ML-KEM / ML-DSA primitives require OpenSSL 3.5+.
-# The default Debian-based aspnet images ship an older OpenSSL, where the PQ
-# paths fail closed. We use the Azure Linux (Mariner) 10 images, which provide
-# a new-enough OpenSSL. Confirm with `openssl version` inside the container if
-# you swap the base image.
+# IMPORTANT: the native ML-KEM / ML-DSA primitives require OpenSSL 3.5+. NO
+# current .NET base image ships it — Debian/Ubuntu images are on OpenSSL 3.0 and
+# even Azure Linux 3.0 is only on 3.3.5, both of which make MLDsa.IsSupported
+# false so every token op fails closed. We bring OpenSSL 3.5 in ourselves via
+# conda-forge and point the runtime loader at it (same approach as the playground
+# Dockerfile and the repo's CI).
 #
 # Build context is the REPO ROOT (we reference ../../src). Build with:
 #   docker build -f samples/WebApiDemo/Dockerfile -t pqjwt-webapidemo .
@@ -23,8 +24,19 @@ COPY samples/WebApiDemo/ samples/WebApiDemo/
 RUN dotnet restore samples/WebApiDemo/WebApiDemo.csproj
 RUN dotnet publish samples/WebApiDemo/WebApiDemo.csproj -c Release -o /app --no-restore
 
+# ---- OpenSSL 3.5 (the base image's 3.3.5 is too old for ML-DSA/ML-KEM) ----
+FROM mcr.microsoft.com/dotnet/sdk:10.0-azurelinux3.0 AS openssl
+# gawk: the miniforge installer needs awk, which the Azure Linux image omits.
+RUN tdnf install -y gawk && tdnf clean all && \
+    curl -fsSL https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh -o /tmp/mf.sh && \
+    bash /tmp/mf.sh -b -p /opt/conda && rm -f /tmp/mf.sh && \
+    /opt/conda/bin/conda create -y -n pq -c conda-forge "openssl>=3.5" && \
+    /opt/conda/bin/conda clean -afy
+
 # ---- runtime ----
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-azurelinux3.0 AS runtime
+COPY --from=openssl /opt/conda/envs/pq /opt/conda/envs/pq
+ENV LD_LIBRARY_PATH=/opt/conda/envs/pq/lib
 WORKDIR /app
 COPY --from=build /app .
 ENV ASPNETCORE_HTTP_PORTS=8080

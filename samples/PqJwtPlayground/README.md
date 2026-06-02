@@ -44,15 +44,19 @@ Open the printed HTTPS URL (e.g. https://localhost:7100).
 
 ## Docker
 
-See the `Dockerfile` (build from the repository root). Uses Azure Linux 3.0 for
-a new-enough OpenSSL.
+See the `Dockerfile` (build from the repository root). It pulls **OpenSSL 3.5+
+from conda-forge** and points the runtime loader at it — the Azure Linux base
+image only ships OpenSSL 3.3.5, which is too old for ML-DSA / ML-KEM (the app
+would start but every token op would fail closed with HTTP 500).
 
 ## Hosting note
 
-This is a stateful Blazor Server app. To put it on `systemslibrarian.dev`, host
-it on a runtime that provides OpenSSL 3.5+ (a container on a VM, Azure Container
-Apps, etc.). It cannot run as a static GitHub Pages site, because the crypto is
-server-side by necessity.
+This is a stateful Blazor Server app — it can't run as a static GitHub Pages
+site, because the crypto is server-side by necessity. It's **live at
+<https://pqjwt.systemslibrarian.dev>**, hosted on Azure Container Apps with
+**scale-to-zero and a 1-replica cap** for cost control (so the first request
+after it's been idle can take up to a minute to wake). To stand up your own, see
+[`DEPLOY.md`](DEPLOY.md) and [`CUSTOM-DOMAIN.md`](CUSTOM-DOMAIN.md).
 
 ## Accessibility
 

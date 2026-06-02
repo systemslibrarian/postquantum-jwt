@@ -541,39 +541,44 @@ only bearer auth, or restrict each scheme to specific routes with
 
 ## Samples
 
-Nine runnable samples live in [`samples/`](samples/) — from a menu-driven console
-tour to a real ASP.NET Core service, an interactive Blazor playground, refresh-token
-rotation, and a distributed replay cache. Each references the library by project
-reference, so the samples always build against the current source (CI builds the
-whole sample solution on every push).
+Nine runnable samples live in
+[`samples/`](https://github.com/systemslibrarian/postquantum-jwt/tree/main/samples)
+— a menu-driven console tour, a real ASP.NET Core service, an interactive Blazor
+playground, refresh-token rotation, a distributed replay cache, and more. Each
+references the library by project reference, so they always build against the
+current source (CI builds the whole sample solution on every push).
+
+> **▶ Live playground — https://pqjwt.systemslibrarian.dev** — build a token
+> (claims, lifetime, optional X-Wing encryption), validate one, and see in plain
+> language *why* a tampered or expired token is rejected — all in your browser, no
+> install. (It's hosted scale-to-zero to keep costs near nothing, so the first
+> request after it's been idle can take up to a minute to wake; reload if needed.)
+> Every *other* sample is source you clone and run locally — browse them all in
+> [`samples/`](https://github.com/systemslibrarian/postquantum-jwt/tree/main/samples).
 
 | Sample | Shows |
 | --- | --- |
-| [`ConsoleDemo`](samples/ConsoleDemo)                     | Every feature, fast — a Spectre.Console menu |
-| [`WebApiDemo`](samples/WebApiDemo)                       | Real ASP.NET Core integration via `AddPqJwtBearer` |
-| [`VerifierDemo`](samples/VerifierDemo)                   | Cross-service key rotation against an issuer's key directory |
-| [`PqJwtPlayground`](samples/PqJwtPlayground)             | Interactive Blazor UI — build and validate tokens in a browser |
-| [`RefreshTokenDemo`](samples/RefreshTokenDemo)           | Access/refresh split, rotation, reuse detection |
-| [`DistributedReplayCache`](samples/DistributedReplayCache) | `IPqJwtReplayCache` over Redis / `IDistributedCache` |
-| [`SpecByExample`](samples/SpecByExample)                 | xUnit tests whose names are the lessons |
-| [`TestingSupport`](samples/TestingSupport)               | A no-crypto test auth handler for your own `[Authorize]` endpoints |
+| [`ConsoleDemo`](https://github.com/systemslibrarian/postquantum-jwt/tree/main/samples/ConsoleDemo) | Every feature, fast — a Spectre.Console menu |
+| [`WebApiDemo`](https://github.com/systemslibrarian/postquantum-jwt/tree/main/samples/WebApiDemo) | Real ASP.NET Core integration via `AddPqJwtBearer` |
+| [`VerifierDemo`](https://github.com/systemslibrarian/postquantum-jwt/tree/main/samples/VerifierDemo) | Cross-service key rotation against an issuer's key directory |
+| [`PqJwtPlayground`](https://github.com/systemslibrarian/postquantum-jwt/tree/main/samples/PqJwtPlayground) | Interactive Blazor UI — the [live demo](https://pqjwt.systemslibrarian.dev) above |
+| [`RefreshTokenDemo`](https://github.com/systemslibrarian/postquantum-jwt/tree/main/samples/RefreshTokenDemo) | Access/refresh split, rotation, reuse detection |
+| [`DistributedReplayCache`](https://github.com/systemslibrarian/postquantum-jwt/tree/main/samples/DistributedReplayCache) | `IPqJwtReplayCache` over Redis / `IDistributedCache` |
+| [`SpecByExample`](https://github.com/systemslibrarian/postquantum-jwt/tree/main/samples/SpecByExample) | xUnit tests whose names are the lessons |
+| [`TestingSupport`](https://github.com/systemslibrarian/postquantum-jwt/tree/main/samples/TestingSupport) | A no-crypto test auth handler for your own `[Authorize]` endpoints |
 
 ```bash
-# build every sample
+# clone, then build every sample
 dotnet build samples/PostQuantum.Jwt.Samples.slnx
 # or run one
 dotnet run --project samples/ConsoleDemo
 ```
 
-See [`samples/README.md`](samples/README.md) for the full guide,
-[`samples/SECURE-USAGE.md`](samples/SECURE-USAGE.md) for the decisions *around* the
-token, and [`samples/HARDENING-CHECKLIST.md`](samples/HARDENING-CHECKLIST.md) for
-how each attack is blocked.
-
-> **Live playground:** **https://pqjwt-playground.politeforest-51c29669.eastus.azurecontainerapps.io/**
-> — build and validate post-quantum tokens in your browser. (Scale-to-zero, so the
-> first request after it's been idle takes a few seconds to wake.) To host your
-> own, see [`samples/PqJwtPlayground/DEPLOY.md`](samples/PqJwtPlayground/DEPLOY.md).
+See [`samples/README.md`](https://github.com/systemslibrarian/postquantum-jwt/blob/main/samples/README.md) for the full guide,
+[`samples/SECURE-USAGE.md`](https://github.com/systemslibrarian/postquantum-jwt/blob/main/samples/SECURE-USAGE.md) for the decisions *around* the
+token, and [`samples/HARDENING-CHECKLIST.md`](https://github.com/systemslibrarian/postquantum-jwt/blob/main/samples/HARDENING-CHECKLIST.md) for
+how each attack is blocked. To host your own playground, see
+[`samples/PqJwtPlayground/DEPLOY.md`](https://github.com/systemslibrarian/postquantum-jwt/blob/main/samples/PqJwtPlayground/DEPLOY.md).
 
 ---
 

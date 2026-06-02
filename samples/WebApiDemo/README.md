@@ -95,11 +95,11 @@ expire.
 
 ## Docker
 
-> **OpenSSL 3.5+ is required for the PQ primitives.** Ubuntu 24.04 (the new
-> default .NET 10 base image) ships OpenSSL 3.0 and will **fail closed** on the
-> ML-KEM / ML-DSA paths. This Dockerfile uses the **Azure Linux 3.0** images,
-> which carry a new-enough OpenSSL. Verify with `openssl version` if you change
-> the base.
+> **OpenSSL 3.5+ is required for the PQ primitives.** No current .NET base image
+> ships it — Ubuntu 24.04 is on OpenSSL 3.0 and even Azure Linux 3.0 is only on
+> 3.3.5 — so the app would start but **fail closed** on every ML-KEM / ML-DSA op.
+> This Dockerfile brings **OpenSSL 3.5 via conda-forge** and points the runtime
+> loader at it (the same approach the playground Dockerfile and the repo's CI use).
 
 Build from the **repository root** (the Dockerfile references `../../src`):
 
