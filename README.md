@@ -42,7 +42,7 @@ small-surface, and honest about what it is.
 ## Table of contents
 
 - [Why](#why)
-- [What's new in 0.3.0-preview.1](#whats-new-in-020-preview1)
+- [What's new in 1.0.0-preview.1](#whats-new-in-100-preview1)
 - [Install](#install)
 - [60-second tour](#60-second-tour)
 - [Usage](#usage)
@@ -79,14 +79,66 @@ If either half stands, your token stands. That is the whole point.
 
 ---
 
-## What's new in 0.3.0-preview.1
+## What's new in 1.0.0-preview.1
 
-A **real-world adoption** release. v0.2 made the existing surface trustworthy;
-v0.3 makes it pleasant to wire into a real ASP.NET Core 10 app, makes it
-AOT-friendly, and adds the supply-chain signals a production-grade crypto
-package needs. Changes are stacked newest-first.
+A **maturity-tier bump** from `0.3.0-preview.1`. The crypto core and public
+algorithm surface are unchanged — ML-DSA-65 + X-Wing + AES-256-GCM with
+sign-then-encrypt and RFC 7516 AAD binding remain the only path, no algorithm
+agility, no new suites. What 1.0 brings is a sharper safety posture, a tighter
+exception contract, and the test seam needed to KAT the parts of X-Wing that
+*can* be made deterministic. The `preview.N` suffix carries the maturity
+caveat, not the leading `1.0`: the construction has **not** been independently
+audited and the non-IANA identifiers mean tokens still do not interop with
+generic JWT tooling. Changes are stacked newest-first.
 
-**New in v0.3.0-preview.1**
+**New in v1.0.0-preview.1**
+
+- **Opt-in fail-closed replay protection.**
+  `PqJwtValidationParameters.RequireReplayProtection`, when `true`, makes the
+  `PqJwtValidator` constructor throw if no `ReplayCache` is wired. Default is
+  `false` (no behavior change for existing callers), but operators who turn it
+  on catch a missing cache at startup rather than as a silent missing defense
+  at runtime.
+- **Parser-level failures now surface as `PqJwtValidationException`.**
+  `Validate` wraps `FormatException` / `JsonException` /
+  `CryptographicException` (raised by Base64Url decode, JSON header/payload
+  parse, and crypto-material import) in `PqJwtValidationException` with the
+  original kept as `InnerException`. Consumers that catch only
+  `PqJwtException` no longer leak a 500 on adversarial input.
+- **`IXWingDeterministicCoins` internal test seam** (visible via
+  `InternalsVisibleTo` only — production code has no parameter for it). Lets
+  the suite KAT the X-Wing combiner direction and the X25519 ephemeral half
+  against the official IETF vectors. The BCL `MLKem.Encapsulate` step is
+  still not KAT-able and is now covered by an N=64 statistical sanity test
+  asserting all 64 ciphertexts *and* all 64 shared secrets are distinct while
+  every round-trip recovers the secret correctly.
+- **Production X25519 ephemeral entropy now flows through
+  `RandomNumberGenerator`** instead of BouncyCastle's `SecureRandom`. Both
+  are CSPRNGs and the wire output is bit-identical, but the production
+  entropy source is now the .NET BCL and the ephemeral key is zeroed in a
+  `finally` (the BC path did not).
+- **Pinned end-to-end roundtrip corpus**
+  (`tests/PostQuantum.Jwt.Tests/TestVectors/jwt-roundtrip-vectors.json`):
+  signed-with-`kid`/`jti`/`aud`/custom-claim, signed-minimal, and
+  signed-then-encrypted-minimal. Each vector pins the deterministic parts
+  (compact JSON of protected header + payload) and asserts successful
+  end-to-end validation; non-deterministic parts (ML-DSA signature, X-Wing
+  ciphertext, AES-GCM nonce/ciphertext/tag) are not pinned and the file
+  documents why.
+- **"Read this first — these tokens are intentionally non-interoperable"
+  disclosure** at the very top of the README, naming the non-IANA `ML-DSA-65`
+  / `X-Wing` / `A256GCM` identifiers and the standard JWT libraries that
+  will reject these tokens. Reinforces — does not replace — the existing
+  mid-page `System.IdentityModel.Tokens.Jwt` comparison.
+- **`PostQuantum.Jwt.AspNetCore` is marked superseded by
+  [`PostQuantum.AspNetCore`](https://github.com/systemslibrarian/postquantum-aspnetcore)**
+  (cleaner naming, event-hook surface, hosted-service warmup, SignalR
+  support, 40-test integration suite). Tokens minted by either validate in
+  the other. The legacy companion receives critical fixes only — no new
+  features — through 1.0.
+- **Test count: 79/79 passing** on the full PQ lane (was 68 at v0.3).
+
+**Previously, in v0.3.0-preview.1**
 
 - **New companion package `PostQuantum.Jwt.AspNetCore`.**
   - `services.AddAuthentication().AddPqJwtBearer(...)` — mirrors the shape
@@ -557,13 +609,14 @@ token's `kid` header. It does *not* fetch keys — there is no JWKS endpoint or
 remote-discovery story. Your application is responsible for the key ring; this
 library is just disciplined about asking for the right key when validating.
 
-**"Preview, not for production" — what that means operationally.** The wire
-format and public API are not stable yet. If you ship 0.3.0-preview.1 in a
-service and a future release bumps to 0.3.0 with a wire-format change, you
-will be re-signing every active token (and possibly running a flag-day
-migration). For an internal service you control end-to-end this is
+**"Preview, not for production" — what that means operationally.** The leading
+`1.0` signals the public API and wire format have stopped moving in
+back-incompatible ways across preview revisions; the `preview.N` suffix
+carries the maturity caveat (no independent audit, non-IANA identifiers).
+A future `preview.N+1` may still adjust the surface if a security review
+demands it. For an internal service you control end-to-end this is
 manageable. For a public API where third parties hold issued tokens, treat
-this as a blocker until 1.0.
+the unaudited construction as the gating concern, not the wire format.
 
 ---
 
@@ -612,7 +665,7 @@ Full detail lives in [`SECURITY.md`](SECURITY.md) and
 | Target framework | `net10.0` |
 | Languages | C# 13 (any CLS-consuming language; the assembly is `[CLSCompliant(false)]` because the public surface exposes raw `byte[]` key material). |
 | Operating system | Windows, Linux, macOS — anywhere .NET 10 + an OpenSSL build that exposes ML-KEM / ML-DSA runs. On Linux that's **OpenSSL 3.5 or later**. |
-| AOT / trimming | Not yet validated. The library uses `System.Text.Json` reflection paths; expect to need source-generated contexts before publishing AOT. |
+| AOT / trimming | Supported. Both `PostQuantum.Jwt` and `PostQuantum.Jwt.AspNetCore` declare `IsAotCompatible=true`. Use `WithClaim<T>(name, value, JsonTypeInfo<T>)` from a source-gen context for custom claims; the reflection-based `WithClaim(name, object?)` overload is annotated `[RequiresUnreferencedCode]` / `[RequiresDynamicCode]` so AOT publishers see one targeted warning. |
 
 ---
 
