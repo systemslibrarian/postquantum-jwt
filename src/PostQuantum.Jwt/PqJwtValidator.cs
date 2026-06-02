@@ -19,6 +19,11 @@ public sealed class PqJwtValidator
     private const int SignedPartCount = 3;
     private const int EncryptedPartCount = 5;
 
+    // Upper bound on accepted token length (characters). ~20x the largest expected
+    // token (encrypted ≈ 6.5 KB), so legitimate tokens are never affected; it exists
+    // only to cap pre-verification work on adversarial oversized input.
+    private const int MaxTokenLength = 128 * 1024;
+
     // -- Observability -------------------------------------------------------
     // Emitted via System.Diagnostics.Metrics so consumers can wire OpenTelemetry
     // (or any IMeterListener) without the library taking a telemetry dependency.
@@ -91,6 +96,19 @@ public sealed class PqJwtValidator
     {
         ArgumentException.ThrowIfNullOrEmpty(token);
 
+        // Reject absurdly large tokens up front — before any split, Base64Url decode,
+        // JSON parse, or (expensive) ML-DSA verification touches the input. A signed
+        // token is ~4.5 KB and an encrypted one ~6.5 KB; the cap is generously above
+        // any legitimate token, so this only stops a memory/CPU-exhaustion attempt
+        // (a multi-megabyte "token") from amplifying work the signature check would
+        // reject anyway.
+        if (token.Length > MaxTokenLength)
+        {
+            throw new PqJwtValidationException(
+                PqJwtFailureReason.MalformedToken,
+                $"Token exceeds the maximum accepted length of {MaxTokenLength} characters.");
+        }
+
         try
         {
             var parts = token.Split('.');
@@ -154,14 +172,14 @@ public sealed class PqJwtValidator
         {
             throw new PqJwtValidationException(
                 PqJwtFailureReason.AlgorithmNotAccepted,
-                $"Unsupported key-agreement algorithm '{header.Algorithm}'; expected '{PqJwtAlgorithms.XWing}'.");
+                $"Unsupported key-agreement algorithm '{Sanitize(header.Algorithm)}'; expected '{PqJwtAlgorithms.XWing}'.");
         }
 
         if (!string.Equals(header.Encryption, PqJwtAlgorithms.Aes256Gcm, StringComparison.Ordinal))
         {
             throw new PqJwtValidationException(
                 PqJwtFailureReason.AlgorithmNotAccepted,
-                $"Unsupported content-encryption algorithm '{header.Encryption}'; expected '{PqJwtAlgorithms.Aes256Gcm}'.");
+                $"Unsupported content-encryption algorithm '{Sanitize(header.Encryption)}'; expected '{PqJwtAlgorithms.Aes256Gcm}'.");
         }
 
         // The builder always emits cty=JWT for encrypted (nested) tokens; require it on
@@ -172,7 +190,7 @@ public sealed class PqJwtValidator
         {
             throw new PqJwtValidationException(
                 PqJwtFailureReason.InvalidHeader,
-                $"Encrypted token must declare 'cty' = '{PqJwtAlgorithms.TokenType}'; got '{header.ContentType ?? "<missing>"}'.");
+                $"Encrypted token must declare 'cty' = '{PqJwtAlgorithms.TokenType}'; got '{Sanitize(header.ContentType)}'.");
         }
 
         var innerJws = Decrypt(parts, header, _parameters.DecryptionKey);
@@ -244,7 +262,7 @@ public sealed class PqJwtValidator
         {
             throw new PqJwtValidationException(
                 PqJwtFailureReason.AlgorithmNotAccepted,
-                $"Unsupported or disallowed signature algorithm '{header.Algorithm}'; expected '{PqJwtAlgorithms.MLDsa65}'.");
+                $"Unsupported or disallowed signature algorithm '{Sanitize(header.Algorithm)}'; expected '{PqJwtAlgorithms.MLDsa65}'.");
         }
 
         var verificationKey = ResolveVerificationKey(header.KeyId);
@@ -264,7 +282,7 @@ public sealed class PqJwtValidator
             return resolver(keyId)
                 ?? throw new PqJwtValidationException(
                     PqJwtFailureReason.UnknownKeyId,
-                    $"No verification key was resolved for kid '{keyId}'.");
+                    $"No verification key was resolved for kid '{Sanitize(keyId)}'.");
         }
 
         return _parameters.SignatureVerificationKey!;
@@ -310,7 +328,7 @@ public sealed class PqJwtValidator
         if (!cache.TryRegister(jwtId, expiresAt))
         {
             throw new PqJwtValidationException(
-                PqJwtFailureReason.ReplayDetected, $"Token replay detected for jti '{jwtId}'.");
+                PqJwtFailureReason.ReplayDetected, $"Token replay detected for jti '{Sanitize(jwtId)}'.");
         }
     }
 
@@ -439,7 +457,7 @@ public sealed class PqJwtValidator
         {
             throw new PqJwtValidationException(
                 PqJwtFailureReason.IssuerMismatch,
-                $"Token issuer '{issuer}' does not match the expected issuer.");
+                $"Token issuer '{Sanitize(issuer)}' does not match the expected issuer.");
         }
     }
 
@@ -518,6 +536,36 @@ public sealed class PqJwtValidator
     // (DateTimeOffset.MinValue / MaxValue .ToUnixTimeSeconds()).
     private const long UnixSecondsMin = -62135596800L;
     private const long UnixSecondsMax = 253402300799L;
+
+    // Renders an untrusted, token-derived value (a header alg/kid, or a claim like
+    // iss/jti) safe to embed in an exception message. Control characters are
+    // replaced — so a crafted value can't forge log lines (CRLF log injection) when
+    // a consumer logs the exception — and the length is capped to avoid log
+    // flooding. Several of these values (e.g. the header alg/kid) are read BEFORE
+    // signature verification, so they are fully attacker-controlled.
+    private const int MaxEmbeddedValueLength = 64;
+
+    private static string Sanitize(string? value)
+    {
+        if (string.IsNullOrEmpty(value))
+        {
+            return "<missing>";
+        }
+
+        var length = Math.Min(value.Length, MaxEmbeddedValueLength);
+        var builder = new StringBuilder(length + 1);
+        foreach (var c in value.AsSpan(0, length))
+        {
+            builder.Append(char.IsControl(c) ? '�' : c);
+        }
+
+        if (value.Length > MaxEmbeddedValueLength)
+        {
+            builder.Append('…');
+        }
+
+        return builder.ToString();
+    }
 
     // Records a fail-closed rejection on the metric. A PqJwtValidationException
     // carries its own strongly-typed Reason (set at the throw site); a plain

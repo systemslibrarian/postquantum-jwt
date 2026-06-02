@@ -14,6 +14,12 @@ internal static partial class Logging
     public static partial void ValidationFailed(this ILogger logger, Exception exception);
 
     [LoggerMessage(
+        EventId = 5,
+        Level = LogLevel.Error,
+        Message = "PqJwt bearer options are misconfigured; every request to this scheme will fail closed (401). Fix the PqJwtValidationParameters.")]
+    public static partial void ValidatorMisconfigured(this ILogger logger, Exception exception);
+
+    [LoggerMessage(
         EventId = 2,
         Level = LogLevel.Warning,
         Message = "PqJwt key ring fetch from {Endpoint} returned an empty document.")]

@@ -35,6 +35,16 @@ Last reviewed for: `1.0.0-preview.2`.
 - **One algorithm suite only.** Only ML-DSA-65, ML-KEM-768, and AES-256-GCM are
   supported. There is no algorithm agility (e.g. ML-DSA-44/87, ML-KEM-512/1024)
   in this preview.
+- **Signatures are pure post-quantum, not hybrid.** *Encryption* key-agreement is
+  hybrid (X-Wing = X25519 + ML-KEM-768), so confidentiality survives a break of
+  either primitive. *Signatures*, however, are pure ML-DSA-65 — not a composite
+  like ECDSA+ML-DSA. ML-DSA is FIPS-204 standardized, and a single pure-PQ suite
+  keeps the surface small and sidesteps the algorithm-confusion class entirely.
+  The trade-off: there is no classical signature as a fallback against an
+  undiscovered ML-DSA *implementation* flaw, which some transition guidance (e.g.
+  BSI) prefers during the migration period. A hybrid signature suite is a
+  candidate for a future version if that guidance hardens; it is a deliberate
+  omission here, not an oversight.
 
 ## Tokens & protocol
 

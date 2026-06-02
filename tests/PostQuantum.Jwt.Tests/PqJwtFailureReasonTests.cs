@@ -233,6 +233,39 @@ public sealed class PqJwtFailureReasonTests
         Assert.Equal(PqJwtFailureReason.ReplayDetected, ReasonOf(() => validator.Validate(token)));
     }
 
+    [Fact]
+    public void Control_characters_in_alg_are_sanitized_out_of_the_message()
+    {
+        // Regression: a CRLF in an attacker-controlled header value must not appear
+        // verbatim in the exception message (which a consumer may log) — that would
+        // be a log-injection / log-forging vector.
+        var token = $"{B64("{\"alg\":\"none\\r\\nInjected-Log-Line: evil\"}")}.{B64("{}")}.sig";
+        var ex = Assert.Throws<PqJwtValidationException>(() => ResolverValidator(null).Validate(token));
+        Assert.Equal(PqJwtFailureReason.AlgorithmNotAccepted, ex.Reason);
+        Assert.DoesNotContain('\n', ex.Message);
+        Assert.DoesNotContain('\r', ex.Message);
+    }
+
+    [Fact]
+    public void Control_characters_in_kid_are_sanitized_out_of_the_message()
+    {
+        var token = $"{B64($"{{\"alg\":\"{PqJwtAlgorithms.MLDsa65}\",\"kid\":\"k\\r\\nevil\"}}")}.{B64("{}")}.sig";
+        var ex = Assert.Throws<PqJwtValidationException>(() => ResolverValidator(null).Validate(token));
+        Assert.Equal(PqJwtFailureReason.UnknownKeyId, ex.Reason);
+        Assert.DoesNotContain('\n', ex.Message);
+        Assert.DoesNotContain('\r', ex.Message);
+    }
+
+    [Fact]
+    public void An_absurdly_long_token_is_rejected_before_parsing()
+    {
+        // Reject oversized input up front (no split/decode/verify), capping
+        // pre-verification work on a memory/CPU-exhaustion attempt.
+        var huge = new string('a', 200_000);
+        Assert.Equal(PqJwtFailureReason.MalformedToken,
+            ReasonOf(() => ResolverValidator(null).Validate(huge)));
+    }
+
     // ── malformed header/claim hardening (no InvalidOperationException escape) ──
 
     [Theory]

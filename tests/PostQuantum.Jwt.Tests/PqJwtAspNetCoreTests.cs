@@ -214,7 +214,34 @@ public sealed class PqJwtAspNetCoreTests
         Assert.Null(ring.Resolve(kid)); // due refresh evicts the removed kid
     }
 
-    private static async Task<TestServer> CreateTestServer(MLDsa signingKey, TimeProvider clock)
+    [PqcFact]
+    public async Task A_misconfigured_validator_returns_401_not_500()
+    {
+        // Regression: the validator is constructed lazily inside the handler, and a
+        // misconfiguration (RequireReplayProtection with no ReplayCache) throws an
+        // ArgumentException there. It must fail closed (401), not escape as a 500.
+        using var signingKey = TestKeys.NewSigningKey();
+        var clock = new FixedTimeProvider(Now);
+        var token = new PqJwtBuilder(clock)
+            .WithSubject("alice").WithLifetime(TimeSpan.FromMinutes(10))
+            .SignWith(signingKey).Build();
+
+        using var verify = TestKeys.PublicKeyOf(signingKey);
+        var badParams = new PqJwtValidationParameters
+        {
+            SignatureVerificationKey = verify,
+            RequireReplayProtection = true, // no ReplayCache -> validator ctor throws
+        };
+        using var server = await CreateTestServer(signingKey, clock, badParams);
+        using var client = server.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var response = await client.GetAsync(new Uri("/me", UriKind.Relative));
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    private static async Task<TestServer> CreateTestServer(
+        MLDsa signingKey, TimeProvider clock, PqJwtValidationParameters? parameters = null)
     {
         using var pubKey = TestKeys.PublicKeyOf(signingKey);
         var publicKeyBytes = pubKey.ExportMLDsaPublicKey();
@@ -227,7 +254,7 @@ public sealed class PqJwtAspNetCoreTests
                     .AddAuthentication(PqJwtBearerDefaults.AuthenticationScheme)
                     .AddPqJwtBearer(options =>
                     {
-                        options.ValidationParameters = new PqJwtValidationParameters
+                        options.ValidationParameters = parameters ?? new PqJwtValidationParameters
                         {
                             SignatureVerificationKey = MLDsa.ImportMLDsaPublicKey(
                                 MLDsaAlgorithm.MLDsa65, publicKeyBytes),
