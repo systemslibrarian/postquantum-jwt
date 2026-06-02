@@ -13,8 +13,16 @@ namespace PostQuantum.Jwt;
 /// </remarks>
 public sealed class InMemoryReplayCache : IPqJwtReplayCache
 {
+    // How often a full sweep for expired entries may run. Pruning is purely memory
+    // hygiene — replay *correctness* never depends on it, because TryRegister already
+    // treats an existing-but-expired entry as reusable. Throttling the sweep keeps
+    // TryRegister amortized O(1) instead of O(n)-per-call: a flood of unique tokens
+    // can no longer turn every registration into a full-dictionary scan.
+    private static readonly long PruneIntervalTicks = TimeSpan.FromSeconds(30).Ticks;
+
     private readonly ConcurrentDictionary<string, DateTimeOffset> _seen = new(StringComparer.Ordinal);
     private readonly TimeProvider _timeProvider;
+    private long _lastPruneTicks;
 
     /// <summary>Creates a new in-memory replay cache.</summary>
     /// <param name="timeProvider">Clock used to expire entries; defaults to <see cref="TimeProvider.System"/>.</param>
@@ -51,6 +59,21 @@ public sealed class InMemoryReplayCache : IPqJwtReplayCache
     private void Prune()
     {
         var now = _timeProvider.GetUtcNow();
+
+        // Run a full sweep at most once per PruneIntervalTicks. The first thread to
+        // observe the interval has elapsed claims the slot via CompareExchange and
+        // sweeps; concurrent callers skip and return immediately.
+        var last = Interlocked.Read(ref _lastPruneTicks);
+        if (now.UtcTicks - last < PruneIntervalTicks)
+        {
+            return;
+        }
+
+        if (Interlocked.CompareExchange(ref _lastPruneTicks, now.UtcTicks, last) != last)
+        {
+            return;
+        }
+
         foreach (var entry in _seen)
         {
             if (entry.Value <= now)

@@ -42,6 +42,25 @@ runnable samples/templates ecosystem.
   carries a typed `PqJwtFailureReason`. No behavior change — control flow and
   rejection conditions are identical.
 
+### Fixed
+
+- **Malformed header fields no longer escape as an uncaught exception.** A header
+  field that is present but not a string (e.g. `"alg": 123` or `"alg": ["none"]`)
+  previously raised `InvalidOperationException`, which fell outside `Validate()`'s
+  catch filter and surfaced as an unhandled error (HTTP 500). Such fields are now
+  read safely and fail closed as `PqJwtValidationException`.
+- **Present-but-malformed `exp` / `nbf` are now rejected, not ignored.** A time
+  claim that exists but isn't an integer Unix time (a string or fractional number)
+  was silently treated as absent — bypassing the not-before check and, with
+  `RequireExpiration` off, making the token immortal. It now fails closed with the
+  new `PqJwtFailureReason.MalformedTimeClaim`, in both lifetime validation and the
+  replay-cache expiry path (so a malformed `exp` can never be cached as a
+  never-expiring entry).
+- **`InMemoryReplayCache` pruning is now amortized.** The expired-entry sweep ran
+  on every `TryRegister`, scanning the whole dictionary — O(n) per call, an
+  algorithmic-complexity DoS vector under token floods. It now runs at most once
+  per interval; replay-detection correctness is unchanged.
+
 ## [1.0.0-preview.1] — 2026-06-01
 
 A **maturity-tier bump** for the PostQuantum.* JWT stack, from

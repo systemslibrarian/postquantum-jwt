@@ -233,6 +233,49 @@ public sealed class PqJwtFailureReasonTests
         Assert.Equal(PqJwtFailureReason.ReplayDetected, ReasonOf(() => validator.Validate(token)));
     }
 
+    // ── malformed header/claim hardening (no InvalidOperationException escape) ──
+
+    [Theory]
+    [InlineData("{\"alg\":123}")]            // number
+    [InlineData("{\"alg\":[\"none\"]}")]     // array
+    [InlineData("{\"alg\":true}")]           // bool
+    [InlineData("{\"alg\":{\"x\":1}}")]      // object
+    public void Non_string_alg_is_rejected_not_crashed(string headerJson)
+    {
+        // Regression: a present-but-non-string header field must NOT escape as an
+        // uncaught InvalidOperationException (HTTP 500); it fails closed as
+        // PqJwtValidationException. ReasonOf asserts the exception type.
+        var token = $"{B64(headerJson)}.{B64("{}")}.sig";
+        Assert.Equal(PqJwtFailureReason.InvalidHeader,
+            ReasonOf(() => ResolverValidator(null).Validate(token)));
+    }
+
+    [PqcTheory]
+    [InlineData("{\"exp\":1700000000.5}")]   // fractional number
+    [InlineData("{\"exp\":\"1700000000\"}")] // string
+    [InlineData("{\"exp\":[1700000000]}")]   // array
+    public void Malformed_exp_claim_is_rejected(string payloadJson)
+    {
+        // Regression: a present-but-malformed exp must be rejected, not silently
+        // ignored (which would make the token immortal).
+        using var key = TestKeys.NewSigningKey();
+        using var verify = TestKeys.PublicKeyOf(key);
+        var token = SignCrafted(key, SignedHeader(), payloadJson);
+        Assert.Equal(PqJwtFailureReason.MalformedTimeClaim,
+            ReasonOf(() => ResolverValidator(verify).Validate(token)));
+    }
+
+    [PqcFact]
+    public void Malformed_nbf_claim_is_rejected()
+    {
+        // exp is far in the future so we reach the nbf check; nbf is malformed.
+        using var key = TestKeys.NewSigningKey();
+        using var verify = TestKeys.PublicKeyOf(key);
+        var token = SignCrafted(key, SignedHeader(), "{\"exp\":4102444800,\"nbf\":\"soon\"}");
+        Assert.Equal(PqJwtFailureReason.MalformedTimeClaim,
+            ReasonOf(() => ResolverValidator(verify).Validate(token)));
+    }
+
     // ── encrypted-path throw sites (require crypto) ────────────────────────
 
     [PqcFact]

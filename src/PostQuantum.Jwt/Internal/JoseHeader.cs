@@ -38,7 +38,7 @@ internal sealed class JoseHeader
                 PqJwtFailureReason.InvalidHeader, "Token header is not a JSON object.");
         }
 
-        var alg = (string?)obj["alg"];
+        var alg = AsString(obj["alg"]);
         if (string.IsNullOrEmpty(alg))
         {
             throw new PqJwtValidationException(
@@ -48,10 +48,20 @@ internal sealed class JoseHeader
         return new JoseHeader
         {
             Algorithm = alg,
-            Encryption = (string?)obj["enc"],
-            Type = (string?)obj["typ"],
-            ContentType = (string?)obj["cty"],
-            KeyId = (string?)obj["kid"],
+            Encryption = AsString(obj["enc"]),
+            Type = AsString(obj["typ"]),
+            ContentType = AsString(obj["cty"]),
+            KeyId = AsString(obj["kid"]),
         };
     }
+
+    // Reads a header field as a string ONLY when it is a JSON string. A field that
+    // is present but a number, array, object, or bool is treated as absent (null)
+    // rather than throwing — an explicit (string?)node cast would raise
+    // InvalidOperationException for those, which escapes the validator's fail-closed
+    // catch filter. Returning null keeps every path fail-closed: a non-string 'alg'
+    // becomes "missing alg", a non-string 'enc'/'cty' fails the algorithm/header
+    // checks, and a non-string 'kid' resolves to no key.
+    private static string? AsString(JsonNode? node) =>
+        node is JsonValue value && value.TryGetValue<string>(out var s) ? s : null;
 }
