@@ -11,7 +11,7 @@
   <PropertyGroup>
     <PackageType>Template</PackageType>
     <PackageId>PostQuantum.Jwt.Templates</PackageId>
-    <Version>1.0.0-preview.2</Version>
+    <Version>1.0.0-preview.3</Version>
     <Title>PostQuantum.Jwt templates (dotnet new)</Title>
     <Authors>Paul Clark</Authors>
     <Description>`dotnet new` templates for PostQuantum.Jwt: scaffold a post-quantum hybrid JWT ASP.NET Core API (pqjwt-webapi) or a console app (pqjwt-console) that signs with ML-DSA-65 and validates fail-closed. Preview release — not for production use.</Description>

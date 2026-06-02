@@ -17,7 +17,7 @@
   <!-- NuGet package metadata -->
   <PropertyGroup>
     <PackageId>PostQuantum.Jwt</PackageId>
-    <Version>1.0.0-preview.2</Version>
+    <Version>1.0.0-preview.3</Version>
     <Title>PostQuantum.Jwt — post-quantum hybrid JWTs for .NET</Title>
     <Authors>Paul Clark</Authors>
     <Description>Post-quantum hybrid JWT library for .NET 10. Signs tokens with ML-DSA-65 (FIPS 204) and optionally encrypts them with X-Wing (X25519 + ML-KEM-768) hybrid key agreement plus AES-256-GCM. Built on the native .NET BCL post-quantum primitives, fail-closed by design, and honest about its security posture. Preview release — not for production use.</Description>
@@ -27,7 +27,7 @@
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageTags>jwt;jose;jwe;post-quantum;pqc;ml-dsa;ml-kem;dilithium;kyber;x-wing;x25519;sha3;hybrid;cryptography;security;fips-203;fips-204;net10</PackageTags>
-    <PackageReleaseNotes>1.0.0-preview.2: Additive observability and a typed failure taxonomy — crypto core unchanged (ML-DSA-65 signatures, X-Wing + AES-256-GCM optional encryption, sign-then-encrypt, RFC 7516 AAD binding, fail-closed validation), no new algorithm suite, no algorithm agility. New: validation metrics via System.Diagnostics.Metrics (meter "PostQuantum.Jwt", counter "pqjwt.validations" tagged outcome=success|failure and a coarse, bounded, non-sensitive reason) — opt in with any OpenTelemetry/meter listener, no new dependency. New public PqJwtFailureReason enum + PqJwtValidationException.Reason so callers (and the metric) categorize failures from a typed value rather than parsing messages; the fail-closed control flow is byte-for-byte unchanged. Also adds a runnable samples/ suite, a `dotnet new` template package (PostQuantum.Jwt.Templates: pqjwt-webapi, pqjwt-console), and expanded SECURE-USAGE / HARDENING-CHECKLIST guidance. The preview.N suffix continues to carry the maturity caveat: NOT independently audited, NOT for production. Full notes: https://github.com/systemslibrarian/postquantum-jwt/blob/main/CHANGELOG.md — known limitations: https://github.com/systemslibrarian/postquantum-jwt/blob/main/KNOWN-GAPS.md.</PackageReleaseNotes>
+    <PackageReleaseNotes>1.0.0-preview.3: Docs and packaging refresh — the library binary is identical to 1.0.0-preview.2 (no code change). The package README now links the runnable samples with absolute URLs (so they resolve on the NuGet page) and points at the live playground at https://pqjwt.systemslibrarian.dev; the sample Dockerfiles were fixed to provide OpenSSL 3.5, which ML-DSA/ML-KEM require. The preview.N suffix continues to carry the maturity caveat: NOT independently audited, NOT for production. Full notes: https://github.com/systemslibrarian/postquantum-jwt/blob/main/CHANGELOG.md — known limitations: https://github.com/systemslibrarian/postquantum-jwt/blob/main/KNOWN-GAPS.md.</PackageReleaseNotes>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
     <Copyright>Copyright © Paul Clark</Copyright>
     <NeutralLanguage>en-US</NeutralLanguage>

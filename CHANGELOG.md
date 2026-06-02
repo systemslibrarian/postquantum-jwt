@@ -8,6 +8,29 @@ the API between previews.
 
 ## [Unreleased]
 
+## [1.0.0-preview.3] — 2026-06-02
+
+Docs and packaging only — the library binary is **unchanged** from `1.0.0-preview.2`.
+
+### Changed
+
+- The package README links the runnable samples with **absolute GitHub URLs** (so
+  they resolve on the NuGet package page, not only on GitHub) and points at the
+  live playground at <https://pqjwt.systemslibrarian.dev>.
+
+### Fixed
+
+- Sample Dockerfiles (`PqJwtPlayground`, `WebApiDemo`) now bring **OpenSSL 3.5**
+  via conda-forge; the Azure Linux base image ships only 3.3.5, which is too old
+  for ML-DSA/ML-KEM — the containers had started but failed closed (HTTP 500) on
+  every token op. The playground deploy is also pinned to scale-to-zero / max 1
+  replica for cost control.
+
+### Added
+
+- `samples/PqJwtPlayground/USING.md` — a how-to guide for the live playground,
+  linked from the site itself.
+
 ## [1.0.0-preview.2] — 2026-06-02
 
 An **additive** release. The crypto core, public algorithm surface, and
@@ -531,7 +554,8 @@ See [`KNOWN-GAPS.md`](KNOWN-GAPS.md). Highlights:
 - **Packages are not author-signed yet** (no code-signing certificate).
   nuget.org applies repository signing on push.
 
-[Unreleased]: https://github.com/systemslibrarian/postquantum-jwt/compare/v1.0.0-preview.2...HEAD
+[Unreleased]: https://github.com/systemslibrarian/postquantum-jwt/compare/v1.0.0-preview.3...HEAD
+[1.0.0-preview.3]: https://github.com/systemslibrarian/postquantum-jwt/compare/v1.0.0-preview.2...v1.0.0-preview.3
 [1.0.0-preview.2]: https://github.com/systemslibrarian/postquantum-jwt/compare/v1.0.0-preview.1...v1.0.0-preview.2
 [1.0.0-preview.1]: https://github.com/systemslibrarian/postquantum-jwt/releases/tag/v1.0.0-preview.1
 [0.3.0-preview.1]: https://github.com/systemslibrarian/postquantum-jwt/releases/tag/v0.3.0-preview.1
