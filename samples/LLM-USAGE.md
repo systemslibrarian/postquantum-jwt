@@ -8,6 +8,11 @@ code here.
 (This is the *consumer* guide. The repo's `CLAUDE.md` is about *contributing to*
 the library itself — different audience.)
 
+> **Tip:** add the `PostQuantum.Jwt.Analyzers` package (`PrivateAssets="all"`) to
+> enforce rules 1–2 at compile time — PQJWT001 forbids inspecting token header
+> fields, PQJWT002 flags per-call validator construction. See
+> [`docs/SECURITY-AUDIT-TOOLS.md`](../docs/SECURITY-AUDIT-TOOLS.md).
+
 ## Hard rules
 
 1. **Validation is fail-closed. `PqJwtValidator.Validate(token)` returns a
@@ -66,7 +71,8 @@ try
 }
 catch (PqJwtValidationException ex)
 {
-    // The ONLY failure path. ex.Message says what failed.
+    // The ONLY failure path. ex.Message says what failed; ex.Reason is a typed
+    // PqJwtFailureReason you can branch on without parsing the message.
 }
 ```
 
