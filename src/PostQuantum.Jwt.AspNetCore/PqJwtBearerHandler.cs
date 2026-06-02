@@ -70,7 +70,19 @@ public sealed class PqJwtBearerHandler : AuthenticationHandler<PqJwtBearerOption
         PqJwtValidationResult result;
         try
         {
+            // Note: the Validator getter constructs the validator on first use, so a
+            // misconfiguration (e.g. RequireReplayProtection with no ReplayCache, a
+            // negative ClockSkew, or no key source) throws Argument* here. Catch it
+            // below and fail closed (401) rather than letting it escape as a 500.
             result = Validator.Validate(token);
+        }
+        catch (ArgumentException ex)
+        {
+            // Operator misconfiguration surfaced at validator construction (or an
+            // empty token). Not the token's fault and not a 500 — fail closed (401)
+            // and log loudly so the misconfiguration is obvious in the logs.
+            Logger.ValidatorMisconfigured(ex);
+            return Task.FromResult(AuthenticateResult.Fail(ex));
         }
         catch (PqJwtException ex)
         {

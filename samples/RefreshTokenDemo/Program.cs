@@ -163,10 +163,18 @@ static string Hash(string raw) =>
 /// <summary>One stored refresh token (only its hash is the dictionary key).</summary>
 internal sealed record RefreshRecord(string UserId, string Family, DateTimeOffset ExpiresAt)
 {
-    private int _used; // 0 = unused, 1 = consumed (atomic single-use claim)
+    private int _used;    // 0 = unused, 1 = consumed (atomic single-use claim)
+    private int _revoked; // 0 = live,   1 = revoked
 
     public bool Used => Volatile.Read(ref _used) == 1;
-    public bool Revoked { get; set; }
+
+    // Volatile so a RevokeFamily() write on one thread is visible to a concurrent
+    // refresh on another — matching the atomicity of the single-use claim.
+    public bool Revoked
+    {
+        get => Volatile.Read(ref _revoked) == 1;
+        set => Volatile.Write(ref _revoked, value ? 1 : 0);
+    }
 
     /// <summary>
     /// Atomically claims this token for its single use. Returns <c>true</c> for

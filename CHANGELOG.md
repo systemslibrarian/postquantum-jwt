@@ -85,6 +85,35 @@ runnable samples/templates ecosystem.
   concurrent refreshes with the same token could both succeed. It now uses an
   atomic compare-and-set so exactly one caller wins and a second is detected as
   reuse.
+- **Exception messages are sanitized against log injection.** Token-derived values
+  (`alg`/`kid`/`jti`/issuer) embedded in a `PqJwtValidationException` message now
+  have control characters stripped and length capped, so logging a rejected token
+  can't forge log lines via a crafted CRLF in a header.
+- **Oversized tokens are rejected before parsing.** A token longer than 128 KB
+  (~20× the largest legitimate token) is rejected up front, before any split,
+  Base64Url decode, JSON parse, or ML-DSA verification — capping pre-verification
+  work on adversarial input.
+- **ASP.NET Core handler returns 401 on validator misconfiguration, not 500.** A
+  misconfigured `PqJwtValidationParameters` (e.g. `RequireReplayProtection` with no
+  `ReplayCache`) throws at lazy validator construction inside the handler; this is
+  now caught, logged at Error, and surfaced as a fail-closed 401 instead of an
+  unhandled 500.
+- **Sample (`WebApiDemo/FileBackedSigningKey`): key file is created owner-only
+  atomically.** The encrypted key blob is written via a `FileStream` opened with
+  `UnixCreateMode` (chmod 600 at create time) instead of write-then-chmod, closing
+  the brief world/group-readable TOCTOU window.
+- **Sample (`RefreshTokenDemo`): `RefreshRecord.Revoked` is now volatile**, matching
+  the atomicity of the single-use flag so a `RevokeFamily` write is visible to a
+  concurrent refresh.
+
+### Documentation
+
+- `SECURE-USAGE.md` §10 documents verification-key distribution and rotation (the
+  JWKS-equivalent directory + `HttpPqJwtKeyRing` `kid`-based rotation/eviction).
+- `KNOWN-GAPS.md` records that signatures are pure ML-DSA-65 (not a hybrid
+  classical+PQ composite) and the trade-off that entails.
+- `HARDENING-CHECKLIST.md` adds rows for log injection, pre-parse size limit,
+  token-type confusion, and malformed time claims.
 
 ## [1.0.0-preview.1] — 2026-06-01
 

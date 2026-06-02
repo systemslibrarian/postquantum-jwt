@@ -173,6 +173,36 @@ implement either, but the fingerprint-claim approach above achieves the same goa
 (a stolen token is useless without the matching client secret) within a single
 issuer/verifier you control.
 
+## 10. Distribute and rotate the verification keys
+
+Because these tokens use non-IANA identifiers and aren't meant to interoperate
+with generic JWT tooling, you own both ends — so you also own how a verifier
+learns the issuer's **public** ML-DSA-65 keys. The pattern this library is built
+around:
+
+- **Publish a key directory.** The issuer exposes a JWKS-equivalent document —
+  `{ "keys": [ { "kid", "alg": "ML-DSA-65", "key": "<base64 public key>" } ] }` —
+  at a stable, **HTTPS** URL (the `WebApiDemo` serves it at
+  `/.well-known/pqjwt-keys`). Only *public* keys ever leave the issuer; the private
+  signing key stays put (§6).
+- **Verifiers fetch by `kid`.** `HttpPqJwtKeyRing` pulls that directory over HTTPS
+  (enforced — a non-loopback `http://` endpoint is rejected at construction),
+  caches by `kid`, refreshes on an interval, and **evicts** keys the directory no
+  longer lists. Wire it as your `SignatureKeyResolver`. The `VerifierDemo` shows a
+  second service validating the issuer's tokens this way.
+- **Rotate with an overlap window.** To rotate: generate a new key with a **new
+  `kid`**, start signing with it, and publish **both** old and new in the directory
+  during the overlap. Verifiers pick up the new `kid` on their next refresh;
+  tokens already signed with the old `kid` keep validating until they expire. Once
+  the old key's tokens can no longer be outstanding (past max token lifetime),
+  drop it from the directory — verifiers then evict it within one refresh interval.
+- **Revoke by removing.** Compromise? Remove the `kid` from the directory; every
+  verifier stops accepting it within a refresh interval, no redeploy required.
+- **Trust root.** The directory *is* the trust root — serve it over HTTPS from
+  infrastructure you control. For the highest assurance, pin or preload keys
+  out-of-band instead of fetching (`HttpPqJwtKeyRing.PreloadAsync`, or a static
+  `SignatureKeyResolver` backed by keys shipped in configuration / a secret store).
+
 ---
 
 *To God be the glory — 1 Corinthians 10:31.*

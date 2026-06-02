@@ -108,15 +108,25 @@ public sealed class FileBackedSigningKey : IDisposable
         var dir = Path.GetDirectoryName(Path.GetFullPath(path));
         if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
 
-        File.WriteAllBytes(path, bytes);
-
+        // Create the file with owner-only permissions ATOMICALLY (UnixCreateMode is
+        // applied at open time), so the key bytes are never briefly world/group-
+        // readable between the write and a later chmod — closing the TOCTOU window a
+        // WriteAllBytes-then-SetUnixFileMode sequence would leave open. On Windows,
+        // UnixCreateMode is ignored; rely on ACL inheritance from a protected
+        // directory (or DPAPI in a real implementation).
+        var options = new FileStreamOptions
+        {
+            Mode = FileMode.Create,
+            Access = FileAccess.Write,
+            Share = FileShare.None,
+        };
         if (!OperatingSystem.IsWindows())
         {
-            // chmod 600 — owner read/write only. On Windows, rely on ACL inheritance
-            // from a suitably-protected directory (or DPAPI in a real implementation).
-            File.SetUnixFileMode(path,
-                UnixFileMode.UserRead | UnixFileMode.UserWrite);
+            options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite; // chmod 600
         }
+
+        using var stream = new FileStream(path, options);
+        stream.Write(bytes);
     }
 
     public void Dispose()
