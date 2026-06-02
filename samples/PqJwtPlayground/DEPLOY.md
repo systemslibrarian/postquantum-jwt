@@ -3,8 +3,9 @@
 The playground is a stateful Blazor Server app whose crypto runs server-side and
 needs **OpenSSL 3.5+**, so it can't be a static GitHub Pages site. Azure
 Container Apps (ACA) is the cheapest, simplest fit: it builds the existing
-`Dockerfile` (Azure Linux 3.0 base → new-enough OpenSSL) and gives you a public
-HTTPS URL with scale-to-zero so an idle demo costs almost nothing.
+`Dockerfile` (which brings OpenSSL 3.5 via conda-forge — the Azure Linux base is
+only on 3.3.5) and gives you a public HTTPS URL with scale-to-zero so an idle
+demo costs almost nothing.
 
 > **Build context is the repo root.** This Dockerfile references `../../src`, so
 > every command below runs from the **repository root** and points at the
@@ -71,7 +72,9 @@ az containerapp up \
   --ingress external \
   --target-port 8080
 
-# 4) (optional) allow scale to zero when idle
+# 4) COST CONTROL — do not skip. `containerapp up` defaults to max 10 replicas
+#    and no explicit minimum; pin min 0 (scale to zero, ~$0 idle) and max 1 so a
+#    traffic spike or bot can't fan out to 10 replicas and run up a bill.
 az containerapp update \
   --name pqjwt-playground \
   --resource-group pqjwt-demos \
@@ -79,6 +82,11 @@ az containerapp update \
 ```
 
 The deploy prints the public URL (e.g. `https://pqjwt-playground.<region>.azurecontainerapps.io`).
+
+> **Scale-to-zero trade-off:** with `min-replicas 0`, an idle app has no running
+> replica, so the first request after idle cold-starts and can take up to a
+> minute (this image bundles OpenSSL 3.5, so it's a chunky cold start). Tell users
+> the demo may take a moment to wake — the README's playground note does this.
 
 ## Verify OpenSSL inside the running container
 
