@@ -114,17 +114,20 @@ app.MapPost("/auth/refresh", (HttpRequest req, HttpResponse res) =>
     if (!store.TryGet(hash, out var record) || record.ExpiresAt < DateTimeOffset.UtcNow)
         return Results.Json(new { error = "Invalid or expired refresh token." }, statusCode: 401);
 
-    // REUSE DETECTION: a token already marked used means either impossible
-    // double-refresh or a stolen token. Assume theft; revoke the whole family.
-    if (record.Used)
+    if (record.Revoked)
+        return Results.Json(new { error = "Refresh token revoked." }, statusCode: 401);
+
+    // REUSE DETECTION (race-free): atomically claim the token's single use. Exactly
+    // one caller wins; a second concurrent (or later) presentation of the same token
+    // loses the claim — that means double-submit or theft, so revoke the whole
+    // family. Doing the check and the mark as one atomic step closes the
+    // read-check-write window a separate `if (Used)` + `MarkUsed()` would leave open.
+    if (!record.TryConsume())
     {
         store.RevokeFamily(record.Family);
         return Results.Json(new { error = "Refresh token reuse detected — family revoked." }, statusCode: 401);
     }
-    if (record.Revoked)
-        return Results.Json(new { error = "Refresh token revoked." }, statusCode: 401);
 
-    store.MarkUsed(hash);
     IssueRefreshCookie(res, record.UserId, record.Family);   // rotate within the same family
     return Results.Ok(new { accessToken = MintAccessToken(record.UserId), expiresInSeconds = (int)AccessTokenTtl.TotalSeconds });
 });
@@ -160,8 +163,18 @@ static string Hash(string raw) =>
 /// <summary>One stored refresh token (only its hash is the dictionary key).</summary>
 internal sealed record RefreshRecord(string UserId, string Family, DateTimeOffset ExpiresAt)
 {
-    public bool Used { get; set; }
+    private int _used; // 0 = unused, 1 = consumed (atomic single-use claim)
+
+    public bool Used => Volatile.Read(ref _used) == 1;
     public bool Revoked { get; set; }
+
+    /// <summary>
+    /// Atomically claims this token for its single use. Returns <c>true</c> for
+    /// exactly one caller; every other concurrent caller gets <c>false</c>. This is
+    /// what makes reuse detection race-free — two requests presenting the same
+    /// refresh token can't both pass the guard and both rotate.
+    /// </summary>
+    public bool TryConsume() => Interlocked.CompareExchange(ref _used, 1, 0) == 0;
 }
 
 /// <summary>In-memory stand-in for the refresh-token table. Thread-safe.</summary>
@@ -171,7 +184,6 @@ internal sealed class RefreshTokenStore
 
     public void Add(string hash, RefreshRecord record) => _byHash[hash] = record;
     public bool TryGet(string hash, out RefreshRecord record) => _byHash.TryGetValue(hash, out record!);
-    public void MarkUsed(string hash) { if (_byHash.TryGetValue(hash, out var r)) r.Used = true; }
     public void Revoke(string hash) { if (_byHash.TryGetValue(hash, out var r)) r.Revoked = true; }
 
     public void RevokeFamily(string family)

@@ -60,6 +60,31 @@ runnable samples/templates ecosystem.
   on every `TryRegister`, scanning the whole dictionary — O(n) per call, an
   algorithmic-complexity DoS vector under token floods. It now runs at most once
   per interval; replay-detection correctness is unchanged.
+- **ASP.NET Core handler returns 401 for any library rejection, not 500.**
+  `PqJwtBearerHandler` caught only `PqJwtValidationException`; a base
+  `PqJwtException` (e.g. an encrypted token presented to a validator with no
+  `DecryptionKey`) escaped as an unhandled 500. It now catches `PqJwtException`
+  and fails closed with 401.
+- **`HttpPqJwtKeyRing` now honors rotation and revocation.** It refreshes the
+  directory on its interval for *already-cached* kids (not only on a cache miss)
+  and evicts kids absent from the latest successful fetch, so a rotated-out or
+  revoked key stops being accepted without a process restart.
+- **`HttpPqJwtKeyRing` enforces HTTPS on the key endpoint.** The key directory is
+  the verifier's trust root; the constructor now rejects a non-HTTPS, non-loopback
+  endpoint (loopback stays allowed for local development).
+- **Out-of-range / non-integer `exp` / `nbf` no longer throw.** An oversized integer
+  `exp` previously made `DateTimeOffset.FromUnixTimeSeconds` throw out of the
+  validator (a 500) and made `PqJwtValidationResult.ExpiresAt` throw on read. Both
+  are now range-guarded: the validator rejects it as `malformed_time_claim`, and
+  `ExpiresAt` returns `null` rather than throwing.
+- **Replay protection requires `exp`.** A replay-protected token with no usable
+  `exp` would register a never-expiring cache entry; it is now rejected so every
+  cache entry can be pruned.
+- **Sample (`RefreshTokenDemo`): reuse detection is now race-free.** The refresh
+  endpoint claimed a token's single use via a non-atomic check-then-mark; two
+  concurrent refreshes with the same token could both succeed. It now uses an
+  atomic compare-and-set so exactly one caller wins and a second is detected as
+  reuse.
 
 ## [1.0.0-preview.1] — 2026-06-01
 

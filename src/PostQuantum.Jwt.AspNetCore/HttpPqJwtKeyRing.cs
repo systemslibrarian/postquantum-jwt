@@ -32,7 +32,7 @@ public sealed class HttpPqJwtKeyRing : IPqJwtKeyRing, IDisposable
 
     /// <summary>Creates an HTTP-backed key ring.</summary>
     /// <param name="httpClient">An <see cref="HttpClient"/> (typed-client friendly).</param>
-    /// <param name="endpoint">The fully-qualified key-directory URL. Must be HTTPS in production.</param>
+    /// <param name="endpoint">The fully-qualified key-directory URL. Must use HTTPS (a loopback address is allowed for local development); a non-HTTPS, non-loopback endpoint is rejected at construction.</param>
     /// <param name="refreshInterval">How often the directory may be re-fetched. Defaults to 5 minutes.</param>
     /// <param name="timeProvider">Clock used for refresh timing.</param>
     /// <param name="logger">Optional logger.</param>
@@ -45,6 +45,20 @@ public sealed class HttpPqJwtKeyRing : IPqJwtKeyRing, IDisposable
     {
         ArgumentNullException.ThrowIfNull(httpClient);
         ArgumentNullException.ThrowIfNull(endpoint);
+
+        // The key directory is the verifier's trust root: whoever controls the
+        // response controls which ML-DSA keys are accepted. Fail fast on a
+        // plaintext endpoint so a downgraded deployment can't enable on-path key
+        // substitution. Loopback is allowed for local development and tests.
+        if (!endpoint.IsLoopback && !string.Equals(endpoint.Scheme, Uri.UriSchemeHttps, StringComparison.Ordinal))
+        {
+            throw new ArgumentException(
+                $"Key-directory endpoint must use HTTPS (got '{endpoint.Scheme}'). " +
+                "It is the verifier's trust root; a plaintext fetch enables key substitution. " +
+                "Use https://, or a loopback address for local development.",
+                nameof(endpoint));
+        }
+
         _httpClient = httpClient;
         _endpoint = endpoint;
         _refreshInterval = refreshInterval ?? TimeSpan.FromMinutes(5);
@@ -60,12 +74,19 @@ public sealed class HttpPqJwtKeyRing : IPqJwtKeyRing, IDisposable
             return null;
         }
 
+        // Pick up rotations and revocations even for a kid we've already cached:
+        // refresh when the interval has elapsed (a cheap no-op otherwise). Without
+        // this, a key stays trusted until process restart even after the issuer
+        // rotates or revokes it. We re-read after refreshing so a kid that was
+        // evicted (removed from the directory) resolves to null, not the stale key.
+        RefreshIfDue(force: false).GetAwaiter().GetResult();
+
         if (_cache.TryGetValue(keyId, out var cached))
         {
             return cached;
         }
 
-        // Unknown kid → give the directory one chance to refresh.
+        // Unknown kid → give the directory one forced chance to refresh.
         RefreshIfDue(force: true).GetAwaiter().GetResult();
         return _cache.TryGetValue(keyId, out var resolved) ? resolved : null;
     }
@@ -106,9 +127,22 @@ public sealed class HttpPqJwtKeyRing : IPqJwtKeyRing, IDisposable
                 return;
             }
 
+            // Every kid the directory still lists — used below to evict kids the
+            // issuer has rotated out or revoked. A kid that is listed but whose new
+            // value is malformed stays in `published` (we keep the previously-good
+            // key rather than drop it on a transient publish glitch).
+            var published = new HashSet<string>(StringComparer.Ordinal);
+
             foreach (var entry in directory.Keys)
             {
-                if (string.IsNullOrEmpty(entry.Kid) || string.IsNullOrEmpty(entry.Key))
+                if (string.IsNullOrEmpty(entry.Kid))
+                {
+                    continue;
+                }
+
+                published.Add(entry.Kid);
+
+                if (string.IsNullOrEmpty(entry.Key))
                 {
                     continue;
                 }
@@ -132,6 +166,20 @@ public sealed class HttpPqJwtKeyRing : IPqJwtKeyRing, IDisposable
                 catch (Exception ex) when (ex is FormatException or CryptographicException)
                 {
                     _logger?.KeyRingEntryMalformed(ex, entry.Kid);
+                }
+            }
+
+            // Evict keys no longer published — this is what makes rotation and
+            // revocation take effect before a process restart. Only happens after a
+            // successful fetch (a failed fetch is caught below and keeps the cache
+            // intact). Removed keys are not Disposed here: a concurrent Resolve may
+            // have just handed one to an in-flight verify; the finalizer reclaims the
+            // native handle once no references remain.
+            foreach (var kid in _cache.Keys)
+            {
+                if (!published.Contains(kid))
+                {
+                    _cache.TryRemove(kid, out _);
                 }
             }
 

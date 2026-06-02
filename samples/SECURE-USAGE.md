@@ -101,7 +101,10 @@ they can't be replayed as access tokens at all.
 
 For tokens that should be used once (e.g. a sensitive action), set
 `RequireReplayProtection = true` and supply a `ReplayCache` — distributed if you
-run more than one node (see `DistributedReplayCache/`).
+run more than one node (see `DistributedReplayCache/`). A replay-protected token
+must carry both a `jti` and an `exp`: the `exp` is what lets the cache entry
+expire and be pruned, so the validator rejects a replay-protected token without
+one (a one-time token with no expiry is unbounded by definition).
 
 ## 6. Persist and protect the signing key
 
