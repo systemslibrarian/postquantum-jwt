@@ -72,9 +72,13 @@ public sealed class PqJwtBearerHandler : AuthenticationHandler<PqJwtBearerOption
         {
             result = Validator.Validate(token);
         }
-        catch (PqJwtValidationException ex)
+        catch (PqJwtException ex)
         {
-            // Fail-closed: tampered / expired / wrong-issuer tokens.
+            // Fail-closed for ANY library-level rejection. Catches both
+            // PqJwtValidationException (tampered / expired / wrong-issuer) and the
+            // base PqJwtException (e.g. an encrypted token presented to a validator
+            // with no DecryptionKey). Either way the request is unauthenticated —
+            // return 401, never let it escape as an unhandled 500.
             Logger.ValidationFailed(ex);
             return Task.FromResult(AuthenticateResult.Fail(ex));
         }

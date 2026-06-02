@@ -42,8 +42,14 @@ public sealed class PqJwtValidationResult
             ? value.GetString()
             : null;
 
+    // Safe by construction: a non-integer or out-of-range time claim yields null
+    // rather than throwing. A successful validation result must never throw when a
+    // caller reads a standard property like ExpiresAt.
     private DateTimeOffset? GetUnixTime(string name) =>
-        Claims.TryGetValue(name, out var value) && value.ValueKind == JsonValueKind.Number
-            ? DateTimeOffset.FromUnixTimeSeconds(value.GetInt64())
+        Claims.TryGetValue(name, out var value) &&
+        value.ValueKind == JsonValueKind.Number &&
+        value.TryGetInt64(out var seconds) &&
+        seconds is >= -62135596800L and <= 253402300799L
+            ? DateTimeOffset.FromUnixTimeSeconds(seconds)
             : null;
 }

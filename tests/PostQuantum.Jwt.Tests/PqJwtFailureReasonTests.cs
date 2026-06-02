@@ -251,18 +251,56 @@ public sealed class PqJwtFailureReasonTests
     }
 
     [PqcTheory]
-    [InlineData("{\"exp\":1700000000.5}")]   // fractional number
-    [InlineData("{\"exp\":\"1700000000\"}")] // string
-    [InlineData("{\"exp\":[1700000000]}")]   // array
+    [InlineData("{\"exp\":1700000000.5}")]    // fractional number
+    [InlineData("{\"exp\":\"1700000000\"}")]  // string
+    [InlineData("{\"exp\":[1700000000]}")]    // array
+    [InlineData("{\"exp\":99999999999999}")]  // integer beyond DateTimeOffset range
     public void Malformed_exp_claim_is_rejected(string payloadJson)
     {
         // Regression: a present-but-malformed exp must be rejected, not silently
-        // ignored (which would make the token immortal).
+        // ignored (immortal token) — and an out-of-range integer must not throw
+        // ArgumentOutOfRangeException out of the validator (a 500).
         using var key = TestKeys.NewSigningKey();
         using var verify = TestKeys.PublicKeyOf(key);
         var token = SignCrafted(key, SignedHeader(), payloadJson);
         Assert.Equal(PqJwtFailureReason.MalformedTimeClaim,
             ReasonOf(() => ResolverValidator(verify).Validate(token)));
+    }
+
+    [PqcFact]
+    public void Out_of_range_exp_is_safe_to_read_on_a_result_when_lifetime_checks_are_off()
+    {
+        // With ValidateLifetime off the token is accepted; reading result.ExpiresAt
+        // must return null, never throw, even for an out-of-range exp.
+        using var key = TestKeys.NewSigningKey();
+        using var verify = TestKeys.PublicKeyOf(key);
+        var token = SignCrafted(key, SignedHeader(), "{\"sub\":\"x\",\"exp\":99999999999999}");
+        var result = new PqJwtValidator(new PqJwtValidationParameters
+        {
+            SignatureVerificationKey = verify,
+            ValidateLifetime = false,
+        }).Validate(token);
+
+        Assert.Null(result.ExpiresAt);   // safe, not an exception
+        Assert.Equal("x", result.Subject);
+    }
+
+    [PqcFact]
+    public void Replay_protection_requires_an_exp_claim()
+    {
+        // A replay-protected token with no exp would create a never-expiring cache
+        // entry; require exp so the entry can be pruned.
+        using var key = TestKeys.NewSigningKey();
+        using var verify = TestKeys.PublicKeyOf(key);
+        var token = new PqJwtBuilder(new FixedTimeProvider(Now))
+            .WithJwtId("jti-no-exp").SignWith(key).Build(); // no WithLifetime -> no exp
+        var validator = new PqJwtValidator(new PqJwtValidationParameters
+        {
+            SignatureVerificationKey = verify,
+            ReplayCache = new InMemoryReplayCache(new FixedTimeProvider(Now)),
+        }, new FixedTimeProvider(Now));
+        Assert.Equal(PqJwtFailureReason.MissingExpiration,
+            ReasonOf(() => validator.Validate(token)));
     }
 
     [PqcFact]

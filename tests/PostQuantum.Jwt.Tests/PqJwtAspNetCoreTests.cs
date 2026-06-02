@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using PostQuantum.Jwt.AspNetCore;
+using PostQuantum.Jwt.Cryptography;
 using Xunit;
 
 namespace PostQuantum.Jwt.Tests;
@@ -152,6 +153,67 @@ public sealed class PqJwtAspNetCoreTests
         Assert.Equal(1, fakeHandler.RequestCount);
     }
 
+    [PqcFact]
+    public async Task An_encrypted_token_with_no_decryption_key_returns_401_not_500()
+    {
+        // Regression: ValidateEncrypted throws the BASE PqJwtException (not
+        // PqJwtValidationException) when no DecryptionKey is configured. The handler
+        // must translate it to 401, not let it escape as an unhandled 500.
+        using var signingKey = TestKeys.NewSigningKey();
+        using var recipient = XWingPrivateKey.Generate();
+        var clock = new FixedTimeProvider(Now);
+        var token = new PqJwtBuilder(clock)
+            .WithSubject("alice")
+            .WithLifetime(TimeSpan.FromMinutes(10))
+            .SignWith(signingKey)
+            .EncryptFor(recipient.PublicKey)
+            .Build();
+
+        using var server = await CreateTestServer(signingKey, clock); // validator has no DecryptionKey
+        using var client = server.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var response = await client.GetAsync(new Uri("/me", UriKind.Relative));
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public void Http_key_ring_rejects_a_non_https_non_loopback_endpoint()
+    {
+        using var http = new HttpClient(new StubHandler("{}"));
+        Assert.Throws<ArgumentException>(() =>
+            new HttpPqJwtKeyRing(http, new Uri("http://keys.example/.well-known/pq-keys")));
+
+        // Loopback over http is allowed for local development.
+        using var loopback = new HttpPqJwtKeyRing(http, new Uri("http://localhost:5080/.well-known/pq-keys"));
+        Assert.NotNull(loopback);
+    }
+
+    [PqcFact]
+    public void Http_key_ring_evicts_a_kid_removed_from_the_directory()
+    {
+        // Regression: a revoked / rotated-out kid must stop resolving, not stay
+        // trusted until process restart.
+        using var signingKey = TestKeys.NewSigningKey();
+        var pub = Convert.ToBase64String(signingKey.ExportMLDsaPublicKey());
+        const string kid = "rotating-kid";
+        var withKey = $$"""{ "keys": [ { "kid": "{{kid}}", "alg": "ML-DSA-65", "key": "{{pub}}" } ] }""";
+
+        using var stub = new StubHandler(withKey);
+        using var http = new HttpClient(stub);
+        var clock = new MutableTimeProvider(Now);
+        using var ring = new HttpPqJwtKeyRing(
+            http, new Uri("https://keys.example/.well-known/pq-keys"), TimeSpan.FromMinutes(1), clock);
+
+        Assert.NotNull(ring.Resolve(kid)); // first resolve fetches + caches
+
+        // Issuer drops the key from the directory; advance past the refresh interval.
+        stub.Response = """{ "keys": [] }""";
+        clock.Now = Now.AddMinutes(2);
+
+        Assert.Null(ring.Resolve(kid)); // due refresh evicts the removed kid
+    }
+
     private static async Task<TestServer> CreateTestServer(MLDsa signingKey, TimeProvider clock)
     {
         using var pubKey = TestKeys.PublicKeyOf(signingKey);
@@ -206,13 +268,16 @@ public sealed class PqJwtAspNetCoreTests
     {
         public int RequestCount { get; private set; }
 
+        /// <summary>The body returned on each call; mutable so a test can simulate the directory changing.</summary>
+        public string Response { get; set; } = responseJson;
+
         protected override Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request, CancellationToken cancellationToken)
         {
             RequestCount++;
             var response = new HttpResponseMessage(HttpStatusCode.OK)
             {
-                Content = new StringContent(responseJson, Encoding.UTF8, "application/json"),
+                Content = new StringContent(Response, Encoding.UTF8, "application/json"),
             };
             return Task.FromResult(response);
         }

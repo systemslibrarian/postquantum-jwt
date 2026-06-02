@@ -287,12 +287,11 @@ public sealed class PqJwtValidator
                 PqJwtFailureReason.MissingJwtId, "Replay protection is enabled but the token has no 'jti' claim.");
         }
 
-        // Determine the cache expiry from exp. A present-but-malformed exp is
-        // rejected here too (not just in ValidateLifetime, which the caller may have
-        // disabled) so a malformed exp can never be cached as DateTimeOffset.MaxValue
-        // — an entry that would otherwise never be pruned. An absent exp still maps
-        // to MaxValue: that requires deliberately running replay protection on tokens
-        // without expiration (RequireExpiration off), and only those entries persist.
+        // Replay protection requires a usable expiry: the cache entry must be able
+        // to expire, or the cache grows without bound. So an absent or malformed exp
+        // is rejected here (independently of ValidateLifetime, which the caller may
+        // have disabled). A one-time-use token without an expiry is nonsensical
+        // anyway — replay protection is for short-lived tokens.
         DateTimeOffset expiresAt;
         switch (GetUnixTime(claims, "exp", out var exp))
         {
@@ -302,9 +301,10 @@ public sealed class PqJwtValidator
             case TimeClaim.Malformed:
                 throw new PqJwtValidationException(
                     PqJwtFailureReason.MalformedTimeClaim, "Token 'exp' claim is not an integer Unix time.");
-            default:
-                expiresAt = DateTimeOffset.MaxValue;
-                break;
+            default: // Absent
+                throw new PqJwtValidationException(
+                    PqJwtFailureReason.MissingExpiration,
+                    "Replay protection requires an 'exp' claim so the replay-cache entry can expire; this token has none.");
         }
 
         if (!cache.TryRegister(jwtId, expiresAt))
@@ -499,7 +499,13 @@ public sealed class PqJwtValidator
             return TimeClaim.Absent;
         }
 
-        if (element.ValueKind == JsonValueKind.Number && element.TryGetInt64(out var seconds))
+        // Must be an integer Unix-seconds value AND within the range DateTimeOffset
+        // can represent. A fractional number, a string, or an in-Int64-but-out-of-
+        // DateTimeOffset-range value (e.g. a huge exp) is Malformed — never let
+        // FromUnixTimeSeconds throw ArgumentOutOfRangeException out of the validator.
+        if (element.ValueKind == JsonValueKind.Number &&
+            element.TryGetInt64(out var seconds) &&
+            seconds is >= UnixSecondsMin and <= UnixSecondsMax)
         {
             value = DateTimeOffset.FromUnixTimeSeconds(seconds);
             return TimeClaim.Present;
@@ -507,6 +513,11 @@ public sealed class PqJwtValidator
 
         return TimeClaim.Malformed;
     }
+
+    // Inclusive bounds of DateTimeOffset expressed as Unix seconds
+    // (DateTimeOffset.MinValue / MaxValue .ToUnixTimeSeconds()).
+    private const long UnixSecondsMin = -62135596800L;
+    private const long UnixSecondsMax = 253402300799L;
 
     // Records a fail-closed rejection on the metric. A PqJwtValidationException
     // carries its own strongly-typed Reason (set at the throw site); a plain
