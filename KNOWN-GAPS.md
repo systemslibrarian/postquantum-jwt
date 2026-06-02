@@ -5,20 +5,28 @@ unverified, and where the sharp edges are. Honesty over polish: if something is
 incomplete, it is listed here rather than glossed over. This file is part of the
 contract with anyone evaluating the library.
 
-Last reviewed for: `0.3.0-preview.1`.
+Last reviewed for: `1.0.0-preview.1`.
 
 ## Cryptography
 
 - **No external audit.** No third party has reviewed the design or
   implementation. Do not use in production.
-- **X-Wing encapsulation is not KAT-validated (BCL limitation).** Seed-based key
-  generation and the decapsulation + SHA3-256 combiner path **are** checked
-  against the official `draft-connolly-cfrg-xwing-kem` known-answer vectors
-  (`spec/test-vectors.json`) — all three vectors pass. The *encapsulation* path
-  is **not** KAT-checked: the native `MLKem.Encapsulate` draws its own randomness
-  and exposes no derandomized ("Encaps_derand") entry point, so the vectors'
-  `eseed` cannot be injected. Encapsulation is covered by round-trip tests
-  instead. If a derandomized ML-KEM API becomes available, add the encaps KAT.
+- **ML-KEM encapsulation specifically is not KAT-validated (BCL limitation).**
+  Seed-based key generation and the decapsulation + SHA3-256 combiner path are
+  checked against the official `draft-connolly-cfrg-xwing-kem` known-answer
+  vectors (`spec/test-vectors.json`) — all three vectors pass. The X-Wing
+  **combiner direction** and the **X25519 ephemeral half** of encapsulation
+  are also exercised deterministically through an internal test seam
+  (`IXWingDeterministicCoins`, reachable only via
+  `InternalsVisibleTo("PostQuantum.Jwt.Tests")` — production always uses the
+  OS CSPRNG via `RandomNumberGenerator` and the BCL `MLKem`, never an
+  injected coin source). The only remaining un-KAT'd path is the BCL
+  `MLKem.Encapsulate` itself: it draws its own randomness and exposes no
+  derandomized ("Encaps_derand") entry point, so the vectors' `eseed` cannot
+  be injected. That path is covered by a 64-iteration round-trip property
+  test with a statistical sanity check (all 64 ciphertexts distinct, all 64
+  shared secrets distinct, every round-trip recovers the secret). If a
+  derandomized ML-KEM API becomes available, add the encaps KAT.
 - **No independent ML-KEM / ML-DSA KATs in this repo.** We rely on the .NET BCL
   (FIPS-validated) for these primitives and do not re-test them here. If your
   threat model needs in-repo KATs, they are not present yet.
@@ -37,7 +45,9 @@ Last reviewed for: `0.3.0-preview.1`.
   `IPqJwtReplayCache` + the bundled `InMemoryReplayCache` enforce single-use
   `jti` when configured, but the in-memory cache is single-process and does not
   survive a restart. Distributed deployments must back the hook with a shared
-  store. With no cache configured, `jti` is carried but not enforced.
+  store. With no cache configured, `jti` is carried but not enforced — set
+  `PqJwtValidationParameters.RequireReplayProtection = true` to fail-closed at
+  validator construction when that omission would be a security regression.
 - **`kid` resolution is supported but does not fetch keys.**
   `SignatureKeyResolver` lets you select a verification key from the token's
   `kid` (key rotation); you still supply the keys — there is no JWKS endpoint or
@@ -63,7 +73,7 @@ Last reviewed for: `0.3.0-preview.1`.
   ML-KEM / ML-DSA are unavailable, operations fail closed and the corresponding
   tests skip themselves with a stated reason.
 - **PQ coverage in CI is proven on Windows *and* Linux** as of
-  `0.3.0-preview.1`. The Windows lane runs natively; the Linux lane pins
+  `1.0.0-preview.1`. The Windows lane runs natively; the Linux lane pins
   OpenSSL 3.5+ via `conda-forge` and points `LD_LIBRARY_PATH` at it before
   testing. Both lanes fail the run on any skipped test, so the
   ML-KEM / ML-DSA / X-Wing paths are proven to execute on every push on

@@ -159,9 +159,30 @@ jobs:
       # attestations (in the pack job above) are an independent transparency
       # signal — anyone can verify with `gh attestation verify <file>
       # --repo systemslibrarian/postquantum-jwt`.
-      - name: Push to NuGet
+      #
+      # The push is split into two explicit, sequential steps so the ordering
+      # is a contract, not a coincidence of alphabetical glob expansion:
+      # PostQuantum.Jwt must be uploaded BEFORE PostQuantum.Jwt.AspNetCore,
+      # because the AspNetCore sibling's .nuspec lists the core as a runtime
+      # dependency. NuGet.org accepts the upload either way, but consumers
+      # who hit the sibling before the core finishes indexing will see a
+      # transient restore failure — sequencing the uploads narrows that
+      # window. `dotnet nuget push` uploads each .nupkg's adjacent .snupkg
+      # automatically. `--skip-duplicate` keeps re-runs idempotent.
+      - name: Push core (PostQuantum.Jwt) first
+        env:
+          PKG_VERSION: ${{ needs.pack.outputs.package_version }}
         run: >
-          dotnet nuget push "artifacts/*.nupkg"
+          dotnet nuget push "artifacts/PostQuantum.Jwt.${PKG_VERSION}.nupkg"
+          --api-key "$NUGET_API_KEY"
+          --source https://api.nuget.org/v3/index.json
+          --skip-duplicate
+
+      - name: Push AspNetCore sibling (depends on core)
+        env:
+          PKG_VERSION: ${{ needs.pack.outputs.package_version }}
+        run: >
+          dotnet nuget push "artifacts/PostQuantum.Jwt.AspNetCore.${PKG_VERSION}.nupkg"
           --api-key "$NUGET_API_KEY"
           --source https://api.nuget.org/v3/index.json
           --skip-duplicate

@@ -92,6 +92,44 @@ public sealed class PqJwtHooksTests
         Assert.Contains("jti", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
+    // These two tests assert the construction-time contract for
+    // RequireReplayProtection. The contract is independent of any PQ
+    // primitive — the validator constructor only checks "have a key OR a
+    // resolver" and "if RequireReplayProtection then ReplayCache". So we
+    // satisfy the key/resolver check with a no-op SignatureKeyResolver
+    // (never invoked — validation is never run, only construction is
+    // exercised). This keeps the tests runnable on every platform,
+    // including CI runners without native ML-DSA.
+    [Fact]
+    public void RequireReplayProtection_with_no_cache_throws_at_construction()
+    {
+        var ex = Assert.Throws<ArgumentException>(() => new PqJwtValidator(
+            new PqJwtValidationParameters
+            {
+                SignatureKeyResolver = _ => null,
+                RequireReplayProtection = true,
+            }));
+
+        Assert.Contains("RequireReplayProtection", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("ReplayCache", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RequireReplayProtection_with_a_cache_constructs_fine()
+    {
+        var clock = new FixedTimeProvider(Now);
+
+        // Should not throw — fail-closed flag is satisfied by the supplied cache.
+        _ = new PqJwtValidator(
+            new PqJwtValidationParameters
+            {
+                SignatureKeyResolver = _ => null,
+                RequireReplayProtection = true,
+                ReplayCache = new InMemoryReplayCache(clock),
+            },
+            clock);
+    }
+
     [Fact]
     public void In_memory_cache_detects_replay_then_allows_reuse_after_expiry()
     {

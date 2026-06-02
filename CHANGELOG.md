@@ -8,38 +8,112 @@ versions.
 
 ## [Unreleased]
 
-### Fixed (correctness)
+## [1.0.0-preview.1] — 2026-06-01
 
-- **`PqJwtValidator.Validate` now wraps Base64/JSON/crypto-material
-  parsing failures in `PqJwtValidationException`** instead of letting
-  `FormatException`, `JsonException`, or `CryptographicException` leak
-  to callers. Adversarial inputs that drove parsers deeper in the stack
-  used to surface as those raw types — consumers that caught only
-  `PqJwtException` saw a 500 instead of a 401. The fix is purely
-  additive: the new outer exception carries the original as
-  `InnerException` so diagnostics aren't lost. Found by SharpFuzz +
-  in-process fuzz testing in the `PostQuantum.AspNetCore` repo. Two
-  new tests in `PqJwtEdgeCaseTests` lock the new contract; the existing
-  68 tests pass unchanged. **Total: 70 tests, zero skips on
-  PQ-capable hosts.**
+A **maturity-tier bump** for the PostQuantum.* JWT stack, from
+`0.3.0-preview.1` to `1.0.0-preview.1`. The crypto core and public algorithm
+surface are unchanged — no new algorithm suite, no algorithm agility,
+ML-DSA-65 + X-Wing + AES-256-GCM with sign-then-encrypt and RFC 7516 AAD
+binding remains the only path. The 1.0 tier brings a sharper safety posture:
+a `RequireReplayProtection` flag so an operator can't forget to wire a
+replay cache, an internal test seam that lets the suite KAT what *can* be
+made deterministic in encapsulation (with the production randomness path
+still bit-identical to before, just routed through `RandomNumberGenerator`),
+a 64-iteration statistical sanity check on encapsulation, and a pinned
+end-to-end roundtrip corpus. The `preview.N` suffix carries the maturity
+caveat, not the leading `1.0`: the cryptographic construction has **not**
+been independently audited, and the non-IANA-registered identifiers mean
+these tokens still do **not** interop with standard JWT tooling. See
+[`KNOWN-GAPS.md`](KNOWN-GAPS.md) and the new "Read this first" disclosure at
+the top of the README.
 
 ### Changed
 
-- **`PostQuantum.Jwt.AspNetCore` is now marked as superseded by
-  `PostQuantum.AspNetCore`** ([new repo](https://github.com/systemslibrarian/postquantum-aspnetcore)).
-  The new package shares this library as its engine — tokens minted
-  under either validate in the other — but ships under a cleaner name,
-  a dedicated release cadence, a richer event surface
-  (`OnMessageReceived` / `OnTokenValidated` /
-  `OnAuthenticationFailed` / `OnChallenge`), hosted-service key-ring
-  warmup, full SignalR support, and a 40-test integration suite. The
-  csproj `<Description>` and `<PackageReleaseNotes>` for
-  `PostQuantum.Jwt.AspNetCore` now lead with the supersession notice
-  so nuget.org search results reflect the change at the next package
-  push. New consumers should adopt `PostQuantum.AspNetCore`
-  directly. The legacy companion will continue to receive **critical
-  fixes only** through 1.0; no new features. Migration guide:
+- **Version raised to `1.0.0-preview.1`** in both `PostQuantum.Jwt` and
+  `PostQuantum.Jwt.AspNetCore`. The two packages move in exact lockstep —
+  `PostQuantum.Jwt.AspNetCore` continues to depend on `PostQuantum.Jwt` at
+  the matching version via its `ProjectReference`, which NuGet rewrites into
+  a pinned `PackageReference` at pack time. See
+  [`VERSION-RECONCILIATION.md`](VERSION-RECONCILIATION.md) for the
+  suite-level audit (no package in this repo advertises more maturity than
+  what it depends on).
+- **`PostQuantum.Jwt.AspNetCore` remains marked as superseded by
+  `PostQuantum.AspNetCore`** (cleaner naming, dedicated release cadence,
+  event-hook surface, hosted-service warmup, SignalR support). Tokens
+  minted under either validate in the other. The legacy companion receives
+  **critical fixes only**; no new features. Migration guide:
   [`postquantum-aspnetcore/docs/MIGRATION.md`](https://github.com/systemslibrarian/postquantum-aspnetcore/blob/main/docs/MIGRATION.md).
+- **Production X-Wing encapsulation entropy now flows through the BCL CSPRNG
+  directly.** The X25519 ephemeral private key was previously drawn from
+  BouncyCastle's `SecureRandom`; it now comes from
+  `System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)`, which
+  goes straight to the OS entropy source. The semantics are unchanged — both
+  are CSPRNGs — but the production randomness source is now the .NET BCL and
+  no longer a BouncyCastle singleton. The `XWing.SecureRandom` static was
+  retired (it had no other callers).
+
+### Added
+
+- **`PqJwtValidationParameters.RequireReplayProtection`** — when `true`, the
+  `PqJwtValidator` constructor throws `ArgumentException` if no
+  `ReplayCache` is supplied. Defaults to `false` so the historical opt-in
+  default is preserved, but turning it on means an operator who forgets to
+  wire a cache sees the misconfiguration at startup rather than as a silent
+  missing defense at runtime. Two new tests in `PqJwtHooksTests` lock both
+  branches.
+- **`IXWingDeterministicCoins` internal test seam** — an
+  `internal`-only-and-reachable-via-`InternalsVisibleTo` interface that lets
+  the test suite inject deterministic ML-KEM outputs and a deterministic
+  X25519 ephemeral private key into the encapsulation path. Production code
+  *never* reaches this — the public `XWing.Encapsulate(recipient)` overload
+  has no parameter for it. The seam exists to make the X-Wing combiner and
+  the X25519 half KAT-able; the BCL `MLKem.Encapsulate` step still cannot
+  be KAT'd and is now covered by an N=64 statistical sanity test
+  (`XWingDeterministicTests.X_Wing_encapsulation_to_the_same_recipient_produces_distinct_outputs_across_64_iterations`)
+  that asserts all 64 ciphertexts and all 64 shared secrets are distinct
+  while every round-trip recovers the secret correctly.
+- **Pinned end-to-end roundtrip corpus**
+  (`tests/PostQuantum.Jwt.Tests/TestVectors/jwt-roundtrip-vectors.json`)
+  with three entries: a signed token with `kid`/`jti`/`aud`/custom claim, a
+  signed token with only `sub`+lifetime, and a signed-then-encrypted minimal
+  token. Each vector pins the deterministic parts — the compact JSON of the
+  protected header and payload — and asserts successful end-to-end
+  validation. The non-deterministic parts (ML-DSA signature bytes, X-Wing
+  KEM ciphertext, AES-GCM nonce / ciphertext / tag) are not pinned and the
+  test file documents why.
+- **README "Read this first — these tokens are intentionally
+  non-interoperable" blockquote** at the very top of the README, above the
+  preview/audit status block. Names the non-IANA `ML-DSA-65`, `X-Wing`,
+  `A256GCM` identifiers and the standard JWT libraries that will reject
+  these tokens (`System.IdentityModel.Tokens.Jwt`, `jose-jwt`, `node-jose`,
+  `python-jose`, Auth0/Okta SDKs). Reinforces — does not replace — the
+  existing mid-page comparison section. Operational caveats elsewhere in
+  the README are unchanged.
+
+### Fixed (correctness)
+
+- **`PqJwtValidator.Validate` now wraps Base64/JSON/crypto-material parsing
+  failures in `PqJwtValidationException`** instead of letting
+  `FormatException`, `JsonException`, or `CryptographicException` leak to
+  callers. Adversarial inputs that drove parsers deeper in the stack used
+  to surface as those raw types — consumers that caught only
+  `PqJwtException` saw a 500 instead of a 401. The fix is purely additive:
+  the new outer exception carries the original as `InnerException` so
+  diagnostics aren't lost. Found by SharpFuzz + in-process fuzz testing in
+  the `PostQuantum.AspNetCore` repo. Two new tests in `PqJwtEdgeCaseTests`
+  lock the new contract.
+
+### Documentation
+
+- **`KNOWN-GAPS.md`** — the "X-Wing encapsulation is not KAT-validated"
+  bullet is narrowed to its actual remaining scope (BCL ML-KEM
+  `Encapsulate` specifically); the combiner direction and the X25519
+  ephemeral half are now exercised through the deterministic test seam and
+  the 64-iteration statistical sanity test. The "Replay protection is
+  opt-in" bullet now names `RequireReplayProtection` as the fail-closed
+  opt-in.
+- **`SECURITY.md`** supported-versions table updated to `1.0.0-preview.1`;
+  older preview lines marked superseded.
 
 ## [0.3.0-preview.1] — 2026-05-30
 
@@ -343,7 +417,8 @@ See [`KNOWN-GAPS.md`](KNOWN-GAPS.md). Highlights:
 - **Packages are not author-signed yet** (no code-signing certificate).
   nuget.org applies repository signing on push.
 
-[Unreleased]: https://github.com/systemslibrarian/postquantum-jwt/compare/v0.3.0-preview.1...HEAD
+[Unreleased]: https://github.com/systemslibrarian/postquantum-jwt/compare/v1.0.0-preview.1...HEAD
+[1.0.0-preview.1]: https://github.com/systemslibrarian/postquantum-jwt/releases/tag/v1.0.0-preview.1
 [0.3.0-preview.1]: https://github.com/systemslibrarian/postquantum-jwt/releases/tag/v0.3.0-preview.1
 [0.2.0-preview.3]: https://github.com/systemslibrarian/postquantum-jwt/releases/tag/v0.2.0-preview.3
 [0.2.0-preview.2]: https://github.com/systemslibrarian/postquantum-jwt/releases/tag/v0.2.0-preview.2

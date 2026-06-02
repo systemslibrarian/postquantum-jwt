@@ -1,0 +1,44 @@
+[
+  {
+    "name": "signed_with_kid_iss_aud_jti_and_role",
+    "shape": "signed",
+    "clock_unix_seconds": 1748606400,
+    "lifetime_seconds": 1800,
+    "kid": "key-2026-q2",
+    "issuer": "https://issuer.example",
+    "subject": "user-123",
+    "audience": "https://api.example",
+    "jwt_id": "token-1",
+    "string_custom_claims": { "role": "admin" },
+    "expected_header_json": "{\"alg\":\"ML-DSA-65\",\"typ\":\"JWT\",\"kid\":\"key-2026-q2\"}",
+    "expected_payload_json": "{\"iss\":\"https://issuer.example\",\"sub\":\"user-123\",\"aud\":\"https://api.example\",\"jti\":\"token-1\",\"role\":\"admin\",\"iat\":1748606400,\"exp\":1748608200}"
+  },
+  {
+    "name": "signed_minimal_sub_only",
+    "shape": "signed",
+    "clock_unix_seconds": 1748606400,
+    "lifetime_seconds": 300,
+    "kid": null,
+    "issuer": null,
+    "subject": "minimal-subject",
+    "audience": null,
+    "jwt_id": null,
+    "string_custom_claims": {},
+    "expected_header_json": "{\"alg\":\"ML-DSA-65\",\"typ\":\"JWT\"}",
+    "expected_payload_json": "{\"sub\":\"minimal-subject\",\"iat\":1748606400,\"exp\":1748606700}"
+  },
+  {
+    "name": "signed_then_encrypted_minimal",
+    "shape": "encrypted",
+    "clock_unix_seconds": 1748606400,
+    "lifetime_seconds": 300,
+    "kid": null,
+    "issuer": null,
+    "subject": "secret-subject",
+    "audience": null,
+    "jwt_id": null,
+    "string_custom_claims": {},
+    "expected_header_json": "{\"alg\":\"X-Wing\",\"enc\":\"A256GCM\",\"typ\":\"JWT\",\"cty\":\"JWT\"}",
+    "expected_payload_json": null
+  }
+]

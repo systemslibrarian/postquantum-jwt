@@ -17,7 +17,7 @@
   <!-- NuGet package metadata -->
   <PropertyGroup>
     <PackageId>PostQuantum.Jwt</PackageId>
-    <Version>0.3.0-preview.1</Version>
+    <Version>1.0.0-preview.1</Version>
     <Title>PostQuantum.Jwt — post-quantum hybrid JWTs for .NET</Title>
     <Authors>Paul Clark</Authors>
     <Description>Post-quantum hybrid JWT library for .NET 10. Signs tokens with ML-DSA-65 (FIPS 204) and optionally encrypts them with X-Wing (X25519 + ML-KEM-768) hybrid key agreement plus AES-256-GCM. Built on the native .NET BCL post-quantum primitives, fail-closed by design, and honest about its security posture. Preview release — not for production use.</Description>
@@ -27,7 +27,7 @@
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageTags>jwt;jose;jwe;post-quantum;pqc;ml-dsa;ml-kem;dilithium;kyber;x-wing;x25519;sha3;hybrid;cryptography;security;fips-203;fips-204;net10</PackageTags>
-    <PackageReleaseNotes>0.3.0-preview.1: Real-world adoption release. New companion package PostQuantum.Jwt.AspNetCore brings AddPqJwtBearer(...) and an HTTP-fetched key ring so post-quantum JWT validation slots into the standard ASP.NET Core auth pipeline. AOT/trim-safe annotations on the reflection-using WithClaim(object?) overload plus an AOT-safe WithClaim&lt;T&gt;(JsonTypeInfo&lt;T&gt;) overload. CycloneDX SBOM now packed inside the .nupkg. Property-based tests on top of the deterministic suite (68 tests total). Containerised Linux PQ-required CI lane (OpenSSL 3.5+ via conda-forge) joins the Windows lane in proving the cryptographic paths run in CI. Release workflow has an optional author-signing hook (NUGET_SIGNING_CERT). Full notes: https://github.com/systemslibrarian/postquantum-jwt/blob/main/CHANGELOG.md — known limitations: https://github.com/systemslibrarian/postquantum-jwt/blob/main/KNOWN-GAPS.md.</PackageReleaseNotes>
+    <PackageReleaseNotes>1.0.0-preview.1: Maturity-tier bump from 0.3.0-preview.1. No new algorithm suite, no algorithm agility — the crypto core (ML-DSA-65 signatures, X-Wing + AES-256-GCM optional encryption, sign-then-encrypt, RFC 7516 AAD binding, fail-closed validation) is unchanged. The 1.0 tier brings a sharper safety posture: a RequireReplayProtection flag so an operator can't forget to wire a replay cache (silent OFF case now opt-in fail-closed), an internal test seam (IXWingDeterministicCoins) that lets the suite KAT the X-Wing combiner and the X25519 ephemeral half against deterministic inputs (the BCL ML-KEM encapsulation path still cannot be KAT'd — that gap is narrowed and re-documented in KNOWN-GAPS.md), a 64-iteration statistical sanity test on encapsulation, a pinned end-to-end roundtrip corpus, and a "Read this first" README disclosure that these tokens use non-IANA-registered identifiers and will NOT validate in generic JWT tooling. Includes the previously-unreleased PqJwtValidationException wrapping fix. The preview.N suffix continues to carry the maturity caveat: NOT independently audited, NOT for production. Full notes: https://github.com/systemslibrarian/postquantum-jwt/blob/main/CHANGELOG.md — known limitations: https://github.com/systemslibrarian/postquantum-jwt/blob/main/KNOWN-GAPS.md.</PackageReleaseNotes>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
     <Copyright>Copyright © Paul Clark</Copyright>
     <NeutralLanguage>en-US</NeutralLanguage>

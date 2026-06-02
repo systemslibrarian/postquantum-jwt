@@ -26,10 +26,14 @@ public sealed class PqJwtValidator
     /// <exception cref="ArgumentNullException"><paramref name="parameters"/> is <see langword="null"/>.</exception>
     /// <exception cref="ArgumentException">
     /// Neither <see cref="PqJwtValidationParameters.SignatureVerificationKey"/> nor
-    /// <see cref="PqJwtValidationParameters.SignatureKeyResolver"/> is configured.
-    /// A security validator without a way to obtain a verification key is
-    /// misconfigured by definition — rejecting that at construction time means
-    /// misconfiguration surfaces before the first token arrives.
+    /// <see cref="PqJwtValidationParameters.SignatureKeyResolver"/> is configured,
+    /// or <see cref="PqJwtValidationParameters.RequireReplayProtection"/> is
+    /// <see langword="true"/> while <see cref="PqJwtValidationParameters.ReplayCache"/>
+    /// is <see langword="null"/>. A security validator without a way to obtain a
+    /// verification key — or one whose replay-protection requirement is asserted
+    /// but unwired — is misconfigured by definition; rejecting that at
+    /// construction time means the misconfiguration surfaces before the first
+    /// token arrives.
     /// </exception>
     /// <exception cref="ArgumentOutOfRangeException">
     /// <see cref="PqJwtValidationParameters.ClockSkew"/> is negative — negative skew
@@ -47,6 +51,15 @@ public sealed class PqJwtValidator
         }
 
         ArgumentOutOfRangeException.ThrowIfLessThan(parameters.ClockSkew, TimeSpan.Zero);
+
+        if (parameters.RequireReplayProtection && parameters.ReplayCache is null)
+        {
+            throw new ArgumentException(
+                "PqJwtValidationParameters.RequireReplayProtection is set, but no ReplayCache was supplied. " +
+                "Either provide a ReplayCache or clear RequireReplayProtection.",
+                nameof(parameters));
+        }
+
         _parameters = parameters;
         _timeProvider = timeProvider ?? TimeProvider.System;
     }
