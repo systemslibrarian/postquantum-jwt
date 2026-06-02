@@ -570,8 +570,10 @@ See [`samples/README.md`](samples/README.md) for the full guide,
 token, and [`samples/HARDENING-CHECKLIST.md`](samples/HARDENING-CHECKLIST.md) for
 how each attack is blocked.
 
-> **Live playground.** The Blazor playground can be hosted as an interactive demo —
-> see [`samples/PqJwtPlayground/DEPLOY.md`](samples/PqJwtPlayground/DEPLOY.md).
+> **Live playground:** **https://pqjwt-playground.politeforest-51c29669.eastus.azurecontainerapps.io/**
+> — build and validate post-quantum tokens in your browser. (Scale-to-zero, so the
+> first request after it's been idle takes a few seconds to wake.) To host your
+> own, see [`samples/PqJwtPlayground/DEPLOY.md`](samples/PqJwtPlayground/DEPLOY.md).
 
 ---
 
