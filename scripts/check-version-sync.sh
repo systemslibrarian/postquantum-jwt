@@ -82,6 +82,18 @@ if [[ -f $templates_csproj ]]; then
   fi
 fi
 
+# The analyzer companion package ships in lockstep with the library.
+analyzers_csproj=$repo_root/src/Analyzers/PostQuantum.Jwt.Analyzers/PostQuantum.Jwt.Analyzers.csproj
+if [[ -f $analyzers_csproj ]]; then
+  analyzers_version=$(grep -oE '<Version>[^<]+</Version>' "$analyzers_csproj" | head -1 | sed -E 's|</?Version>||g')
+  if [[ $analyzers_version != "$csproj_version" ]]; then
+    echo "::error::Analyzers package version ($analyzers_version) does not match csproj ($csproj_version)"
+    errors=$((errors + 1))
+  else
+    echo "Analyzers package: $analyzers_version OK"
+  fi
+fi
+
 if [[ $errors -gt 0 ]]; then
   echo "::error::version-sync check failed with $errors error(s)"
   exit 1

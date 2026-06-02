@@ -64,6 +64,9 @@ jobs:
       - name: Pack — dotnet new templates
         run: dotnet pack templates/PostQuantum.Jwt.Templates.csproj -c Release -o artifacts
 
+      - name: Pack — Roslyn analyzers
+        run: dotnet pack src/Analyzers/PostQuantum.Jwt.Analyzers/PostQuantum.Jwt.Analyzers.csproj -c Release --no-build -o artifacts
+
       - name: Generate top-level CycloneDX SBOM (in addition to the per-nupkg one)
         run: |
           set -euo pipefail
