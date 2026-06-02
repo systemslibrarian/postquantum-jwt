@@ -28,18 +28,21 @@ internal sealed class JoseHeader
         }
         catch (JsonException ex)
         {
-            throw new PqJwtValidationException("Token header is not valid JSON.", ex);
+            throw new PqJwtValidationException(
+                PqJwtFailureReason.MalformedJson, "Token header is not valid JSON.", ex);
         }
 
         if (node is not JsonObject obj)
         {
-            throw new PqJwtValidationException("Token header is not a JSON object.");
+            throw new PqJwtValidationException(
+                PqJwtFailureReason.InvalidHeader, "Token header is not a JSON object.");
         }
 
         var alg = (string?)obj["alg"];
         if (string.IsNullOrEmpty(alg))
         {
-            throw new PqJwtValidationException("Token header is missing the 'alg' field.");
+            throw new PqJwtValidationException(
+                PqJwtFailureReason.InvalidHeader, "Token header is missing the 'alg' field.");
         }
 
         return new JoseHeader

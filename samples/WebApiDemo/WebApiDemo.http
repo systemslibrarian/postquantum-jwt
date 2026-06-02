@@ -1,0 +1,16 @@
+@host = http://localhost:5080
+
+### Issue an admin token
+# @name login
+POST {{host}}/token?sub=alice&role=admin
+
+### Call the protected endpoint with the token from /token
+GET {{host}}/me
+Authorization: Bearer {{login.response.body.token}}
+
+### Admin-only endpoint
+GET {{host}}/admin
+Authorization: Bearer {{login.response.body.token}}
+
+### Key directory (JWKS-equivalent)
+GET {{host}}/.well-known/pqjwt-keys

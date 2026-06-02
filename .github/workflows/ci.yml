@@ -161,10 +161,11 @@ jobs:
       - name: Install CycloneDX SBOM tool
         run: dotnet tool install --global CycloneDX
 
-      - name: Pack (Release) — both packages
+      - name: Pack (Release) — both packages + templates
         run: |
           dotnet pack src/PostQuantum.Jwt/PostQuantum.Jwt.csproj -c Release -o artifacts
           dotnet pack src/PostQuantum.Jwt.AspNetCore/PostQuantum.Jwt.AspNetCore.csproj -c Release -o artifacts
+          dotnet pack templates/PostQuantum.Jwt.Templates.csproj -c Release -o artifacts
 
       - name: Upload package artifact
         uses: actions/upload-artifact@v5
@@ -173,3 +174,22 @@ jobs:
           path: artifacts/*.*nupkg
           if-no-files-found: error
           retention-days: 14
+
+  build-samples:
+    # The samples live in their own solution (samples/PostQuantum.Jwt.Samples.slnx)
+    # and reference src/ by project reference. Build them on every push so a
+    # library API change that breaks a sample is caught here — the samples are
+    # part of the package's story, so they must stay compiling. No test run:
+    # SpecByExample exercises the PQ primitives, which the PQ-required lanes
+    # above already cover; this job is a compile gate.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      - name: Build samples (Release, warnings as errors)
+        run: dotnet build samples/PostQuantum.Jwt.Samples.slnx -c Release

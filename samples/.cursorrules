@@ -1,0 +1,17 @@
+# Cursor rules for projects consuming PostQuantum.Jwt
+# (See LLM-USAGE.md for the full rationale.)
+
+- PostQuantum.Jwt is fail-closed: PqJwtValidator.Validate(token) returns a result
+  ONLY on success and THROWS PqJwtValidationException on failure. There is no
+  IsValid property. Always use try/catch (PqJwtValidationException); never
+  generate a soft bool/result-with-error wrapper.
+- One suite only: ML-DSA-65 signatures, X-Wing + A256GCM encryption. Never add
+  algorithm agility, alg negotiation, RSA/HMAC/ECDSA, or an alg:none path.
+- Identifiers are NOT IANA-registered. Never suggest interop with
+  System.IdentityModel.Tokens.Jwt, jose-jwt, python-jose, Auth0/Okta, etc.
+  Use this only when one party controls both issuer and verifier.
+- exp is required; always set a lifetime.
+- Never log/print/return private key material. Public key only. Persist private
+  keys as encrypted PKCS#8 / HSM / key vault, never a plaintext file.
+- Replay protection is opt-in; InMemoryReplayCache is single-process. Use a
+  shared IPqJwtReplayCache for multiple instances.

@@ -53,6 +53,35 @@ else
   echo "CHANGELOG entry:   $csproj_version OK"
 fi
 
+# The dotnet-new template package, and the PostQuantum.Jwt* PackageReferences in
+# the scaffolded template content, reference the PUBLISHED library version. Keep
+# them in lockstep so `dotnet new pqjwt-*` never scaffolds against a stale version.
+templates_csproj=$repo_root/templates/PostQuantum.Jwt.Templates.csproj
+if [[ -f $templates_csproj ]]; then
+  tpl_version=$(grep -oE '<Version>[^<]+</Version>' "$templates_csproj" | head -1 | sed -E 's|</?Version>||g')
+  if [[ $tpl_version != "$csproj_version" ]]; then
+    echo "::error::Templates package version ($tpl_version) does not match csproj ($csproj_version)"
+    errors=$((errors + 1))
+  else
+    echo "Templates package: $tpl_version OK"
+  fi
+
+  ref_mismatch=0
+  while IFS= read -r ref_version; do
+    [[ -z $ref_version ]] && continue
+    if [[ $ref_version != "$csproj_version" ]]; then
+      echo "::error::Template content has a PostQuantum.Jwt PackageReference at $ref_version, expected $csproj_version"
+      ref_mismatch=$((ref_mismatch + 1))
+    fi
+  done < <(grep -rhoE 'PackageReference Include="PostQuantum\.Jwt[^"]*" Version="[^"]+"' "$repo_root/templates/content" \
+             | sed -E 's|.*Version="([^"]+)".*|\1|')
+  if [[ $ref_mismatch -gt 0 ]]; then
+    errors=$((errors + ref_mismatch))
+  else
+    echo "Template content refs: all PostQuantum.Jwt references at $csproj_version OK"
+  fi
+fi
+
 if [[ $errors -gt 0 ]]; then
   echo "::error::version-sync check failed with $errors error(s)"
   exit 1

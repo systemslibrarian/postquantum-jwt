@@ -24,6 +24,9 @@ coverage*.xml
 .DS_Store
 Thumbs.db
 
+# Local working notes — not part of the repo
+articles/
+
 # Secrets — never commit API keys or signing material
 nuget.key.txt
 *.apikey

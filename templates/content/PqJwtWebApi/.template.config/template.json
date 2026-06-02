@@ -1,0 +1,12 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Paul Clark",
+  "classifications": [ "Web", "WebAPI", "Security", "Authentication", "Post-Quantum" ],
+  "name": "PostQuantum.Jwt ASP.NET Core API",
+  "description": "A minimal ASP.NET Core API that issues and fail-closed-validates post-quantum (ML-DSA-65) JWTs via AddPqJwtBearer, with a JWKS-equivalent key directory.",
+  "identity": "PostQuantum.Jwt.Templates.WebApi",
+  "shortName": "pqjwt-webapi",
+  "tags": { "language": "C#", "type": "project" },
+  "sourceName": "PqJwtWebApi",
+  "preferNameDirectory": true
+}

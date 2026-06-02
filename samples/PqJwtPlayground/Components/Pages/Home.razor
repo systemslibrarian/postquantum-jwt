@@ -1,0 +1,288 @@
+@page "/"
+@rendermode InteractiveServer
+@inject PqJwtDemoService Demo
+
+<PageTitle>Post-Quantum JWT Playground</PageTitle>
+
+<h1 class="screenreader">Post-Quantum JWT Playground</h1>
+
+<div class="warnbar" role="note">
+    These tokens use <code>ML-DSA-65</code> / <code>X-Wing</code> / <code>A256GCM</code> &mdash;
+    <strong>not</strong> IANA-registered. They will not validate in generic JWT tooling.
+    This is preview, unaudited software.
+</div>
+
+<div class="grid">
+
+    <!-- 01 BUILD -->
+    <section class="card" aria-labelledby="build-h">
+        <h2 id="build-h"><span class="num">01</span> Build a token</h2>
+
+        <label>Subject (sub)
+            <input @bind="_sub" placeholder="user-123" aria-label="Subject claim" />
+        </label>
+        <div class="row">
+            <label>Issuer (iss)
+                <input @bind="_iss" placeholder="https://issuer.example" aria-label="Issuer claim" />
+            </label>
+            <label>Audience (aud)
+                <input @bind="_aud" placeholder="https://api.example" aria-label="Audience claim" />
+            </label>
+        </div>
+        <div class="row">
+            <label>Lifetime (minutes)
+                <input type="number" min="1" max="1440" @bind="_minutes" aria-label="Lifetime in minutes" />
+            </label>
+            <label class="check">
+                <input type="checkbox" @bind="_encrypt" /> Encrypt (X-Wing)
+            </label>
+            <label class="check">
+                <input type="checkbox" @bind="_jti" /> Include jti
+            </label>
+        </div>
+
+        <fieldset class="claims-edit">
+            <legend>Custom claims</legend>
+            @if (_claimRows.Count == 0)
+            {
+                <p class="empty-state">No custom claims yet. Add one (e.g. <code>role</code> = <code>admin</code>) or just build with the standard claims above.</p>
+            }
+            @for (int i = 0; i < _claimRows.Count; i++)
+            {
+                var idx = i;
+                <div class="claim-row">
+                    <input class="cn" placeholder="name (e.g. role)" @bind="_claimRows[idx].Name"
+                           @onkeydown="@(e => OnClaimKey(e, idx))" aria-label="Claim name" />
+                    <input class="cv" placeholder="value (admin / 3 / true)" @bind="_claimRows[idx].Value"
+                           @onkeydown="@(e => OnClaimKey(e, idx))" aria-label="Claim value" />
+                    <button class="mini" @onclick="() => RemoveClaim(idx)" aria-label="Remove claim">&times;</button>
+                </div>
+            }
+            <button class="ghost mini-add" @onclick="AddClaim">+ add claim</button>
+            <p class="hint small">Values are typed automatically: <code>true</code>/<code>false</code> &rarr; bool,
+                whole numbers &rarr; integer, decimals &rarr; number, everything else &rarr; string. No raw JSON needed.
+                Press <kbd>Enter</kbd> on the last row to add another.</p>
+        </fieldset>
+
+        <button class="primary" @onclick="DoBuild">Create token</button>
+
+        @if (_buildError is not null)
+        {
+            <p class="err" role="alert">@_buildError</p>
+        }
+
+        @if (_build is not null)
+        {
+            <div class="output">
+                <div class="tokenhead">
+                    <span>Compact token</span>
+                    <span class="chip">@_build.Segments segments</span>
+                    <span class="chip">@_build.ApproxBytes bytes</span>
+                    <span class="chip">@_build.ElapsedMs.ToString("F1") ms</span>
+                </div>
+                <pre class="token" tabindex="0">@_build.Token</pre>
+
+                <div class="cols">
+                    <div>
+                        <h3>Header</h3>
+                        <pre class="json">@_build.DecodedHeaderJson</pre>
+                    </div>
+                    <div>
+                        <h3>Payload</h3>
+                        <pre class="json">@_build.DecodedPayloadJson</pre>
+                    </div>
+                </div>
+
+                <SizeBar PqBytes="_build.ApproxBytes" Encrypted="_build.Encrypted" />
+
+                <button class="ghost" @onclick="UseInValidator">Send to validator &darr;</button>
+            </div>
+        }
+    </section>
+
+    <!-- 02 VALIDATE -->
+    <section class="card" aria-labelledby="val-h">
+        <h2 id="val-h"><span class="num">02</span> Validate a token</h2>
+        <p class="hint">Validates against this session's demo keys. Fail-closed: anything wrong is rejected with a reason.</p>
+
+        <label>Token
+            <textarea rows="6" @bind="_validateInput" placeholder="paste a token..." aria-label="Token to validate"></textarea>
+        </label>
+        <button class="primary" @onclick="DoValidate">Validate</button>
+
+        @if (_validation is not null)
+        {
+            <div class="result @(_validation.Valid ? "ok" : "bad")" role="status">
+                <div class="resulthead">
+                    <span class="status">@(_validation.Valid ? "VALID" : "REJECTED")</span>
+                    <span class="chip">@_validation.ElapsedMs.ToString("F1") ms</span>
+                    @if (_validation.WasEncrypted)
+                    {
+                        <span class="chip">decrypted</span>
+                    }
+                </div>
+
+                @if (_validation.Valid)
+                {
+                    <table class="claims">
+                        <tbody>
+                            <tr><td>sub</td><td>@(_validation.Subject ?? "—")</td></tr>
+                            <tr><td>iss</td><td>@(_validation.Issuer ?? "—")</td></tr>
+                            <tr><td>aud</td><td>@(_validation.Audience ?? "—")</td></tr>
+                            <tr><td>jti</td><td>@(_validation.JwtId ?? "—")</td></tr>
+                            <tr><td>exp</td><td>@(_validation.ExpiresAt ?? "—")</td></tr>
+                        </tbody>
+                    </table>
+                    <h3>All claims</h3>
+                    <pre class="json">@_validation.ClaimsJson</pre>
+                }
+                else
+                {
+                    <!-- The highest-value teaching moment: WHY it was rejected. -->
+                    <div class="why">
+                        <h3>Why was this rejected?</h3>
+                        <p class="why-what">@_validation.What</p>
+                        <p class="why-why">@_validation.Why</p>
+                        <details>
+                            <summary>Technical detail</summary>
+                            <code class="raw">@_validation.Message</code>
+                        </details>
+                    </div>
+                }
+            </div>
+        }
+    </section>
+
+    <!-- 03 KEYS -->
+    <section class="card span2" aria-labelledby="keys-h">
+        <h2 id="keys-h"><span class="num">03</span> Session keys</h2>
+        <p class="hint">
+            Generated server-side and held in memory. Private keys never reach the browser.
+            Regenerating invalidates tokens built with the old keys.
+        </p>
+        <div class="cols">
+            <div>
+                <h3>ML-DSA-65 verification (public)</h3>
+                <pre class="json mono small">@_verPub</pre>
+            </div>
+            <div>
+                <h3>X-Wing recipient (public, 1216 B)</h3>
+                <pre class="json mono small">@_recPub</pre>
+            </div>
+        </div>
+        <button class="ghost" @onclick="Regenerate">Regenerate keys</button>
+        <span class="kid">active kid: <code>@Demo.SigningKid</code></span>
+    </section>
+
+    <!-- 04 SECURITY PROPERTIES -->
+    <section class="card span2" aria-labelledby="props-h">
+        <h2 id="props-h"><span class="num">04</span> What this protects against</h2>
+        <div class="props">
+            <div class="prop"><span class="ok-dot"></span><strong>Forgery &amp; tampering</strong>
+                <p>ML-DSA-65 over header+payload. Edit any claim and the signature no longer verifies.</p></div>
+            <div class="prop"><span class="ok-dot"></span><strong>Algorithm downgrade</strong>
+                <p>The validator accepts one suite and never trusts the token's own <code>alg</code>. No <code>alg: none</code> path exists.</p></div>
+            <div class="prop"><span class="ok-dot"></span><strong>Quantum harvest-now-decrypt-later</strong>
+                <p>Hybrid X-Wing: an attacker must break <em>both</em> X25519 and ML-KEM-768 to recover an encrypted payload.</p></div>
+            <div class="prop"><span class="ok-dot"></span><strong>Stale &amp; replayed tokens</strong>
+                <p><code>exp</code> is required; <code>nbf</code> enforced; optional <code>jti</code> replay cache rejects reuse.</p></div>
+            <div class="prop warn"><span class="warn-dot"></span><strong>Not protected: interop</strong>
+                <p>Non-IANA identifiers mean these tokens are deliberately non-interoperable with standard JWT stacks.</p></div>
+            <div class="prop warn"><span class="warn-dot"></span><strong>Not protected: audited assurance</strong>
+                <p>Preview software; the construction has not had an independent third-party audit.</p></div>
+        </div>
+    </section>
+
+</div>
+
+@code {
+    // build inputs
+    private string _sub = "user-123";
+    private string _iss = "https://issuer.example";
+    private string _aud = "https://api.example";
+    private int _minutes = 15;
+    private bool _encrypt;
+    private bool _jti = true;
+
+    // mutable claim rows (class so @bind can write into list elements)
+    private sealed class Row { public string Name { get; set; } = ""; public string Value { get; set; } = ""; }
+    private readonly List<Row> _claimRows = new() { new Row { Name = "role", Value = "admin" } };
+
+    private BuildResult? _build;
+    private string? _buildError;
+
+    private string _validateInput = "";
+    private ValidationView? _validation;
+
+    private string _verPub = "";
+    private string _recPub = "";
+
+    protected override void OnInitialized() => RefreshKeys();
+
+    private void RefreshKeys()
+    {
+        _verPub = Wrap(Demo.VerificationPublicKeyBase64);
+        _recPub = Wrap(Demo.RecipientPublicKeyBase64);
+    }
+
+    private void AddClaim() => _claimRows.Add(new Row());
+    private void RemoveClaim(int i) { if (i >= 0 && i < _claimRows.Count) _claimRows.RemoveAt(i); }
+
+    // Enter on the last row appends a new empty row, so a keyboard user can add
+    // several claims without reaching for the mouse.
+    private void OnClaimKey(KeyboardEventArgs e, int idx)
+    {
+        if (e.Key == "Enter" && idx == _claimRows.Count - 1)
+            AddClaim();
+    }
+
+    private void DoBuild()
+    {
+        _buildError = null;
+        try
+        {
+            var claims = _claimRows
+                .Where(r => !string.IsNullOrWhiteSpace(r.Name))
+                .Select(r => new ClaimInput(r.Name.Trim(), r.Value))
+                .ToList();
+            _build = Demo.Build(_sub, _iss, _aud, _minutes, _encrypt, _jti, claims);
+        }
+        catch (Exception ex)
+        {
+            _build = null;
+            _buildError = "Could not build token: " + ex.Message;
+        }
+    }
+
+    private void DoValidate()
+    {
+        if (string.IsNullOrWhiteSpace(_validateInput)) return;
+        _validation = Demo.Validate(_validateInput.Trim());
+    }
+
+    private void UseInValidator()
+    {
+        if (_build is not null)
+        {
+            _validateInput = _build.Token;
+            _validation = null;
+        }
+    }
+
+    private void Regenerate()
+    {
+        Demo.RegenerateKeys();
+        RefreshKeys();
+        _validation = null;
+        _build = null;
+    }
+
+    private static string Wrap(string s)
+    {
+        const int w = 64;
+        var sb = new System.Text.StringBuilder(s.Length + s.Length / w + 1);
+        for (int i = 0; i < s.Length; i += w)
+            sb.AppendLine(s.Substring(i, Math.Min(w, s.Length - i)));
+        return sb.ToString().TrimEnd();
+    }
+}

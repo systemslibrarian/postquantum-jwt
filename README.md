@@ -32,8 +32,9 @@ small-surface, and honest about what it is.
 > [Compared to System.IdentityModel.Tokens.Jwt](#compared-to-systemidentitymodeltokensjwt)
 > for the side-by-side.
 
-> **Status — `1.0.0-preview.1`. Preview software. Not for production use.**
-> The API may change before 1.0. The cryptographic construction has **not** been
+> **Status — `1.0.0-preview.2`. Preview software. Not for production use.**
+> The API may change between previews, before the stable `1.0.0`. The
+> cryptographic construction has **not** been
 > independently audited. Read [`KNOWN-GAPS.md`](KNOWN-GAPS.md) before depending
 > on this for anything that matters.
 
@@ -42,7 +43,7 @@ small-surface, and honest about what it is.
 ## Table of contents
 
 - [Why](#why)
-- [What's new in 1.0.0-preview.1](#whats-new-in-100-preview1)
+- [What's new in 1.0.0-preview.2](#whats-new-in-100-preview2)
 - [Install](#install)
 - [60-second tour](#60-second-tour)
 - [Usage](#usage)
@@ -50,10 +51,12 @@ small-surface, and honest about what it is.
   - [Sign *and* encrypt](#sign-and-encrypt)
   - [Key rotation and replay protection](#key-rotation-and-replay-protection)
   - [ASP.NET Core integration](#aspnet-core-integration)
+- [Samples](#samples)
 - [Token format](#token-format)
 - [Public API at a glance](#public-api-at-a-glance)
 - [Compared to System.IdentityModel.Tokens.Jwt](#compared-to-systemidentitymodeltokensjwt)
 - [Operational tradeoffs](#operational-tradeoffs)
+- [Observability](#observability)
 - [Security posture](#security-posture)
 - [Compatibility](#compatibility)
 - [Building from source](#building-from-source)
@@ -78,6 +81,29 @@ once:
 If either half stands, your token stands. That is the whole point.
 
 ---
+
+## What's new in 1.0.0-preview.2
+
+An **additive** release — the crypto core, public algorithm surface, and
+fail-closed behavior are **unchanged** (no new suite, no algorithm agility). It
+adds observability and a typed failure taxonomy, plus the runnable samples and
+templates that grow the ecosystem.
+
+- **Validation metrics.** The validator emits a `pqjwt.validations` counter on a
+  `System.Diagnostics.Metrics` meter named `PostQuantum.Jwt`, tagged
+  `outcome=success|failure` and — on failure — a coarse, bounded, **non-sensitive**
+  `reason`. Opt in with OpenTelemetry or any meter listener; no new dependency,
+  no token/claim/key material ever emitted. See [Observability](#observability).
+- **Typed failure reasons.** A new public `PqJwtFailureReason` enum and
+  `PqJwtValidationException.Reason` let callers (and the metric) categorize a
+  rejection from a typed value instead of parsing the message. The fail-closed
+  control flow is byte-for-byte unchanged.
+- **Runnable samples** (`samples/`) and a **`dotnet new` template package**
+  (`PostQuantum.Jwt.Templates` — `pqjwt-webapi`, `pqjwt-console`). See
+  [Samples](#samples).
+- **Expanded hardening guidance** — `samples/SECURE-USAGE.md` and
+  `samples/HARDENING-CHECKLIST.md` now map common JWT attacks to the library's
+  defenses and the metric `reason` that surfaces each.
 
 ## What's new in 1.0.0-preview.1
 
@@ -250,13 +276,13 @@ Full notes in [`CHANGELOG.md`](CHANGELOG.md).
 ## Install
 
 ```bash
-dotnet add package PostQuantum.Jwt --version 1.0.0-preview.1
+dotnet add package PostQuantum.Jwt --version 1.0.0-preview.2
 ```
 
 Or in a `.csproj`:
 
 ```xml
-<PackageReference Include="PostQuantum.Jwt" Version="1.0.0-preview.1" />
+<PackageReference Include="PostQuantum.Jwt" Version="1.0.0-preview.2" />
 ```
 
 **Runtime requirement:** the native ML-KEM / ML-DSA primitives need an OpenSSL
@@ -418,7 +444,7 @@ package and call `AddPqJwtBearer(...)` on the standard
 `ML-DSA-65`.
 
 ```bash
-dotnet add package PostQuantum.Jwt.AspNetCore --version 1.0.0-preview.1
+dotnet add package PostQuantum.Jwt.AspNetCore --version 1.0.0-preview.2
 ```
 
 ```csharp
@@ -505,6 +531,42 @@ across services.
 parse the token's `alg` and fail. Either use `AddPqJwtBearer` as your
 only bearer auth, or restrict each scheme to specific routes with
 `[Authorize(AuthenticationSchemes = ...)]`.
+
+---
+
+## Samples
+
+Nine runnable samples live in [`samples/`](samples/) — from a menu-driven console
+tour to a real ASP.NET Core service, an interactive Blazor playground, refresh-token
+rotation, and a distributed replay cache. Each references the library by project
+reference, so the samples always build against the current source (CI builds the
+whole sample solution on every push).
+
+| Sample | Shows |
+| --- | --- |
+| [`ConsoleDemo`](samples/ConsoleDemo)                     | Every feature, fast — a Spectre.Console menu |
+| [`WebApiDemo`](samples/WebApiDemo)                       | Real ASP.NET Core integration via `AddPqJwtBearer` |
+| [`VerifierDemo`](samples/VerifierDemo)                   | Cross-service key rotation against an issuer's key directory |
+| [`PqJwtPlayground`](samples/PqJwtPlayground)             | Interactive Blazor UI — build and validate tokens in a browser |
+| [`RefreshTokenDemo`](samples/RefreshTokenDemo)           | Access/refresh split, rotation, reuse detection |
+| [`DistributedReplayCache`](samples/DistributedReplayCache) | `IPqJwtReplayCache` over Redis / `IDistributedCache` |
+| [`SpecByExample`](samples/SpecByExample)                 | xUnit tests whose names are the lessons |
+| [`TestingSupport`](samples/TestingSupport)               | A no-crypto test auth handler for your own `[Authorize]` endpoints |
+
+```bash
+# build every sample
+dotnet build samples/PostQuantum.Jwt.Samples.slnx
+# or run one
+dotnet run --project samples/ConsoleDemo
+```
+
+See [`samples/README.md`](samples/README.md) for the full guide,
+[`samples/SECURE-USAGE.md`](samples/SECURE-USAGE.md) for the decisions *around* the
+token, and [`samples/HARDENING-CHECKLIST.md`](samples/HARDENING-CHECKLIST.md) for
+how each attack is blocked.
+
+> **Live playground.** The Blazor playground can be hosted as an interactive demo —
+> see [`samples/PqJwtPlayground/DEPLOY.md`](samples/PqJwtPlayground/DEPLOY.md).
 
 ---
 
@@ -620,6 +682,36 @@ the unaudited construction as the gating concern, not the wire format.
 
 ---
 
+## Observability
+
+`PqJwtValidator` emits a single counter so you can watch validation outcomes
+without bolting on logging — and without ever logging anything sensitive.
+
+- **Meter:** `PostQuantum.Jwt` (the name is stable API).
+- **Counter:** `pqjwt.validations`, tagged `outcome` = `success` | `failure`, and
+  on failure a `reason` drawn from the typed
+  [`PqJwtFailureReason`](#public-api-at-a-glance) — a closed, bounded-cardinality
+  set (e.g. `signature_mismatch`, `expired`, `replay_detected`,
+  `algorithm_not_accepted`, `unknown_kid`, `audience_mismatch`). The `reason`
+  **never** contains the token, claim values, `jti`, issuer/audience values, or
+  key material — only the category.
+
+It's emitted via `System.Diagnostics.Metrics`, so there's no telemetry
+dependency in the package — opt in with OpenTelemetry or any meter listener:
+
+```csharp
+builder.Services.AddOpenTelemetry().WithMetrics(m => m
+    .AddMeter("PostQuantum.Jwt")
+    .AddPrometheusExporter());        // or OTLP, console, etc.
+```
+
+A spike in `pqjwt.validations{outcome="failure",reason="signature_mismatch"}` is
+a live forgery signal. Because post-quantum signature verification costs more
+than classical, this is also your DoS canary — see
+[`samples/HARDENING-CHECKLIST.md`](samples/HARDENING-CHECKLIST.md). The same
+typed `PqJwtFailureReason` is available on `PqJwtValidationException.Reason` for
+callers that want to branch on the failure category directly.
+
 ## Security posture
 
 We aim to be honest about exactly what this library does and does not give you.
@@ -651,7 +743,7 @@ We aim to be honest about exactly what this library does and does not give you.
 - **Non-standard identifiers.** The `alg`/`enc` values describe a scheme the
   IANA JOSE registry does not cover, so these tokens are intentionally **not**
   interoperable with generic JWT tooling.
-- **Preview.** Treat the API and wire format as unstable until 1.0.
+- **Preview.** Treat the API and wire format as unstable until the stable `1.0.0` release; the `1.0.0-preview.*` series may break between previews.
 
 Full detail lives in [`SECURITY.md`](SECURITY.md) and
 [`KNOWN-GAPS.md`](KNOWN-GAPS.md). To report a vulnerability, see `SECURITY.md`.

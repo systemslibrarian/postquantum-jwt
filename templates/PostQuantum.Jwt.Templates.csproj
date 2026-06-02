@@ -1,0 +1,53 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    `dotnet new` template package. This project compiles nothing of its own; it
+    packs the projects under content/ as item templates. The packed templates
+    reference the PUBLISHED PostQuantum.Jwt package (PackageReference), unlike the
+    in-repo samples which use ProjectReference against local src/. The referenced
+    version is kept in lockstep with the library by scripts/check-version-sync.sh.
+  -->
+
+  <PropertyGroup>
+    <PackageType>Template</PackageType>
+    <PackageId>PostQuantum.Jwt.Templates</PackageId>
+    <Version>1.0.0-preview.2</Version>
+    <Title>PostQuantum.Jwt templates (dotnet new)</Title>
+    <Authors>Paul Clark</Authors>
+    <Description>`dotnet new` templates for PostQuantum.Jwt: scaffold a post-quantum hybrid JWT ASP.NET Core API (pqjwt-webapi) or a console app (pqjwt-console) that signs with ML-DSA-65 and validates fail-closed. Preview release — not for production use.</Description>
+    <PackageProjectUrl>https://github.com/systemslibrarian/postquantum-jwt</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/systemslibrarian/postquantum-jwt</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageTags>dotnet-new;templates;template;jwt;jose;post-quantum;pqc;ml-dsa;ml-kem;aspnetcore;authentication;security;net10</PackageTags>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+    <Copyright>Copyright © Paul Clark</Copyright>
+    <NeutralLanguage>en-US</NeutralLanguage>
+
+    <!-- Template-package mechanics: pack content, produce no lib/ build output. -->
+    <TargetFramework>net10.0</TargetFramework>
+    <IncludeContentInPack>true</IncludeContentInPack>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <EnableDefaultItems>false</EnableDefaultItems>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <!-- Keep the scaffolded content (incl. .template.config) verbatim. -->
+    <NoDefaultExcludes>true</NoDefaultExcludes>
+    <!-- A template package legitimately ships no lib/ assemblies. -->
+    <NoWarn>$(NoWarn);NU5128</NoWarn>
+    <!-- No public API to document here. -->
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Pack the template sources to content/… (explicit PackagePath so the
+         leading content\ in the source path isn't applied twice). -->
+    <Content Include="content\**\*"
+             Exclude="content\**\bin\**;content\**\obj\**"
+             Pack="true"
+             PackagePath="content\%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Remove="**\*" />
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Tiny shared library for the PostQuantum.Jwt samples.
+
+    Its ONE job is to hold code that is coupled to the library's behavior and
+    must not silently drift between samples - specifically RejectionExplainer,
+    whose plain-language mapping keys off the validator's exact exception
+    messages. A single source of truth here means a validator-message change is
+    fixed in one place, not three.
+
+    Everything else in the samples stays self-contained and copy-paste-readable;
+    this project deliberately holds nothing that a reader needs in order to
+    understand an individual sample end to end.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <AssemblyName>Pq.Samples.Shared</AssemblyName>
+    <RootNamespace>Pq.Samples.Shared</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\PostQuantum.Jwt\PostQuantum.Jwt.csproj" />
+  </ItemGroup>
+
+</Project>

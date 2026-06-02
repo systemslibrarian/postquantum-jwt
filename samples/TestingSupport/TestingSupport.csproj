@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    A test-only authentication handler that lets CONSUMERS of PostQuantum.Jwt
+    test their own [Authorize] endpoints without running ML-DSA / X-Wing crypto.
+    Depends only on ASP.NET Core auth - NOT on the crypto library - so it's a
+    clean candidate to lift into a published PostQuantum.Jwt.Testing package.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,58 @@
+# Two-service local demo: issuer + independent verifier, on an isolated network.
+#
+# Shows the full cross-service flow WITHOUT any shared secret:
+#   1. issuer  (WebApiDemo)   mints tokens and publishes its public keys at
+#                             /.well-known/pqjwt-keys
+#   2. verifier (VerifierDemo) fetches those keys over the internal network via
+#                             HttpPqJwtKeyRing and validates tokens by `kid`
+#
+# Both images need OpenSSL 3.5+, so both Dockerfiles use Azure Linux 3.0.
+# Build context is the REPOSITORY ROOT for both (they reference ../../src), so
+# run this from the repo root:
+#
+#   docker compose -f samples/docker-compose.yml up --build
+#
+# Then, against the published ports on your host:
+#   # mint an admin token from the issuer
+#   TOKEN=$(curl -s -X POST "http://localhost:5080/token?sub=alice&role=admin" | jq -r .token)
+#   # verify it on the SEPARATE verifier service (which never saw the signing key)
+#   curl -s http://localhost:5090/verify -H "Authorization: Bearer $TOKEN" | jq
+#
+# To God be the glory - 1 Corinthians 10:31.
+
+services:
+  issuer:
+    build:
+      context: ..
+      dockerfile: samples/WebApiDemo/Dockerfile
+    environment:
+      ASPNETCORE_HTTP_PORTS: "8080"
+      # Persist the issuer key inside the container volume so a restart keeps the
+      # same kid (and previously issued tokens keep validating).
+      PQJWT_KEY_PATH: "/keys/issuer-signing.pkcs8"
+      PQJWT_KEY_PASSPHRASE: "compose-demo-passphrase"
+    volumes:
+      - issuer-keys:/keys
+    ports:
+      - "5080:8080"
+    networks: [pqjwt]
+
+  verifier:
+    build:
+      context: ..
+      dockerfile: samples/VerifierDemo/Dockerfile
+    environment:
+      ASPNETCORE_HTTP_PORTS: "8080"
+      # Internal service name resolves on the compose network - no host ports needed.
+      ISSUER_KEYS_URL: "http://issuer:8080/.well-known/pqjwt-keys"
+    ports:
+      - "5090:8080"
+    depends_on: [issuer]
+    networks: [pqjwt]
+
+volumes:
+  issuer-keys:
+
+networks:
+  pqjwt:
+    driver: bridge

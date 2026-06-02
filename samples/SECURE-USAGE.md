@@ -102,6 +102,62 @@ PKCS#8 at minimum; HSM / key vault in production). See
 `WebApiDemo/FileBackedSigningKey.cs`. Never log or return private key material —
 only the public key is shareable.
 
+## 7. Step up authentication for sensitive actions
+
+A short-lived access token still has a blast radius: if it's stolen, the attacker
+can do anything it authorizes until it expires. Shrink that radius — don't let the
+ordinary session token authorize your most destructive operations. For actions
+like changing a password, updating billing, or moving money, demand a fresh proof
+of presence *at that moment*: a re-entered password, an OTP, or a passkey/
+biometric. Keep that elevated state out of the ordinary access token — issue a
+separate short-lived, single-use token for the sensitive step (pair it with replay
+protection, §5) or track a server-side "recently re-authenticated" flag. Low-risk
+reads stay seamless; high-risk writes cost the attacker a second factor they
+don't have.
+
+## 8. Protect the token in transit and in logs
+
+A validated token is a **bearer credential** — whoever holds it *is* the user
+until it expires. So:
+
+- **TLS only.** Never send tokens over plain HTTP. Terminate HTTPS (and HSTS for
+  browsers) so a token can't be sniffed in transit.
+- **Never log the token.** Keep `Authorization` and `Cookie` values out of logs,
+  traces, and error reports; redact them in any request-logging middleware. (This
+  library logs *nothing*; the ASP.NET Core handler logs only the validation
+  *failure* — its reason — never the token or key bytes. The `pqjwt.validations`
+  metric is the safe way to watch failures; see `HARDENING-CHECKLIST.md`.)
+- **Never put a token in a URL.** Query strings leak into browser history, proxy
+  and server access logs, and `Referer` headers. Tokens belong in the
+  `Authorization` header or an `HttpOnly` cookie — never `?token=`.
+
+## 9. Bind the token to its client (advanced, optional)
+
+§7 limits what a stolen token can *do*; binding limits *who can use it at all*.
+The OWASP "token sidejacking" defense: when you issue the token, generate a high-
+entropy random value, put its **hash** in a claim, and hand the **raw** value to
+the client in a separate hardened `HttpOnly; Secure; SameSite=Strict` cookie. On
+each request, re-hash the cookie value and compare it to the claim. A token lifted
+from a log or an `Authorization` header is then useless without the matching
+cookie, which `HttpOnly` keeps out of JavaScript's reach.
+
+```csharp
+// Issue: fingerprint hash travels in the token, raw value in a hardened cookie.
+var raw = RandomNumberGenerator.GetHexString(64);
+var fpt = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(raw)));
+var token = new PqJwtBuilder()
+    .WithSubject(userId).WithLifetime(TimeSpan.FromMinutes(15))
+    .WithClaim("fpt", fpt)            // hash only — never the raw value
+    .SignWith(signingKey).Build();
+// Validate: after PqJwtValidator succeeds, compare result.GetString("fpt")
+// to SHA-256 of the fingerprint cookie; reject on mismatch.
+```
+
+This is an application-level control the library *enables* (it's just a claim) but
+does not enforce for you. It's worth the complexity for high-value sessions; for
+most apps, §2 (in-memory) + §3 (short-lived + refresh) + §8 already cover the
+common theft paths.
+
 ---
 
 *To God be the glory — 1 Corinthians 10:31.*
