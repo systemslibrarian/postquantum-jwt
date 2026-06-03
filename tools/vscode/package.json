@@ -1,0 +1,94 @@
+{
+  "name": "postquantum-jwt",
+  "displayName": "PostQuantum.Jwt",
+  "description": "Snippets, a token decoder, and quick links for the PostQuantum.Jwt .NET library (ML-DSA-65 signatures + X-Wing hybrid confidentiality).",
+  "version": "0.1.0",
+  "publisher": "systemslibrarian",
+  "license": "MIT",
+  "icon": "images/icon.png",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Snippets",
+    "Other"
+  ],
+  "keywords": [
+    "jwt",
+    "jose",
+    "post-quantum",
+    "pqc",
+    "ml-dsa",
+    "ml-kem",
+    "x-wing",
+    "csharp",
+    "dotnet",
+    "cryptography"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/systemslibrarian/postquantum-jwt",
+    "directory": "tools/vscode"
+  },
+  "homepage": "https://github.com/systemslibrarian/postquantum-jwt/tree/main/tools/vscode#readme",
+  "bugs": {
+    "url": "https://github.com/systemslibrarian/postquantum-jwt/issues"
+  },
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "onLanguage:csharp"
+  ],
+  "contributes": {
+    "snippets": [
+      {
+        "language": "csharp",
+        "path": "./snippets/csharp.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "pqjwt.decodeToken",
+        "title": "PostQuantum.Jwt: Decode Token"
+      },
+      {
+        "command": "pqjwt.openPlayground",
+        "title": "PostQuantum.Jwt: Open Live Playground"
+      },
+      {
+        "command": "pqjwt.openDocs",
+        "title": "PostQuantum.Jwt: Open Docs (README)"
+      },
+      {
+        "command": "pqjwt.openNuget",
+        "title": "PostQuantum.Jwt: Open on NuGet"
+      },
+      {
+        "command": "pqjwt.openRepo",
+        "title": "PostQuantum.Jwt: Open GitHub Repository"
+      },
+      {
+        "command": "pqjwt.generateKeyPair",
+        "title": "PostQuantum.Jwt: Generate a Key Pair (in Playground)"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "pqjwt.decodeToken",
+          "when": "editorHasSelection",
+          "group": "navigation@9"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.4.0"
+  }
+}
