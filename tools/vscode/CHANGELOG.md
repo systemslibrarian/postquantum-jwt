@@ -4,6 +4,20 @@ All notable changes to the **PostQuantum.Jwt for VS Code** extension. This
 extension does no cryptography; it helps you write and understand
 PostQuantum.Jwt code. It sends no telemetry and makes no network calls.
 
+## 0.1.7
+
+- **Fixed:** the `pqjwt-aspnetcore` and `pqjwt-keyring` snippets now use the
+  `PostQuantum.AspNetCore` package's real identifiers (`PostQuantumJwtBearerDefaults`,
+  `HttpPostQuantumJwtKeyRing`) instead of stale legacy names, and the key-ring
+  snippet imports its namespace — so pasted code compiles.
+- **Fixed:** decoded-output documents are now released when their tab closes
+  (the content store no longer grows for the host's lifetime).
+- **Improved:** **Decode Token** also strips a leading `Authorization:` /
+  `Bearer ` prefix, so selecting a header line from an `.http` file works.
+- **Improved:** the API-docs CodeLens skips comment-only lines (less noise;
+  symbols inside string literals are still matched — a full fix needs semantic
+  tokens).
+
 ## 0.1.6
 
 - **Fixed:** hovering an inherited Object property (`constructor`, `toString`,

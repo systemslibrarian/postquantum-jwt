@@ -133,3 +133,17 @@ test("bug 4: surrounding quotes are stripped before decoding", () => {
   assert.match(out, /kid = k1/);
   assert.doesNotMatch(out, /not valid base64url/);
 });
+
+test("chatbug 4: Bearer / Authorization prefixes are stripped (.http selections)", () => {
+  for (const prefixed of [
+    "Bearer " + signedToken(),
+    "bearer " + signedToken(),
+    "Authorization: Bearer " + signedToken(),
+    '"Bearer ' + signedToken() + '"',
+  ]) {
+    const out = decodeToken(prefixed);
+    assert.match(out, /Form: SIGNED/, prefixed.slice(0, 24));
+    assert.match(out, /kid = k1/);
+    assert.doesNotMatch(out, /not valid base64url/);
+  }
+});

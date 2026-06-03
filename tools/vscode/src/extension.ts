@@ -26,6 +26,13 @@ class DecodeContentProvider implements vscode.TextDocumentContentProvider {
     this.store.set(uri.toString(), content);
     return uri;
   }
+
+  // Drop a closed document's content so the store doesn't grow unbounded.
+  remove(uri: vscode.Uri): void {
+    if (uri.scheme === DECODE_SCHEME) {
+      this.store.delete(uri.toString());
+    }
+  }
 }
 
 const decodeContent = new DecodeContentProvider();
@@ -94,6 +101,13 @@ class PqJwtCodeLensProvider implements vscode.CodeLensProvider {
     const lenses: vscode.CodeLens[] = [];
     for (let line = 0; line < document.lineCount; line++) {
       const text = document.lineAt(line).text;
+      // Cheap noise filter: skip comment-only lines (`// PqJwtBuilder`, block
+      // comment bodies). Symbols inside string literals or trailing comments are
+      // still matched — a full fix needs semantic tokens.
+      const lead = text.trimStart();
+      if (lead.startsWith("//") || lead.startsWith("*") || lead.startsWith("/*")) {
+        continue;
+      }
       const seenOnLine = new Set<string>();
       for (const match of text.matchAll(apiRegex())) {
         const symbol = match[1];
@@ -148,6 +162,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   context.subscriptions.push(
     vscode.workspace.registerTextDocumentContentProvider(DECODE_SCHEME, decodeContent),
+    vscode.workspace.onDidCloseTextDocument((doc) => decodeContent.remove(doc.uri)),
     vscode.commands.registerCommand("pqjwt.decodeToken", runDecode),
     vscode.commands.registerCommand("pqjwt.inspectToken", (token: string) => showDecodedToken(token)),
     vscode.commands.registerCommand("pqjwt.openPlayground", open(LINKS.playground)),
