@@ -17,17 +17,17 @@
   <!-- NuGet package metadata -->
   <PropertyGroup>
     <PackageId>PostQuantum.Jwt</PackageId>
-    <Version>1.0.0-preview.3</Version>
-    <Title>PostQuantum.Jwt — post-quantum hybrid JWTs for .NET</Title>
+    <Version>1.0.0-preview.4</Version>
+    <Title>PostQuantum.Jwt — JOSE-style post-quantum tokens for .NET</Title>
     <Authors>Paul Clark</Authors>
-    <Description>Post-quantum hybrid JWT library for .NET 10. Signs tokens with ML-DSA-65 (FIPS 204) and optionally encrypts them with X-Wing (X25519 + ML-KEM-768) hybrid key agreement plus AES-256-GCM. Built on the native .NET BCL post-quantum primitives, fail-closed by design, and honest about its security posture. Preview release — not for production use.</Description>
+    <Description>Production-oriented preview library for JOSE-style post-quantum tokens in controlled .NET issuer/verifier systems. Provides ML-DSA-65 signatures (FIPS 204), optional hybrid X-Wing-style confidentiality (X25519 + ML-KEM-768 with AES-256-GCM), strict algorithm handling, fail-closed validation, replay-protection support, and key-rotation patterns. Built on the native .NET BCL post-quantum primitives. Not a production OAuth/OIDC/JWT replacement; not independently audited.</Description>
     <PackageProjectUrl>https://github.com/systemslibrarian/postquantum-jwt</PackageProjectUrl>
     <RepositoryUrl>https://github.com/systemslibrarian/postquantum-jwt</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageTags>jwt;jose;jwe;post-quantum;pqc;ml-dsa;ml-kem;dilithium;kyber;x-wing;x25519;sha3;hybrid;cryptography;security;fips-203;fips-204;net10</PackageTags>
-    <PackageReleaseNotes>1.0.0-preview.3: Docs and packaging refresh — the library binary is identical to 1.0.0-preview.2 (no code change). The package README now links the runnable samples with absolute URLs (so they resolve on the NuGet page) and points at the live playground at https://pqjwt.systemslibrarian.dev; the sample Dockerfiles were fixed to provide OpenSSL 3.5, which ML-DSA/ML-KEM require. The preview.N suffix continues to carry the maturity caveat: NOT independently audited, NOT for production. Full notes: https://github.com/systemslibrarian/postquantum-jwt/blob/main/CHANGELOG.md — known limitations: https://github.com/systemslibrarian/postquantum-jwt/blob/main/KNOWN-GAPS.md.</PackageReleaseNotes>
+    <PackageReleaseNotes>1.0.0-preview.4: Documentation and hardening update — the library binary is identical to 1.0.0-preview.3 (no code change). Clarified JOSE/IANA standards status (ML-DSA-65 and A256GCM are registered JOSE identifiers per RFC 9964 / RFC 7518, but the X-Wing key-management profile is not a standardized JOSE/JWE profile), added a normative v1 token profile (docs/SPEC.md), expanded the security model, strengthened production-readiness guidance, clarified replay-protection/key-rotation posture, made hybrid wording precise (hybrid confidentiality, ML-DSA-65 signatures), and aligned package positioning for controlled issuer/verifier systems. Production-oriented preview: NOT independently audited, NOT a drop-in OAuth/OIDC/JWT replacement. Full notes: https://github.com/systemslibrarian/postquantum-jwt/blob/main/CHANGELOG.md — known limitations: https://github.com/systemslibrarian/postquantum-jwt/blob/main/KNOWN-GAPS.md.</PackageReleaseNotes>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
     <Copyright>Copyright © Paul Clark</Copyright>
     <NeutralLanguage>en-US</NeutralLanguage>

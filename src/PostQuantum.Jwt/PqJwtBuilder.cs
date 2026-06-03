@@ -9,7 +9,8 @@ using PostQuantum.Jwt.Internal;
 namespace PostQuantum.Jwt;
 
 /// <summary>
-/// Builds post-quantum hybrid JWTs with secure, fail-closed defaults.
+/// Builds JOSE-style post-quantum tokens — ML-DSA-65 signatures with optional
+/// hybrid X-Wing-style confidentiality — using secure, fail-closed defaults.
 /// </summary>
 /// <remarks>
 /// <para>

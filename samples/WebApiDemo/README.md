@@ -112,7 +112,7 @@ docker run --rm -p 5080:8080 pqjwt-webapidemo
 
 - **DEMO ONLY.** See the key-lifecycle section above.
 - Don't also call `AddJwtBearer` — the standard handler can't parse `ML-DSA-65`.
-- Preview software, not audited; non-IANA identifiers, non-interoperable tokens.
+- Production-oriented preview, not audited; non-standardized X-Wing key-management profile; tokens not interoperable with generic JWT/JWE tooling.
 
 ## Persisting the signing key (surviving restarts)
 

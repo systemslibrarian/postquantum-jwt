@@ -5,7 +5,7 @@ unverified, and where the sharp edges are. Honesty over polish: if something is
 incomplete, it is listed here rather than glossed over. This file is part of the
 contract with anyone evaluating the library.
 
-Last reviewed for: `1.0.0-preview.3`.
+Last reviewed for: `1.0.0-preview.4`.
 
 ## Cryptography
 
@@ -48,15 +48,20 @@ Last reviewed for: `1.0.0-preview.3`.
 
 ## Tokens & protocol
 
-- **Non-standard JOSE identifiers.** `alg`/`enc` values (`ML-DSA-65`, `X-Wing`,
-  `A256GCM` over a nested JWT) are not IANA-registered. Tokens will **not**
-  validate in standard JWT tooling, and the wire format may change before the
-  stable `1.0.0`.
+- **Non-standardized JOSE/JWE profile.** `ML-DSA-65` (RFC 9964) and `A256GCM`
+  (RFC 7518) are registered JOSE identifiers, but the `X-Wing` key-management
+  profile that ties them together here is **not** a standardized JOSE/JWE
+  profile, and there is no JWK/JWKS representation for ML-DSA keys in this
+  library. Tokens will **not** validate or decrypt in generic JWT/JWE tooling
+  without custom integration, and the wire format may change before the stable
+  `1.0.0`. This is **not** a public OAuth/OIDC replacement.
 - **Replay protection is opt-in and only as strong as the cache you provide.**
   `IPqJwtReplayCache` + the bundled `InMemoryReplayCache` enforce single-use
-  `jti` when configured, but the in-memory cache is single-process and does not
-  survive a restart. Distributed deployments must back the hook with a shared
-  store. With no cache configured, `jti` is carried but not enforced — set
+  `jti` when configured, but the bundled `InMemoryReplayCache` is
+  **development/single-process only**: it does not survive a restart and is not
+  sufficient for multi-server production. Distributed deployments must back the
+  hook with a shared store (see `samples/DistributedReplayCache`). With no cache
+  configured, `jti` is carried but not enforced — set
   `PqJwtValidationParameters.RequireReplayProtection = true` to fail-closed at
   validator construction when that omission would be a security regression.
 - **`kid` resolution is supported but does not fetch keys.**
@@ -84,7 +89,7 @@ Last reviewed for: `1.0.0-preview.3`.
   ML-KEM / ML-DSA are unavailable, operations fail closed and the corresponding
   tests skip themselves with a stated reason.
 - **PQ coverage in CI is proven on Windows *and* Linux** as of
-  `1.0.0-preview.3`. The Windows lane runs natively; the Linux lane pins
+  `1.0.0-preview.4`. The Windows lane runs natively; the Linux lane pins
   OpenSSL 3.5+ via `conda-forge` and points `LD_LIBRARY_PATH` at it before
   testing. Both lanes fail the run on any skipped test, so the
   ML-KEM / ML-DSA / X-Wing paths are proven to execute on every push on
@@ -101,6 +106,50 @@ Last reviewed for: `1.0.0-preview.3`.
   uploaded as a release artifact and getting its own build-provenance
   attestation). Consumers can inspect `bom.json` directly from the
   package on nuget.org.
+
+## Summary of limitations
+
+A consolidated list, for quick scanning:
+
+- **No independent cryptographic audit** has been completed.
+- **Preview package** — the API and wire format may change before the stable
+  `1.0.0`.
+- **Not a public OAuth/OIDC replacement** and **not guaranteed compatible with
+  generic JWT/JWE libraries.**
+- The **X-Wing key-management profile is not standardized** as a JOSE/JWE
+  profile (the `ML-DSA-65` and `A256GCM` identifiers themselves are registered).
+- **Signatures are ML-DSA-65 only**, not a hybrid classical + post-quantum
+  signature.
+- **Replay protection depends on the configured replay cache**; the bundled
+  in-memory cache is development/single-process only and is not enough for
+  multi-server production.
+- **Key rotation is `kid`-based selection only** — you supply the keys; there is
+  no JWKS endpoint, remote discovery, or HSM/KMS integration in the package.
+- **.NET 10 + OpenSSL 3.5+** (or a recent Windows) is required, which limits
+  portability.
+- **Consuming applications must still** enforce authorization correctly and
+  protect clients against XSS/CSRF and insecure token storage — the library
+  authenticates tokens, it does not secure your application for you.
+- **No formal verification.** Property/fuzz-style and known-answer tests exist
+  (see `tests/`), but there is no machine-checked proof of correctness.
+
+## Language we intentionally avoid
+
+To keep the positioning honest, the docs and package metadata do **not** use
+these terms about PostQuantum.Jwt:
+
+- "production-grade crypto"
+- "audited"
+- "FIPS-validated module" (the underlying BCL primitives are FIPS-validated; the
+  *library* is not a validated module)
+- "OIDC replacement"
+- "generic JWT compatible"
+- "military-grade" / "battle-tested" / "unbreakable"
+- "quantum-proof" in all contexts (signatures are post-quantum; confidentiality
+  is hybrid — neither is an unconditional guarantee)
+
+Preferred framing: **"production-oriented preview for controlled systems; not
+independently audited."**
 
 ---
 

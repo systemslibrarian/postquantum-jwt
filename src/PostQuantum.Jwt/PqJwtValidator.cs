@@ -9,7 +9,8 @@ using PostQuantum.Jwt.Internal;
 namespace PostQuantum.Jwt;
 
 /// <summary>
-/// Validates post-quantum hybrid JWTs. Fail-closed by design: any problem with
+/// Validates JOSE-style post-quantum tokens (ML-DSA-65 signatures, optional
+/// hybrid X-Wing-style confidentiality). Fail-closed by design: any problem with
 /// structure, decryption, signature, or claims raises
 /// <see cref="PqJwtValidationException"/> rather than returning a degraded result.
 /// </summary>

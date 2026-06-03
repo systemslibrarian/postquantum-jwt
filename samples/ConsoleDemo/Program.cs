@@ -521,7 +521,7 @@ internal static class Program
         AnsiConsole.Write(new Panel(
             "• [bold]Preview software, not audited.[/] API and wire format may change before 1.0.\n" +
             "• Native .NET 10 BCL primitives: ML-DSA-65 (FIPS 204), ML-KEM-768 (FIPS 203). X25519 + SHA3-256 via BouncyCastle.\n" +
-            "• [bold]Non-IANA identifiers[/] (ML-DSA-65 / X-Wing / A256GCM) → tokens will NOT validate in generic JWT tooling.\n" +
+            "• [bold]Non-standardized profile[/]: ML-DSA-65 / A256GCM are registered JOSE identifiers, but the X-Wing key-management profile is not — tokens will NOT validate in generic JWT tooling.\n" +
             "• Fail-closed: any validation failure throws PqJwtValidationException. No alg:none, no unsigned path.\n" +
             "• Replay protection requires a shared cache across all validating nodes.\n" +
             "• X-Wing encryption is one recipient per token.\n" +

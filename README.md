@@ -6,20 +6,28 @@
 [![.NET](https://img.shields.io/badge/.NET-10.0-512BD4)](https://dotnet.microsoft.com/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-**Post-quantum hybrid JWTs for .NET 10.** Signs with ML-DSA-65 (FIPS 204).
-Optionally encrypts with X-Wing (X25519 + ML-KEM-768) and AES-256-GCM. Built
-on the native .NET BCL post-quantum primitives. Fail-closed by design,
-small-surface, and honest about what it is.
+**Hybrid confidentiality, post-quantum signatures — JOSE-style tokens for
+.NET 10.** PostQuantum.Jwt is a production-oriented preview library for
+controlled .NET issuer/verifier systems that need JOSE-style post-quantum
+tokens. It provides ML-DSA-65 signed tokens, optional hybrid X-Wing-style
+confidentiality (X25519 + ML-KEM-768 with AES-256-GCM), strict algorithm
+handling, fail-closed validation, replay-protection support, key-rotation
+patterns, and hardened usage guidance. Built on the native .NET BCL
+post-quantum primitives. It is **not independently audited** and is **not a
+drop-in replacement for OAuth/OIDC/JWT middleware**.
 
-> ### Read this first — these tokens are intentionally non-interoperable
+> ### Read this first — these tokens target controlled systems, not generic JWT interop
 >
-> PostQuantum.Jwt uses `alg = ML-DSA-65` and (optionally) `enc = X-Wing` /
-> `cty = JWT` with `A256GCM`. **None of these identifiers are registered
-> with IANA.** Tokens produced by this library will **not** validate in
-> `System.IdentityModel.Tokens.Jwt`, `jose-jwt`, `node-jose`,
-> `python-jose`, Auth0/Okta SDKs, or any other generic JWT tooling — and
-> they will not until IANA registers post-quantum JOSE identifiers (a
-> process this project does not control).
+> PostQuantum.Jwt signs with `alg = ML-DSA-65` and (optionally) encrypts with
+> `enc = A256GCM` under `X-Wing` key management (`cty = JWT`). **ML-DSA-65 and
+> A256GCM are registered JOSE identifiers, but this library's X-Wing
+> key-management profile is not currently a standardized JOSE/JWE profile.**
+> PostQuantum.Jwt is therefore intended for controlled issuer/verifier systems
+> rather than generic JWT/JWE interoperability. Tokens produced by this library
+> will **not** validate or decrypt in `System.IdentityModel.Tokens.Jwt`,
+> `jose-jwt`, `node-jose`, `python-jose`, Auth0/Okta SDKs, or other generic JWT
+> tooling — the X-Wing key-management profile has no standardized JOSE/JWE
+> definition for them to follow.
 >
 > This is the right library only when **you own both the issuer and every
 > verifier** (closed system, internal service-to-service, your own
@@ -27,23 +35,26 @@ small-surface, and honest about what it is.
 > interop-translating gateway). If you need a JWT that an arbitrary
 > third-party stack can validate today, use
 > `System.IdentityModel.Tokens.Jwt` with a NIST-approved classical
-> algorithm instead — and revisit post-quantum once IANA-registered PQ
-> identifiers and standards-track JOSE PQ profiles exist. See
+> algorithm instead — and revisit broad interop once a standards-track
+> JOSE/JWE profile for hybrid post-quantum key management exists. See
 > [Compared to System.IdentityModel.Tokens.Jwt](#compared-to-systemidentitymodeltokensjwt)
 > for the side-by-side.
 
-> **Status — `1.0.0-preview.3`. Preview software. Not for production use.**
-> The API may change between previews, before the stable `1.0.0`. The
-> cryptographic construction has **not** been
-> independently audited. Read [`KNOWN-GAPS.md`](KNOWN-GAPS.md) before depending
-> on this for anything that matters.
+> **Status — `1.0.0-preview.4`. Production-oriented preview for controlled
+> systems; not independently audited.** The API may change between previews,
+> before the stable `1.0.0`. "Production-oriented" describes the hardened
+> defaults (strict validation, fail-closed, replay and key-rotation support) —
+> **not** an audit sign-off: the cryptographic construction has **not** been
+> independently reviewed. Use it only in systems where you control both issuer
+> and verifier, and read [`KNOWN-GAPS.md`](KNOWN-GAPS.md) before depending on
+> this for anything that matters.
 
 ---
 
 ## Table of contents
 
 - [Why](#why)
-- [What's new in 1.0.0-preview.3](#whats-new-in-100-preview3)
+- [What's new in 1.0.0-preview.4](#whats-new-in-100-preview4)
 - [Install](#install)
 - [60-second tour](#60-second-tour)
 - [Usage](#usage)
@@ -55,6 +66,7 @@ small-surface, and honest about what it is.
 - [Token format](#token-format)
 - [Public API at a glance](#public-api-at-a-glance)
 - [Compared to System.IdentityModel.Tokens.Jwt](#compared-to-systemidentitymodeltokensjwt)
+- [Standards and interoperability status](#standards-and-interoperability-status)
 - [Operational tradeoffs](#operational-tradeoffs)
 - [Observability](#observability)
 - [Security posture](#security-posture)
@@ -68,19 +80,61 @@ small-surface, and honest about what it is.
 ## Why
 
 A cryptographically relevant quantum computer would break the elliptic-curve
-math behind today's JWT signatures (EdDSA, ECDSA, RSA). Pure post-quantum
-schemes are new and comparatively under-attacked. **Hybrid** hedges both at
-once:
+math behind today's JWT signatures (EdDSA, ECDSA, RSA) and key agreement. This
+library splits the response: **post-quantum signatures**, and **hybrid
+confidentiality** for the optional encryption path.
 
-- **Signatures — ML-DSA-65.** NIST-standardized lattice signature, FIPS 204,
-  security category 3.
-- **Key agreement — X-Wing.** The IETF hybrid KEM combining the battle-tested
-  **X25519** with **ML-KEM-768** (FIPS 203), bound together by a SHA3-256
-  combiner. An attacker must break *both* to recover the key.
+- **Signatures — ML-DSA-65 (post-quantum, not hybrid).** NIST-standardized
+  lattice signature, FIPS 204, security category 3. Signing is ML-DSA-65 only —
+  there is no classical co-signature, so this is *not* a composite
+  classical + PQ signature.
+- **Key agreement — X-Wing (hybrid).** The IETF hybrid KEM combining the
+  well-studied **X25519** with **ML-KEM-768** (FIPS 203), bound together by a
+  SHA3-256 combiner. An attacker must break *both* to recover the key.
 
-If either half stands, your token stands. That is the whole point.
+For the encrypted form, if either half of the key agreement stands, your token's
+confidentiality stands. That hedge is the whole point of the hybrid KEM.
+
+### What this package is — and is not
+
+**It is** a production-oriented preview for *controlled* systems: ML-DSA-65
+signed tokens, optional hybrid X-Wing-style confidentiality, strict algorithm
+handling, fail-closed validation, replay-protection support, and key-rotation
+patterns — with the security posture documented honestly.
+
+**It is not** independently audited, and **not** a drop-in replacement for
+OAuth/OIDC/JWT middleware or a generic JWT/JWE library.
+
+| Intended use cases | Non-use cases |
+|---|---|
+| Controlled issuer/verifier services (same team owns both ends) | Public OAuth/OpenID Connect provider replacement |
+| Internal/service-to-service APIs | Drop-in replacement for `Microsoft.AspNetCore.Authentication.JwtBearer` |
+| Post-quantum migration experiments | Unaudited high-risk production deployments |
+| Research prototypes & educational security engineering | Consumer-facing auth without careful, independent review |
+| Systems behind an interop-translating gateway | Anywhere generic JWT/JWE interoperability is required |
 
 ---
+
+## What's new in 1.0.0-preview.4
+
+A **documentation and hardening** update — the library binary is **identical** to
+`preview.3` (no code change):
+
+- **Clarified JOSE/IANA standards status.** ML-DSA-65 (RFC 9964) and A256GCM
+  (RFC 7518) are registered JOSE identifiers; the X-Wing key-management profile
+  is not a standardized JOSE/JWE profile. New
+  [Standards and interoperability status](#standards-and-interoperability-status)
+  section and table.
+- **Normative token profile** — [`docs/SPEC.md`](docs/SPEC.md) defines the v1
+  profile (headers, claims, fail-closed validation order, rejection rules).
+- **Expanded security model** ([`SECURITY.md`](SECURITY.md)) and a
+  **production-readiness checklist** ([`samples/HARDENING-CHECKLIST.md`](samples/HARDENING-CHECKLIST.md)).
+- **Precise hybrid language** throughout: hybrid confidentiality, ML-DSA-65
+  (post-quantum, not hybrid) signatures.
+- **Aligned positioning** across all packages: *production-oriented preview for
+  controlled issuer/verifier systems; not independently audited; not a drop-in
+  OAuth/OIDC/JWT replacement.*
+- **Supply-chain:** added a CodeQL workflow, Dependabot, and `CONTRIBUTING.md`.
 
 ## What's new in 1.0.0-preview.3
 
@@ -133,8 +187,8 @@ agility, no new suites. What 1.0 brings is a sharper safety posture, a tighter
 exception contract, and the test seam needed to KAT the parts of X-Wing that
 *can* be made deterministic. The `preview.N` suffix carries the maturity
 caveat, not the leading `1.0`: the construction has **not** been independently
-audited and the non-IANA identifiers mean tokens still do not interop with
-generic JWT tooling. Changes are stacked newest-first.
+audited and the non-standardized X-Wing key-management profile means tokens
+still do not interop with generic JWT tooling. Changes are stacked newest-first.
 
 **New in v1.0.0-preview.1**
 
@@ -170,11 +224,11 @@ generic JWT tooling. Changes are stacked newest-first.
   end-to-end validation; non-deterministic parts (ML-DSA signature, X-Wing
   ciphertext, AES-GCM nonce/ciphertext/tag) are not pinned and the file
   documents why.
-- **"Read this first — these tokens are intentionally non-interoperable"
-  disclosure** at the very top of the README, naming the non-IANA `ML-DSA-65`
-  / `X-Wing` / `A256GCM` identifiers and the standard JWT libraries that
-  will reject these tokens. Reinforces — does not replace — the existing
-  mid-page `System.IdentityModel.Tokens.Jwt` comparison.
+- **"Read this first" interoperability disclosure** at the very top of the
+  README, naming the `ML-DSA-65` / `X-Wing` / `A256GCM` identifiers, the
+  non-standardized X-Wing key-management profile, and the standard JWT
+  libraries that will reject these tokens. Reinforces — does not replace — the
+  existing mid-page `System.IdentityModel.Tokens.Jwt` comparison.
 - **`PostQuantum.Jwt.AspNetCore` is marked superseded by
   [`PostQuantum.AspNetCore`](https://github.com/systemslibrarian/postquantum-aspnetcore)**
   (cleaner naming, event-hook surface, hosted-service warmup, SignalR
@@ -295,13 +349,13 @@ Full notes in [`CHANGELOG.md`](CHANGELOG.md).
 ## Install
 
 ```bash
-dotnet add package PostQuantum.Jwt --version 1.0.0-preview.3
+dotnet add package PostQuantum.Jwt --version 1.0.0-preview.4
 ```
 
 Or in a `.csproj`:
 
 ```xml
-<PackageReference Include="PostQuantum.Jwt" Version="1.0.0-preview.3" />
+<PackageReference Include="PostQuantum.Jwt" Version="1.0.0-preview.4" />
 ```
 
 **Runtime requirement:** the native ML-KEM / ML-DSA primitives need an OpenSSL
@@ -463,7 +517,7 @@ package and call `AddPqJwtBearer(...)` on the standard
 `ML-DSA-65`.
 
 ```bash
-dotnet add package PostQuantum.Jwt.AspNetCore --version 1.0.0-preview.3
+dotnet add package PostQuantum.Jwt.AspNetCore --version 1.0.0-preview.4
 ```
 
 ```csharp
@@ -608,10 +662,14 @@ PostQuantum.Jwt uses JOSE-style compact serialization:
 | Signed    | 3        | `ML-DSA-65`                       |
 | Encrypted | 5        | `X-Wing` / `A256GCM` (nested JWT) |
 
-These algorithm identifiers are **not** registered with IANA — see
-[Security posture](#security-posture).
+`ML-DSA-65` and `A256GCM` are registered JOSE identifiers; the `X-Wing`
+key-management profile that ties them together here is not a standardized
+JOSE/JWE profile, so these tokens are not interoperable with generic JWT
+tooling — see [Standards and interoperability status](#standards-and-interoperability-status).
 
-Full wire-format and combiner details are in [`docs/design.md`](docs/design.md).
+The normative token profile (headers, claims, validation order, rejection rules)
+is in [`docs/SPEC.md`](docs/SPEC.md); full wire-format and combiner details are in
+[`docs/design.md`](docs/design.md).
 
 ---
 
@@ -641,14 +699,15 @@ ecosystem, and has been hardened over a decade of production use. **Use it
 unless you have a specific reason not to.**
 
 PostQuantum.Jwt is a focused, deliberately *non-interoperable* tool for one
-problem: hybrid post-quantum JWTs. The trade-offs:
+problem: JOSE-style post-quantum tokens (ML-DSA-65 signatures, optional hybrid
+confidentiality) for controlled systems. The trade-offs:
 
 | Concern | `System.IdentityModel.Tokens.Jwt` | `PostQuantum.Jwt` |
 |---|---|---|
 | **Algorithms** | RS256/384/512, PS256/384/512, ES256/384/512, EdDSA, HS256/384/512, etc. | **One suite only:** ML-DSA-65 for signatures, X-Wing + AES-256-GCM for encryption. |
-| **Quantum resistance** | None of the standard algorithms are quantum-resistant. | Hybrid: classical *and* post-quantum, both must fall. |
+| **Quantum resistance** | None of the standard algorithms are quantum-resistant. | Post-quantum signatures (ML-DSA-65); hybrid confidentiality (X25519 *and* ML-KEM-768 must both fall). |
 | **Algorithm agility** | Yes (and historically the source of `alg: none`, RS/HS confusion, and downgrade attacks). | **No, by design.** The validator does not trust the token's `alg` to choose a path; it accepts exactly one. See [`docs/adr/0001-algorithm-agility.md`](docs/adr/0001-algorithm-agility.md). |
-| **Standards interop** | Fully IANA-registered identifiers; tokens validate in every JWT library. | Identifiers (`ML-DSA-65`, `X-Wing`) are not IANA-registered. Tokens **will not** validate in generic JWT tooling. |
+| **Standards interop** | Fully IANA-registered identifiers; tokens validate in every JWT library. | `ML-DSA-65` and `A256GCM` are registered JOSE identifiers, but the `X-Wing` key-management profile that combines them here is **not** a standardized JOSE/JWE profile. Tokens **will not** validate in generic JWT tooling. |
 | **`alg: none`** | Historically supported (and disastrous); now disabled by default. | **Impossible.** No unsigned path exists in the code. |
 | **Default `exp` enforcement** | Configurable; default depends on the consumer (`TokenValidationParameters`). | Required by default. A token without an `exp` claim is rejected. |
 | **Encryption** | JWE with many supported `alg`/`enc` combos. | Sign-then-encrypt only; `X-Wing` (X25519 + ML-KEM-768) → AES-256-GCM. One recipient per token. |
@@ -661,10 +720,42 @@ problem: hybrid post-quantum JWTs. The trade-offs:
 **Use `System.IdentityModel.Tokens.Jwt` if** you need OAuth/OIDC interop, JWKS,
 multi-algorithm agility, or any standards-conformant JWT.
 
-**Use `PostQuantum.Jwt` if** you specifically want hybrid post-quantum tokens
-*now*, you control both the issuer and the verifier, and you accept that your
-tokens won't validate in any other ecosystem until IANA registers these
-identifiers and standard libraries catch up.
+**Use `PostQuantum.Jwt` if** you specifically want post-quantum signatures (and
+optional hybrid confidentiality) *now*, you control both the issuer and the
+verifier, and you accept that your tokens won't validate in another ecosystem
+until a standards-track JOSE/JWE profile for hybrid post-quantum key management
+exists and generic libraries adopt it.
+
+---
+
+## Standards and interoperability status
+
+The primitives this library uses are mostly standardized; the *profile* that
+ties them together is not. That distinction is the whole reason these tokens are
+for controlled systems rather than generic interop.
+
+| Component | Status |
+|---|---|
+| ML-DSA-65 signatures | Registered JOSE algorithm ([RFC 9964](https://www.rfc-editor.org/info/rfc9964/)); experimental use in this package |
+| AES-256-GCM / A256GCM | Registered JOSE content-encryption algorithm ([RFC 7518](https://www.rfc-editor.org/info/rfc7518/)) |
+| X-Wing / ML-KEM key management | Not currently a standardized JOSE/JWE profile |
+| Generic JWT library interoperability | Not guaranteed |
+| OAuth/OIDC production replacement | No |
+| Controlled issuer/verifier systems | Intended use case |
+| Independent cryptographic audit | Not yet completed |
+
+**What this means in practice:**
+
+- **Works best in closed systems** where the same team controls token issuing
+  and token validation. Generic JWT/JWE libraries may not validate or decrypt
+  these tokens, because the X-Wing key-management construction has no
+  standardized profile for them to implement.
+- **Header algorithm selection stays fail-closed.** The validator never trusts
+  the token's `alg`/`enc` to choose a verification or decryption path — it
+  accepts exactly one configured suite. See
+  [`docs/adr/0001-algorithm-agility.md`](docs/adr/0001-algorithm-agility.md).
+- **No unsafe algorithm fallback.** There is no `alg: none`, no unsigned path,
+  and no silent downgrade; every validation or decryption failure throws.
 
 ---
 
@@ -700,12 +791,13 @@ token's `kid` header. It does *not* fetch keys — there is no JWKS endpoint or
 remote-discovery story. Your application is responsible for the key ring; this
 library is just disciplined about asking for the right key when validating.
 
-**"Preview, not for production" — what that means operationally.** The leading
+**"Production-oriented preview" — what that means operationally.** The leading
 `1.0` signals the public API and wire format have stopped moving in
 back-incompatible ways across preview revisions; the `preview.N` suffix
-carries the maturity caveat (no independent audit, non-IANA identifiers).
-A future `preview.N+1` may still adjust the surface if a security review
-demands it. For an internal service you control end-to-end this is
+carries the maturity caveat (no independent audit, and a non-standardized
+X-Wing key-management profile). A future `preview.N+1` may still adjust the
+surface if a security review demands it. For an internal service you control
+end-to-end this is
 manageable. For a public API where third parties hold issued tokens, treat
 the unaudited construction as the gating concern, not the wire format.
 
@@ -747,8 +839,9 @@ We aim to be honest about exactly what this library does and does not give you.
 
 **What you get**
 
-- **Hybrid by construction.** Encryption stays secure unless *both* X25519 and
-  ML-KEM-768 fall; signatures rest on ML-DSA-65.
+- **Hybrid confidentiality, post-quantum signatures.** Encryption stays secure
+  unless *both* X25519 and ML-KEM-768 fall; signatures are ML-DSA-65 only (not a
+  hybrid classical + post-quantum signature).
 - **Native post-quantum primitives.** ML-KEM-768 and ML-DSA-65 are the .NET
   BCL implementations, not a re-implementation.
 - **Fail-closed validation.** Bad signature, tampered ciphertext, expired or
@@ -769,9 +862,11 @@ We aim to be honest about exactly what this library does and does not give you.
   generation and the decapsulation/combiner path **are** validated against the
   official IETF known-answer vectors; the encapsulation path is not (the native
   ML-KEM API is randomized). See [`KNOWN-GAPS.md`](KNOWN-GAPS.md).
-- **Non-standard identifiers.** The `alg`/`enc` values describe a scheme the
-  IANA JOSE registry does not cover, so these tokens are intentionally **not**
-  interoperable with generic JWT tooling.
+- **Non-standardized profile.** `ML-DSA-65` and `A256GCM` are registered JOSE
+  identifiers, but the `X-Wing` key-management profile that ties them together
+  here is not a standardized JOSE/JWE profile. These tokens are therefore
+  intentionally **not** interoperable with generic JWT tooling — see
+  [Standards and interoperability status](#standards-and-interoperability-status).
 - **Preview.** Treat the API and wire format as unstable until the stable `1.0.0` release; the `1.0.0-preview.*` series may break between previews.
 
 Full detail lives in [`SECURITY.md`](SECURITY.md) and
@@ -808,15 +903,16 @@ at a newer one:
 LD_LIBRARY_PATH=/path/to/openssl-3.5/lib dotnet test
 ```
 
-The full suite is **68 tests, zero skips** on a Windows 11 / .NET 10 host
-with native ML-KEM and ML-DSA support. Both the Windows and Linux CI lanes
-fail the run if any test skips.
+The full library suite is **119 tests, zero skips** on a host with native
+ML-KEM and ML-DSA support (plus 11 analyzer tests). Both the Windows and Linux
+CI lanes fail the run if any test skips.
 
 ---
 
 ## Contributing
 
-Issues and pull requests are welcome. Before opening a PR:
+Issues and pull requests are welcome. See [`CONTRIBUTING.md`](CONTRIBUTING.md)
+for the full guide. Before opening a PR:
 
 1. Run `dotnet build` and `dotnet test` — both must be green, with **zero
    warnings** (the build treats compiler warnings as errors).
@@ -824,6 +920,7 @@ Issues and pull requests are welcome. Before opening a PR:
    fail-closed always, no rolled-your-own crypto, native BCL first.
 3. Security-sensitive changes should land alongside a test that locks in the
    fail-closed behavior.
+4. Update [`docs/SPEC.md`](docs/SPEC.md) if you change the token profile.
 
 **Cutting a release** is documented in [`docs/RELEASE.md`](docs/RELEASE.md).
 It enumerates exactly what CI enforces, what humans review, and what

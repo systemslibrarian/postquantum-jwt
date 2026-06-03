@@ -69,7 +69,7 @@ column on narrow screens.
 ## Notes
 
 - Demo keys are per-process and in-memory; regenerating invalidates old tokens.
-- Preview software, not audited; non-IANA identifiers; non-interoperable tokens.
+- Production-oriented preview, not audited; non-standardized X-Wing key-management profile; tokens not interoperable with generic JWT/JWE tooling.
 
 ---
 

@@ -45,7 +45,7 @@ Start with option **1** (generate a keypair), then try **2**, **3**, **4**, and 
 - All keys live only in memory for the session; nothing is persisted.
 - Private key material is never printed — only the public key is exportable.
 - This is **preview software** and the construction is **not audited**.
-- Tokens use non-IANA identifiers and will not validate in generic JWT tooling.
+- Tokens use a non-standardized X-Wing key-management profile and will not validate or decrypt in generic JWT tooling.
 
 ## Next steps
 
