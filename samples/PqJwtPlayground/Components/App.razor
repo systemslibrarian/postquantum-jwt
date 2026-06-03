@@ -6,10 +6,15 @@
     <title>Post-Quantum JWT Playground</title>
     <base href="/" />
     <link rel="stylesheet" href="app.css" />
+    @* Apply the saved theme before first paint to avoid a flash of the wrong theme. *@
+    <script>
+        (function () { try { var t = localStorage.getItem('pqjwt-theme'); if (t) document.documentElement.setAttribute('data-theme', t); } catch (e) { } })();
+    </script>
     <HeadOutlet />
 </head>
 <body>
     <Routes />
     <script src="_framework/blazor.web.js"></script>
+    <script src="playground.js"></script>
 </body>
 </html>
