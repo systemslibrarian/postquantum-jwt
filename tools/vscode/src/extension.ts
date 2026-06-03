@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { LINKS, docUrl } from "./links";
 import { API_DOCS, apiRegex, lookupApiDoc } from "./apiDocs";
 import { decodeToken, findPqJwtTokens } from "./decoder";
+import { PqJwtInspectorPanel } from "./panel";
 
 // Languages where we look for inline tokens to offer an "Inspect" CodeLens.
 const TOKEN_LENS_LANGUAGES = ["csharp", "json", "jsonc", "http"];
@@ -64,6 +65,26 @@ async function runDecode(): Promise<void> {
   }
 
   await showDecodedToken(candidate);
+}
+
+// Open the visual inspector for the active selection, or prompt for a token.
+async function runVisualInspect(): Promise<void> {
+  const editor = vscode.window.activeTextEditor;
+  let candidate = "";
+  if (editor && !editor.selection.isEmpty) {
+    candidate = editor.document.getText(editor.selection);
+  }
+  if (!candidate.trim()) {
+    const input = await vscode.window.showInputBox({
+      prompt: "Paste a PostQuantum.Jwt token to inspect (structure + header only — no crypto).",
+      placeHolder: "eyJhbGciOiJNTC1EU0EtNjUi...",
+    });
+    if (!input) {
+      return;
+    }
+    candidate = input;
+  }
+  PqJwtInspectorPanel.show(candidate);
 }
 
 // ---------------------------------------------------------------------------
@@ -143,7 +164,7 @@ class PqJwtTokenLensProvider implements vscode.CodeLensProvider {
         lenses.push(
           new vscode.CodeLens(range, {
             title: "🔍 Inspect PQ-JWT",
-            command: "pqjwt.inspectToken",
+            command: "pqjwt.inspectVisual",
             arguments: [token.value],
           })
         );
@@ -164,6 +185,12 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.workspace.registerTextDocumentContentProvider(DECODE_SCHEME, decodeContent),
     vscode.workspace.onDidCloseTextDocument((doc) => decodeContent.remove(doc.uri)),
     vscode.commands.registerCommand("pqjwt.decodeToken", runDecode),
+    // Visual inspector: a string arg (from the inline CodeLens) opens directly;
+    // no arg (from the palette/context menu) falls back to selection/prompt.
+    vscode.commands.registerCommand("pqjwt.inspectVisual", (token?: string) =>
+      typeof token === "string" ? PqJwtInspectorPanel.show(token) : runVisualInspect()
+    ),
+    // Back-compat: the old text-decode command still works from the palette.
     vscode.commands.registerCommand("pqjwt.inspectToken", (token: string) => showDecodedToken(token)),
     vscode.commands.registerCommand("pqjwt.openPlayground", open(LINKS.playground)),
     vscode.commands.registerCommand("pqjwt.openDocs", open(LINKS.docs)),

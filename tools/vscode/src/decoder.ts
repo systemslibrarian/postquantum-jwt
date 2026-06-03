@@ -132,6 +132,197 @@ export function findPqJwtTokens(text: string): FoundToken[] {
   return found;
 }
 
+// ---------------------------------------------------------------------------
+// Structured inspection (drives the visual webview)
+//
+// inspectToken() returns the same facts decodeToken() renders as text, but as a
+// data model the webview can lay out as boxes/chips. Keeping it here — pure and
+// vscode-free — means the panel never re-parses a token: the tested decoder is
+// the single source of truth. decodeToken() (the text path) is left untouched.
+// ---------------------------------------------------------------------------
+
+// Visual emphasis for a header field. ok = matches the suite, info = neutral
+// (e.g. kid), warn = present but unexpected, bad = actively rejected (alg:none).
+export type FieldStatus = "ok" | "info" | "warn" | "bad";
+
+export interface HeaderField {
+  name: string;
+  value: string;
+  status: FieldStatus;
+  note: string;
+}
+
+// One compact-serialization segment, with whether/how its bytes were readable.
+export interface SegmentInfo {
+  index: number;
+  label: string; // "Protected header", "Payload (claims)", "Signature", …
+  role: string; // one-line description of what this segment carries
+  // Exactly one of json / text / problem is set for a readable/unreadable
+  // segment; opaque binary segments (signature, IV, tag…) set none of them.
+  json?: string;
+  text?: string;
+  problem?: string;
+  opaque?: boolean; // binary/ciphertext — not meant to be human-readable
+}
+
+export type TokenForm = "signed" | "encrypted" | "invalid";
+
+// Teaching panels the webview should surface for this token.
+export type Topic =
+  | "ml-dsa"
+  | "x-wing"
+  | "sign-then-encrypt"
+  | "validation-path"
+  | "fail-closed";
+
+export interface TokenInspection {
+  form: TokenForm;
+  segmentCount: number;
+  summary: string;
+  headerFields: HeaderField[];
+  segments: SegmentInfo[];
+  notes: string[];
+  topics: Topic[];
+  error?: string; // set only when form === "invalid"
+}
+
+// Normalize the raw input the same way decodeToken() does (quotes, Bearer, …).
+function normalizeToken(token: string): string {
+  return token
+    .trim()
+    .replace(/^['"`]+/, "")
+    .replace(/['"`,;]+$/, "")
+    .replace(/^authorization\s*:\s*/i, "")
+    .replace(/^bearer\s+/i, "")
+    .replace(/\s+/g, "");
+}
+
+// Build a SegmentInfo for a segment that is supposed to carry JSON (header,
+// payload), classifying any decode failure precisely.
+function jsonSegment(raw: string, index: number, label: string, role: string): SegmentInfo {
+  const base: SegmentInfo = { index, label, role };
+  const decode = decodeSegment(raw);
+  switch (decode.kind) {
+    case "json":
+      return { ...base, json: decode.pretty };
+    case "empty":
+      return { ...base, problem: `${label} segment is empty.` };
+    case "not-base64url":
+      return { ...base, problem: `${label} segment is not valid base64url — cannot decode.` };
+    case "not-json": {
+      const preview = decode.text.length > 200 ? decode.text.slice(0, 200) + "…" : decode.text;
+      return { ...base, text: preview, problem: `${label} decoded but is not valid JSON.` };
+    }
+  }
+}
+
+// An opaque (binary) segment — signature, encrypted key, IV, ciphertext, tag.
+function opaqueSegment(index: number, label: string, role: string): SegmentInfo {
+  return { index, label, role, opaque: true };
+}
+
+function fieldFor(name: string, value: string | undefined, status: FieldStatus, note: string): HeaderField {
+  return { name, value: value ?? "(missing)", status, note };
+}
+
+export function inspectToken(token: string): TokenInspection {
+  const trimmed = normalizeToken(token);
+  const parts = trimmed.split(".");
+
+  if (trimmed.length === 0) {
+    return invalid(0, "No token provided.", "Paste or select a PostQuantum.Jwt compact token to inspect.");
+  }
+  if (parts.length !== 3 && parts.length !== 5) {
+    return invalid(
+      parts.length,
+      `Not a compact PQ-JWT (${parts.length} segments)`,
+      `Found ${parts.length} segment(s); a PostQuantum.Jwt token has 3 (signed) or 5 (encrypted).`
+    );
+  }
+
+  const headerDecode = decodeSegment(parts[0]);
+  const header: JoseHeader = headerDecode.kind === "json" ? asHeader(headerDecode.value) : {};
+
+  return parts.length === 3 ? inspectSigned(parts, header) : inspectEncrypted(parts, header);
+}
+
+function invalid(segmentCount: number, summary: string, error: string): TokenInspection {
+  return { form: "invalid", segmentCount, summary, headerFields: [], segments: [], notes: [], topics: [], error };
+}
+
+function inspectSigned(parts: string[], header: JoseHeader): TokenInspection {
+  const fields: HeaderField[] = [];
+  const topics: Topic[] = ["validation-path", "fail-closed"];
+
+  if (header.alg === "ML-DSA-65") {
+    fields.push(fieldFor("alg", header.alg, "ok", "Post-quantum signature (FIPS 204 ML-DSA-65)."));
+    topics.unshift("ml-dsa");
+  } else if (header.alg === "none") {
+    fields.push(fieldFor("alg", header.alg, "bad", "PostQuantum.Jwt has NO unsigned path — it rejects alg:none."));
+  } else {
+    fields.push(fieldFor("alg", header.alg, "warn", "Not the expected ML-DSA-65 suite."));
+  }
+  if (header.kid !== undefined) {
+    fields.push(fieldFor("kid", header.kid, "info", "Key id — resolved against the trusted key ring at validation (rotation)."));
+  }
+
+  const notes = ["The verification key is chosen by the verifier from a trusted key ring — never from this header."];
+
+  return {
+    form: "signed",
+    segmentCount: 3,
+    summary: "Signed token — header.payload.signature",
+    headerFields: fields,
+    segments: [
+      jsonSegment(parts[0], 0, "Protected header", "Algorithm + key id (integrity-protected, not secret)."),
+      jsonSegment(parts[1], 1, "Payload (claims)", "The JWT claims being asserted (readable; signed, not encrypted)."),
+      opaqueSegment(2, "Signature", "ML-DSA-65 signature over header.payload — verified with the public key."),
+    ],
+    notes,
+    topics,
+  };
+}
+
+function inspectEncrypted(parts: string[], header: JoseHeader): TokenInspection {
+  const fields: HeaderField[] = [];
+
+  fields.push(
+    header.alg === "X-Wing"
+      ? fieldFor("alg", header.alg, "ok", "Hybrid key management: X25519 + ML-KEM-768 (X-Wing).")
+      : fieldFor("alg", header.alg, "warn", "Expected X-Wing for the encrypted form.")
+  );
+  fields.push(
+    header.enc === "A256GCM"
+      ? fieldFor("enc", header.enc, "ok", "AES-256-GCM content encryption.")
+      : fieldFor("enc", header.enc, "warn", "Expected A256GCM.")
+  );
+  if (header.cty === "JWT") {
+    fields.push(fieldFor("cty", header.cty, "info", "A signed JWT is nested inside (sign-then-encrypt)."));
+  }
+  if (header.kid !== undefined) {
+    fields.push(fieldFor("kid", header.kid, "info", "Recipient key id — resolved against the trusted key ring."));
+  }
+
+  return {
+    form: "encrypted",
+    segmentCount: 5,
+    summary: "Encrypted token — header.encryptedKey.iv.ciphertext.tag",
+    headerFields: fields,
+    segments: [
+      jsonSegment(parts[0], 0, "Protected header", "Key-management + content-encryption algorithms (not secret)."),
+      opaqueSegment(1, "Encrypted key (CEK)", "Content key wrapped by the X-Wing KEM for the recipient."),
+      opaqueSegment(2, "Initialization vector", "Random IV for AES-256-GCM."),
+      opaqueSegment(3, "Ciphertext", "The encrypted (and signed) inner JWT — unreadable without the private key."),
+      opaqueSegment(4, "Authentication tag", "AES-GCM tag binding ciphertext + header integrity."),
+    ],
+    notes: [
+      "Claims are encrypted — not readable without the X-Wing private key. This decoder does no cryptography.",
+      "The inner content is itself a signed JWT: decrypt, then verify the ML-DSA-65 signature.",
+    ],
+    topics: ["x-wing", "sign-then-encrypt", "validation-path", "fail-closed"],
+  };
+}
+
 export function decodeToken(token: string): string {
   const trimmed = token
     .trim()
