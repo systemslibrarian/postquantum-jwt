@@ -1,8 +1,8 @@
 {
   "name": "postquantum-jwt",
   "displayName": "PostQuantum.Jwt",
-  "description": "Snippets, a token decoder, and quick links for the PostQuantum.Jwt .NET library (ML-DSA-65 signatures + X-Wing hybrid confidentiality).",
-  "version": "0.1.7",
+  "description": "Visual token inspector, hybrid-construction & validation-flow diagrams, snippets, and quick links for the PostQuantum.Jwt .NET library (ML-DSA-65 + X-Wing).",
+  "version": "0.2.0",
   "publisher": "systemslibrarian",
   "license": "MIT",
   "icon": "images/icon.png",
@@ -15,6 +15,8 @@
   },
   "categories": [
     "Snippets",
+    "Visualization",
+    "Education",
     "Other"
   ],
   "keywords": [
@@ -54,8 +56,20 @@
     ],
     "commands": [
       {
+        "command": "pqjwt.openInspector",
+        "title": "PostQuantum.Jwt: Inspect Token (Visual)"
+      },
+      {
         "command": "pqjwt.decodeToken",
-        "title": "PostQuantum.Jwt: Decode Token"
+        "title": "PostQuantum.Jwt: Decode Token (Text)"
+      },
+      {
+        "command": "pqjwt.showHybridConstruction",
+        "title": "PostQuantum.Jwt: Show Hybrid Construction Diagram"
+      },
+      {
+        "command": "pqjwt.showValidationFlow",
+        "title": "PostQuantum.Jwt: Show Validation Flow"
       },
       {
         "command": "pqjwt.openPlayground",
@@ -81,12 +95,91 @@
     "menus": {
       "editor/context": [
         {
+          "command": "pqjwt.openInspector",
+          "when": "editorHasSelection",
+          "group": "navigation@8"
+        },
+        {
           "command": "pqjwt.decodeToken",
           "when": "editorHasSelection",
           "group": "navigation@9"
         }
+      ],
+      "commandPalette": [
+        {
+          "command": "pqjwt.openInspector",
+          "when": "true"
+        },
+        {
+          "command": "pqjwt.decodeToken",
+          "when": "true"
+        }
       ]
-    }
+    },
+    "configuration": {
+      "title": "PostQuantum.Jwt",
+      "properties": {
+        "pqjwt.codeLens.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show the inline 'Inspect PQ-JWT' / docs CodeLenses above detected tokens and API symbols."
+        },
+        "pqjwt.inspector.openToSide": {
+          "type": "boolean",
+          "default": true,
+          "description": "Open the visual token inspector in a column beside the editor instead of replacing it."
+        }
+      }
+    },
+    "walkthroughs": [
+      {
+        "id": "pqjwt.gettingStarted",
+        "title": "Understand post-quantum JWTs",
+        "description": "See how PostQuantum.Jwt builds and validates ML-DSA-65 + X-Wing tokens — visually, with no crypto run on your machine.",
+        "steps": [
+          {
+            "id": "pqjwt.step.inspect",
+            "title": "Inspect a token visually",
+            "description": "Run __PostQuantum.Jwt: Inspect Token (Visual)__ (or click the 🔍 Inspect PQ-JWT CodeLens above any token). Paste a token, or just try it — the inspector colors each segment and decodes the header.\n[Inspect Token](command:pqjwt.openInspector)",
+            "media": {
+              "markdown": "media/walkthrough/inspect.md"
+            }
+          },
+          {
+            "id": "pqjwt.step.signed-vs-encrypted",
+            "title": "Signed vs. encrypted",
+            "description": "A signed token has 3 segments; an encrypted token has 5 and wraps a signed token (sign-then-encrypt). The inspector labels every lane.",
+            "media": {
+              "markdown": "media/walkthrough/forms.md"
+            }
+          },
+          {
+            "id": "pqjwt.step.hybrid",
+            "title": "How the hybrid is built",
+            "description": "Open the __Hybrid construction__ view to see sign → X-Wing encapsulate → AES-256-GCM, including the X-Wing combiner.\n[Show Hybrid Construction](command:pqjwt.showHybridConstruction)",
+            "media": {
+              "markdown": "media/walkthrough/hybrid.md"
+            }
+          },
+          {
+            "id": "pqjwt.step.validation",
+            "title": "How validation fails closed",
+            "description": "Open the __Validation flow__ view for the 8 ordered checks the validator runs — and exactly what makes each one reject.\n[Show Validation Flow](command:pqjwt.showValidationFlow)",
+            "media": {
+              "markdown": "media/walkthrough/validation.md"
+            }
+          },
+          {
+            "id": "pqjwt.step.code",
+            "title": "Write the code",
+            "description": "Type a snippet prefix in a C# file — `pqjwt-quick`, `pqjwt-sign`, `pqjwt-encrypt`, `pqjwt-rotate`, `pqjwt-aspnetcore` — and tab through a working example.",
+            "media": {
+              "markdown": "media/walkthrough/code.md"
+            }
+          }
+        ]
+      }
+    ]
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
