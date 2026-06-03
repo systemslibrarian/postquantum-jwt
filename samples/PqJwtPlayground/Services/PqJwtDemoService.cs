@@ -42,6 +42,19 @@ public sealed record AttackResult(
     string TamperedToken,
     ValidationView Validation);
 
+/// <summary>One custom claim in a shareable configuration.</summary>
+public sealed record ShareClaim(string Name, string Value);
+
+/// <summary>
+/// A shareable playground configuration. Captures the <em>build form</em> only —
+/// claims and options, NEVER key material. A restored link regenerates its own
+/// session keys server-side, so a share link can't leak (or pin) private keys.
+/// </summary>
+public sealed record ShareState(
+    string? Sub, string? Iss, string? Aud,
+    int Minutes, bool Encrypt, bool Jti,
+    List<ShareClaim> Claims);
+
 /// <summary>Result of validating a token, for display in the UI.</summary>
 public sealed record ValidationView(
     bool Valid,
@@ -366,6 +379,38 @@ public sealed class PqJwtDemoService : IDisposable
 
     private static string Base64UrlEncode(byte[] bytes) =>
         Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+
+    private static byte[] Base64UrlDecodeBytes(string s)
+    {
+        s = s.Replace('-', '+').Replace('_', '/');
+        switch (s.Length % 4) { case 2: s += "=="; break; case 3: s += "="; break; }
+        return Convert.FromBase64String(s);
+    }
+
+    // Share links carry claims/options only — never keys. camelCase keeps the
+    // encoded JSON (and therefore the URL) a little shorter.
+    private static readonly JsonSerializerOptions ShareJson =
+        new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+
+    /// <summary>Encode a build configuration into a compact base64url string for a URL.</summary>
+    public static string EncodeShare(ShareState state) =>
+        Base64UrlEncode(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(state, ShareJson)));
+
+    /// <summary>Decode a share code back into a configuration; returns null on any
+    /// malformed/oversized input (it's untrusted, attacker-craftable URL data).</summary>
+    public static ShareState? DecodeShare(string? code)
+    {
+        if (string.IsNullOrEmpty(code) || code.Length > 8192) return null;
+        try
+        {
+            return JsonSerializer.Deserialize<ShareState>(
+                Encoding.UTF8.GetString(Base64UrlDecodeBytes(code)), ShareJson);
+        }
+        catch
+        {
+            return null;
+        }
+    }
 
     // Decode header (and payload for signed tokens) purely for display.
     // Encrypted tokens have an opaque ciphertext payload, so we only show the header.
