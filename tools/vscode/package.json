@@ -2,7 +2,7 @@
   "name": "postquantum-jwt",
   "displayName": "PostQuantum.Jwt",
   "description": "Snippets, a token decoder, and quick links for the PostQuantum.Jwt .NET library (ML-DSA-65 signatures + X-Wing hybrid confidentiality).",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "systemslibrarian",
   "license": "MIT",
   "icon": "images/icon.png",
