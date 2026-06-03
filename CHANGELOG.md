@@ -37,6 +37,12 @@ or wire-format change** (the library binary is identical to `1.0.0-preview.3`).
   drop-in OAuth/OIDC replacement" framing as the core package.
 - **Corrected stale test counts** in `README.md` and `SECURITY.md` (the library
   suite is now 119 tests).
+- **Corrected a stale `KNOWN-GAPS.md` entry** that claimed no ASP.NET Core
+  authentication handler exists — `PostQuantum.Jwt.AspNetCore` ships
+  `AddPqJwtBearer` + `PqJwtBearerHandler` + `HttpPqJwtKeyRing`; only the *core*
+  package intentionally has no DI. Added an actionable "how to close" note for
+  author code-signing.
+- **Bumped the CodeQL workflow** from `github/codeql-action` v3 to v4.
 
 ### Added
 
