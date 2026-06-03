@@ -2,10 +2,14 @@
   "name": "postquantum-jwt",
   "displayName": "PostQuantum.Jwt",
   "description": "Snippets, a token decoder, and quick links for the PostQuantum.Jwt .NET library (ML-DSA-65 signatures + X-Wing hybrid confidentiality).",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "publisher": "systemslibrarian",
   "license": "MIT",
   "icon": "images/icon.png",
+  "galleryBanner": {
+    "color": "#0B1021",
+    "theme": "dark"
+  },
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -89,12 +93,14 @@
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "lint": "eslint src",
-    "test": "npm run compile && node --test \"out/**/*.test.js\""
+    "test": "npm run compile && node --test \"out/**/*.test.js\"",
+    "test:integration": "npm run compile && node ./out/test/runTests.js"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",
     "@types/node": "^20.0.0",
     "@types/vscode": "^1.85.0",
+    "@vscode/test-electron": "^2.4.0",
     "eslint": "^9.0.0",
     "typescript": "^5.4.0",
     "typescript-eslint": "^8.0.0"

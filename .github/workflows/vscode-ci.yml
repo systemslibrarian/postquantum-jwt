@@ -43,5 +43,14 @@ jobs:
       - name: Test (compiles, then runs node:test)
         run: npm test
 
+      - name: Install headless VS Code runtime libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb libnss3 libatk1.0-0 libatk-bridge2.0-0 \
+            libcups2 libgtk-3-0 libgbm1 libasound2t64
+
+      - name: Integration tests (headless VS Code host)
+        run: xvfb-run -a npm run test:integration
+
       - name: Package VSIX (smoke-checks manifest + compiled output)
         run: npx --yes @vscode/vsce package --no-dependencies -o /tmp/pqjwt-extension-ci.vsix
