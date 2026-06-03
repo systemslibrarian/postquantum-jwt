@@ -32,7 +32,7 @@ Type a prefix and tab through a fully-formed example:
 | `pqjwt-encrypt` | Sign-then-encrypt for an X-Wing recipient |
 | `pqjwt-rotate` | `kid` key rotation + `jti` replay protection |
 | `pqjwt-aspnetcore` | `AddPostQuantumJwtBearer` ASP.NET Core wiring |
-| `pqjwt-keyring` | `HttpPqJwtKeyRing` (JWKS-equivalent) |
+| `pqjwt-keyring` | `HttpPostQuantumJwtKeyRing` (JWKS-equivalent) |
 | `pqjwt-install` | `<PackageReference>` for the library |
 
 ### Decode Token
