@@ -664,7 +664,7 @@ how each attack is blocked. To host your own playground, see
 ## Editor tooling
 
 A companion **[VS Code extension](https://marketplace.visualstudio.com/items?itemName=systemslibrarian.postquantum-jwt)**
-(`ext install systemslibrarian.postquantum-jwt`) adds C# snippets, a structure-only
+(`code --install-extension systemslibrarian.postquantum-jwt`) adds C# snippets, a structure-only
 token decoder, and quick links for working with PostQuantum.Jwt. It does **no
 cryptography** — it helps you write and read the code, and points at the
 [live playground](https://pqjwt.systemslibrarian.dev) for anything that actually
