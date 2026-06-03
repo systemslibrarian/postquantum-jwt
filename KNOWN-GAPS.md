@@ -5,7 +5,7 @@ unverified, and where the sharp edges are. Honesty over polish: if something is
 incomplete, it is listed here rather than glossed over. This file is part of the
 contract with anyone evaluating the library.
 
-Last reviewed for: `1.0.0-preview.4`.
+Last reviewed for: `1.0.0-preview.5`.
 
 ## Cryptography
 
@@ -96,7 +96,7 @@ Last reviewed for: `1.0.0-preview.4`.
   ML-KEM / ML-DSA are unavailable, operations fail closed and the corresponding
   tests skip themselves with a stated reason.
 - **PQ coverage in CI is proven on Windows *and* Linux** as of
-  `1.0.0-preview.4`. The Windows lane runs natively; the Linux lane pins
+  `1.0.0-preview.5`. The Windows lane runs natively; the Linux lane pins
   OpenSSL 3.5+ via `conda-forge` and points `LD_LIBRARY_PATH` at it before
   testing. Both lanes fail the run on any skipped test, so the
   ML-KEM / ML-DSA / X-Wing paths are proven to execute on every push on

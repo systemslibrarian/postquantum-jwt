@@ -40,7 +40,7 @@ drop-in replacement for OAuth/OIDC/JWT middleware**.
 > [Compared to System.IdentityModel.Tokens.Jwt](#compared-to-systemidentitymodeltokensjwt)
 > for the side-by-side.
 
-> **Status — `1.0.0-preview.4`. Production-oriented preview for controlled
+> **Status — `1.0.0-preview.5`. Production-oriented preview for controlled
 > systems; not independently audited.** The public API and wire format are held
 > stable across the `1.0.0-preview.*` series — the `preview` suffix marks the
 > **pending independent audit**, not API churn; no breaking changes are expected
@@ -57,7 +57,7 @@ drop-in replacement for OAuth/OIDC/JWT middleware**.
 ## Table of contents
 
 - [Why](#why)
-- [What's new in 1.0.0-preview.4](#whats-new-in-100-preview4)
+- [What's new in 1.0.0-preview.5](#whats-new-in-100-preview5)
 - [Install](#install)
 - [60-second tour](#60-second-tour)
 - [Usage](#usage)
@@ -118,11 +118,15 @@ OAuth/OIDC/JWT middleware or a generic JWT/JWE library.
 
 ---
 
-## What's new in 1.0.0-preview.4
+## What's new in 1.0.0-preview.5
 
 A **documentation and hardening** update — the library binary is **identical** to
-`preview.3` (no code change):
+`preview.3` (no code change; supersedes the unpublished `preview.4` tag):
 
+- **Reworded the API-stability language.** The public API and wire format are
+  held stable across the `1.0.0-preview.*` series; the `preview` suffix reflects
+  the pending independent audit, not API churn. (Also: a free-for-OSS
+  code-signing path via the SignPath Foundation is now noted in `KNOWN-GAPS.md`.)
 - **Clarified JOSE/IANA standards status.** ML-DSA-65 (RFC 9964) and A256GCM
   (RFC 7518) are registered JOSE identifiers; the X-Wing key-management profile
   is not a standardized JOSE/JWE profile. New
@@ -352,13 +356,13 @@ Full notes in [`CHANGELOG.md`](CHANGELOG.md).
 ## Install
 
 ```bash
-dotnet add package PostQuantum.Jwt --version 1.0.0-preview.4
+dotnet add package PostQuantum.Jwt --version 1.0.0-preview.5
 ```
 
 Or in a `.csproj`:
 
 ```xml
-<PackageReference Include="PostQuantum.Jwt" Version="1.0.0-preview.4" />
+<PackageReference Include="PostQuantum.Jwt" Version="1.0.0-preview.5" />
 ```
 
 **Runtime requirement:** the native ML-KEM / ML-DSA primitives need an OpenSSL
@@ -520,7 +524,7 @@ package and call `AddPqJwtBearer(...)` on the standard
 `ML-DSA-65`.
 
 ```bash
-dotnet add package PostQuantum.Jwt.AspNetCore --version 1.0.0-preview.4
+dotnet add package PostQuantum.Jwt.AspNetCore --version 1.0.0-preview.5
 ```
 
 ```csharp

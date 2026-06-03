@@ -17,7 +17,8 @@ decision before relying on it.
 
 | Version             | Supported           |
 |---------------------|---------------------|
-| `1.0.0-preview.4`+  | ✅ (latest preview)  |
+| `1.0.0-preview.5`+  | ✅ (latest preview)  |
+| `1.0.0-preview.4`   | ❌ (tagged, not published) |
 | `1.0.0-preview.3`   | ❌ (superseded)      |
 | `0.3.0-preview.*`   | ❌ (superseded)      |
 | `0.2.0-preview.*`   | ❌ (superseded)      |
