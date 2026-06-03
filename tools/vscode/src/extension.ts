@@ -46,7 +46,22 @@ const API_DOCS: Record<string, { anchor: string; blurb: string }> = {
   },
 };
 
-const API_REGEX = new RegExp(`\\b(${Object.keys(API_DOCS).join("|")})\\b`, "g");
+// Base docs URL without the README fragment, plus a helper to anchor into it.
+const DOCS_BASE = LINKS.docs.replace("#readme", "");
+const docUrl = (anchor: string): string => `${DOCS_BASE}${anchor}`;
+
+// A fresh global regex per call — `matchAll` requires the `g` flag, and a new
+// instance avoids the shared-`lastIndex` state a module-level regex would carry.
+const apiRegex = (): RegExp =>
+  new RegExp(`\\b(${Object.keys(API_DOCS).join("|")})\\b`, "g");
+
+// The subset of JOSE header fields this decoder inspects (structure only).
+interface JoseHeader {
+  alg?: string;
+  enc?: string;
+  cty?: string;
+  kid?: string;
+}
 
 // ---------------------------------------------------------------------------
 // Token decoder (pure string work, no crypto)
@@ -88,10 +103,10 @@ function decodeToken(token: string): string {
 
   lines.push("");
   lines.push("=== Protected header ===");
-  let header: any = {};
+  let header: JoseHeader = {};
   try {
     const headerRaw = base64UrlDecode(parts[0]);
-    header = JSON.parse(headerRaw);
+    header = JSON.parse(headerRaw) as JoseHeader;
     lines.push(prettyJson(headerRaw));
   } catch {
     lines.push("(could not decode header)");
@@ -100,6 +115,9 @@ function decodeToken(token: string): string {
   // Algorithm sanity notes
   lines.push("");
   lines.push("=== Notes ===");
+  if (header.kid) {
+    lines.push(`• kid = ${header.kid} (key id — resolved at validation for rotation).`);
+  }
   if (parts.length === 3) {
     if (header.alg === "ML-DSA-65") {
       lines.push("✓ alg = ML-DSA-65 (post-quantum signature, FIPS 204).");
@@ -187,7 +205,7 @@ class PqJwtHoverProvider implements vscode.HoverProvider {
     }
     const md = new vscode.MarkdownString(
       `**${word}** — PostQuantum.Jwt\n\n${entry.blurb}\n\n` +
-        `[Docs](${LINKS.docs.replace("#readme", "")}${entry.anchor}) · ` +
+        `[Docs](${docUrl(entry.anchor)}) · ` +
         `[Playground](${LINKS.playground}) · [NuGet](${LINKS.nuget})`
     );
     md.isTrusted = true;
@@ -201,22 +219,21 @@ class PqJwtHoverProvider implements vscode.HoverProvider {
 class PqJwtCodeLensProvider implements vscode.CodeLensProvider {
   provideCodeLenses(document: vscode.TextDocument): vscode.CodeLens[] {
     const lenses: vscode.CodeLens[] = [];
-    const seenLines = new Set<number>();
     for (let line = 0; line < document.lineCount; line++) {
       const text = document.lineAt(line).text;
-      API_REGEX.lastIndex = 0;
-      const match = API_REGEX.exec(text);
-      if (match && !seenLines.has(line)) {
-        seenLines.add(line);
-        const entry = API_DOCS[match[1]];
+      const seenOnLine = new Set<string>();
+      for (const match of text.matchAll(apiRegex())) {
+        const symbol = match[1];
+        if (seenOnLine.has(symbol)) {
+          continue; // one lens per distinct symbol per line
+        }
+        seenOnLine.add(symbol);
         const range = new vscode.Range(line, 0, line, 0);
         lenses.push(
           new vscode.CodeLens(range, {
-            title: `📖 PostQuantum.Jwt: ${match[1]} docs`,
+            title: `📖 PostQuantum.Jwt: ${symbol} docs`,
             command: "vscode.open",
-            arguments: [
-              vscode.Uri.parse(`${LINKS.docs.replace("#readme", "")}${entry.anchor}`),
-            ],
+            arguments: [vscode.Uri.parse(docUrl(API_DOCS[symbol].anchor))],
           })
         );
       }
