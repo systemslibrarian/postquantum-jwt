@@ -8,6 +8,14 @@ the API between previews.
 
 ## [Unreleased]
 
+## [1.0.0-preview.5] — 2026-06-03
+
+Documentation, positioning, and supply-chain hardening only — **no library code
+or wire-format change** (the library binary is identical to `1.0.0-preview.3`).
+Supersedes the `1.0.0-preview.4` tag, which was built and verified but **not
+published** to nuget.org (its README still carried the old API-stability
+wording); preview.5 is the first published cut of this work.
+
 ### Changed
 
 - **Reframed the API-stability wording** in `README.md`, `SECURITY.md`, and
@@ -18,14 +26,6 @@ the API between previews.
 - **Author code-signing note** now points open-source projects at the free
   [SignPath Foundation](https://signpath.org/) certificate rather than implying a
   commercial cert must be purchased.
-
-## [1.0.0-preview.4] — 2026-06-03
-
-Documentation, positioning, and supply-chain hardening only — **no library code
-or wire-format change** (the library binary is identical to `1.0.0-preview.3`).
-
-### Changed
-
 - **Clarified standards/interoperability language** across the README, package
   metadata, `SECURITY.md`, `KNOWN-GAPS.md`, code XML docs, and samples: `ML-DSA-65`
   (RFC 9964) and `A256GCM` (RFC 7518) are **registered JOSE identifiers**, but the
