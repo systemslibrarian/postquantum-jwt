@@ -6,13 +6,15 @@ This extension does **no cryptography**. It helps you *write* and *understand* P
 
 ## Install
 
-Search **PostQuantum.Jwt** in the VS Code Extensions view, or install from the command line:
+- **Extensions view:** open Extensions (`Ctrl+Shift+X` / `Cmd+Shift+X`), search **PostQuantum.Jwt**, and click *Install*.
+- **Quick Open:** press `Ctrl+P` / `Cmd+P` and run `ext install systemslibrarian.postquantum-jwt`.
+- **Command line:**
 
-```
-ext install systemslibrarian.postquantum-jwt
-```
+  ```bash
+  code --install-extension systemslibrarian.postquantum-jwt
+  ```
 
-Also on the [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=systemslibrarian.postquantum-jwt).
+Or install from the [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=systemslibrarian.postquantum-jwt) page.
 
 ## Features
 
