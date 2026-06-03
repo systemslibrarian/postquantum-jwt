@@ -1,6 +1,7 @@
 @page "/"
 @rendermode InteractiveServer
 @inject PqJwtDemoService Demo
+@inject IJSRuntime JS
 
 <PageTitle>Post-Quantum JWT Playground</PageTitle>
 
@@ -86,6 +87,10 @@
                     <span class="chip">@_build.Segments segments</span>
                     <span class="chip">@_build.ApproxBytes bytes</span>
                     <span class="chip">@_build.ElapsedMs.ToString("F1") ms</span>
+                    <button class="copybtn @(_copied == "token" ? "copied" : "")"
+                            @onclick='() => Copy("token", _build.Token)'>
+                        @(_copied == "token" ? "Copied ✓" : "Copy token")
+                    </button>
                 </div>
                 <pre class="token" tabindex="0">@_build.Token</pre>
 
@@ -101,6 +106,17 @@
                 </div>
 
                 <SizeBar PqBytes="_build.ApproxBytes" Encrypted="_build.Encrypted" />
+
+                <details class="snippet">
+                    <summary>Validate this token in C#</summary>
+                    <div class="snip-wrap">
+                        <button class="copybtn @(_copied == "snippet" ? "copied" : "")"
+                                @onclick='() => Copy("snippet", _build.CSharpSnippet)'>
+                            @(_copied == "snippet" ? "Copied ✓" : "Copy")
+                        </button>
+                        <pre class="code">@_build.CSharpSnippet</pre>
+                    </div>
+                </details>
 
                 <button class="ghost" @onclick="UseInValidator">Send to validator &darr;</button>
             </div>
@@ -160,20 +176,92 @@
         }
     </section>
 
-    <!-- 03 KEYS -->
+    <!-- 03 BREAK IT -->
+    <section class="card span2" aria-labelledby="break-h">
+        <h2 id="break-h"><span class="num">03</span> Break it</h2>
+        <p class="hint">
+            Each button starts from a freshly-built <strong>valid</strong> token, tampers with it,
+            then runs it through the same validator. Fail-closed means every one is rejected &mdash;
+            with a specific reason. This is the library's core promise, made visible.
+        </p>
+
+        <div class="attacks">
+            @foreach (var atk in PqJwtDemoService.Attacks)
+            {
+                var id = atk.Id;
+                <button class="attack" @onclick="() => RunAttack(id)">
+                    <span class="at-title">@atk.Title</span>
+                    <span class="at-hint">@atk.Hint</span>
+                </button>
+            }
+        </div>
+
+        @if (_attack is not null)
+        {
+            <div class="attack-did">
+                <span class="lead">@_attack.Title.</span> @_attack.Did
+            </div>
+
+            <div class="tokenhead">
+                <span>Tampered token</span>
+                <button class="copybtn @(_copied == "attack" ? "copied" : "")"
+                        @onclick='() => Copy("attack", _attack.TamperedToken)'>
+                    @(_copied == "attack" ? "Copied ✓" : "Copy")
+                </button>
+            </div>
+            <pre class="token" tabindex="0">@_attack.TamperedToken</pre>
+
+            <div class="result @(_attack.Validation.Valid ? "ok" : "bad")" role="status">
+                <div class="resulthead">
+                    <span class="status">@(_attack.Validation.Valid ? "VALID" : "REJECTED")</span>
+                    <span class="chip">@_attack.Validation.ElapsedMs.ToString("F1") ms</span>
+                </div>
+                @if (_attack.Validation.Valid)
+                {
+                    <p class="hint">Unexpected: this tamper was accepted. That should never happen &mdash; please report it.</p>
+                }
+                else
+                {
+                    <div class="why">
+                        <h3>Why was this rejected?</h3>
+                        <p class="why-what">@_attack.Validation.What</p>
+                        <p class="why-why">@_attack.Validation.Why</p>
+                        <details>
+                            <summary>Technical detail</summary>
+                            <code class="raw">@_attack.Validation.Message</code>
+                        </details>
+                    </div>
+                }
+            </div>
+        }
+    </section>
+
+    <!-- 04 KEYS -->
     <section class="card span2" aria-labelledby="keys-h">
-        <h2 id="keys-h"><span class="num">03</span> Session keys</h2>
+        <h2 id="keys-h"><span class="num">04</span> Session keys</h2>
         <p class="hint">
             Generated server-side and held in memory. Private keys never reach the browser.
             Regenerating invalidates tokens built with the old keys.
         </p>
         <div class="cols">
             <div>
-                <h3>ML-DSA-65 verification (public)</h3>
+                <div class="keyhead">
+                    <h3>ML-DSA-65 verification (public)</h3>
+                    <button class="copybtn @(_copied == "verkey" ? "copied" : "")"
+                            @onclick='() => Copy("verkey", Demo.VerificationPublicKeyBase64)'>
+                        @(_copied == "verkey" ? "Copied ✓" : "Copy")
+                    </button>
+                </div>
                 <pre class="json mono small">@_verPub</pre>
             </div>
             <div>
-                <h3>X-Wing recipient (public, 1216 B)</h3>
+                <div class="keyhead">
+                    <h3>X-Wing recipient (public, 1216 B)</h3>
+                    <button class="copybtn @(_copied == "reckey" ? "copied" : "")"
+                            @onclick='() => Copy("reckey", Demo.RecipientPublicKeyBase64)'>
+                        @(_copied == "reckey" ? "Copied ✓" : "Copy")
+                    </button>
+                </div>
                 <pre class="json mono small">@_recPub</pre>
             </div>
         </div>
@@ -181,9 +269,9 @@
         <span class="kid">active kid: <code>@Demo.SigningKid</code></span>
     </section>
 
-    <!-- 04 SECURITY PROPERTIES -->
+    <!-- 05 SECURITY PROPERTIES -->
     <section class="card span2" aria-labelledby="props-h">
-        <h2 id="props-h"><span class="num">04</span> What this protects against</h2>
+        <h2 id="props-h"><span class="num">05</span> What this protects against</h2>
         <div class="props">
             <div class="prop"><span class="ok-dot"></span><strong>Forgery &amp; tampering</strong>
                 <p>ML-DSA-65 over header+payload. Edit any claim and the signature no longer verifies.</p></div>
@@ -220,6 +308,10 @@
 
     private string _validateInput = "";
     private ValidationView? _validation;
+
+    // transient "Copied ✓" marker (which button was last copied) + last attack run
+    private string? _copied;
+    private AttackResult? _attack;
 
     private string _verPub = "";
     private string _recPub = "";
@@ -282,6 +374,23 @@
         RefreshKeys();
         _validation = null;
         _build = null;
+        _attack = null;
+    }
+
+    private void RunAttack(string id) => _attack = Demo.BreakIt(id);
+
+    // Copy via JS clipboard and flash a transient "Copied ✓" on the source button.
+    private async Task Copy(string key, string text)
+    {
+        await JS.InvokeVoidAsync("pqCopy", text);
+        _copied = key;
+        StateHasChanged();
+        await Task.Delay(1400);
+        if (_copied == key)
+        {
+            _copied = null;
+            StateHasChanged();
+        }
     }
 
     private static string Wrap(string s)
