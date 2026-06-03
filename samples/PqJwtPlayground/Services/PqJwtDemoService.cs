@@ -9,7 +9,9 @@
 
 using System.Diagnostics;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using PostQuantum.Jwt;
 using PostQuantum.Jwt.Cryptography;
 using Pq.Samples.Shared;
@@ -25,7 +27,20 @@ public sealed record BuildResult(
     bool Encrypted,
     double ElapsedMs,
     string DecodedHeaderJson,
-    string DecodedPayloadJson);
+    string DecodedPayloadJson,
+    string CSharpSnippet);
+
+/// <summary>One pre-canned tampering attack offered in the "Break it" panel.</summary>
+public sealed record Attack(string Id, string Title, string Hint);
+
+/// <summary>Outcome of running an <see cref="Attack"/>: what we changed, the
+/// tampered token, and how the fail-closed validator responded.</summary>
+public sealed record AttackResult(
+    string Id,
+    string Title,
+    string Did,
+    string TamperedToken,
+    ValidationView Validation);
 
 /// <summary>Result of validating a token, for display in the UI.</summary>
 public sealed record ValidationView(
@@ -147,9 +162,48 @@ public sealed class PqJwtDemoService : IDisposable
                 Encrypted: encrypt,
                 ElapsedMs: sw.Elapsed.TotalMilliseconds,
                 DecodedHeaderJson: header,
-                DecodedPayloadJson: payload);
+                DecodedPayloadJson: payload,
+                CSharpSnippet: BuildSnippet(encrypt, issuer, audience));
         }
     }
+
+    // Ready-to-read C# that validates a token of exactly this shape with the real
+    // library API. It mirrors what the playground does server-side, so a reader can
+    // copy it into their own service. The verification key is referenced as a
+    // server-held value — never pulled from the token — which is the whole point.
+    private static string BuildSnippet(bool encrypt, string? issuer, string? audience)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("using PostQuantum.Jwt;");
+        if (encrypt) sb.AppendLine("using PostQuantum.Jwt.Cryptography;");
+        sb.AppendLine("using System.Security.Cryptography;");
+        sb.AppendLine();
+        sb.AppendLine("// The verification key is YOUR trusted public key, held server-side.");
+        sb.AppendLine("// It is never read from the token's own header — that is how alg:none");
+        sb.AppendLine("// and downgrade attacks are foreclosed. (This session's key is in panel 04.)");
+        sb.AppendLine("byte[] publicKey = Convert.FromBase64String(verificationPublicKeyBase64);");
+        sb.AppendLine("using var verificationKey = MLDsa.ImportMLDsaPublicKey(MLDsaAlgorithm.MLDsa65, publicKey);");
+        sb.AppendLine();
+        sb.AppendLine("var validator = new PqJwtValidator(new PqJwtValidationParameters");
+        sb.AppendLine("{");
+        sb.AppendLine("    SignatureVerificationKey = verificationKey,");
+        if (encrypt)
+            sb.AppendLine("    DecryptionKey = recipientPrivateKey, // XWingPrivateKey held server-side");
+        if (!string.IsNullOrWhiteSpace(issuer))
+            sb.AppendLine($"    ValidIssuer = \"{EscapeForCSharp(issuer)}\",");
+        if (!string.IsNullOrWhiteSpace(audience))
+            sb.AppendLine($"    ValidAudience = \"{EscapeForCSharp(audience)}\",");
+        sb.AppendLine("});");
+        sb.AppendLine();
+        sb.AppendLine("// Fail-closed: throws PqJwtValidationException if ANYTHING is wrong");
+        sb.AppendLine("// (bad signature, expiry, wrong audience, malformed structure, …).");
+        sb.AppendLine("PqJwtValidationResult result = validator.Validate(token);");
+        sb.AppendLine("Console.WriteLine($\"sub = {result.Subject}, expires {result.ExpiresAt:u}\");");
+        return sb.ToString();
+    }
+
+    private static string EscapeForCSharp(string s) =>
+        s.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("\"", "\\\"", StringComparison.Ordinal);
 
     // Infer a typed claim value from a UI string, most specific first.
     private static object InferValue(string raw)
@@ -211,6 +265,107 @@ public sealed class PqJwtDemoService : IDisposable
             }
         }
     }
+
+    /// <summary>The tampering attacks offered in the "Break it" panel. Each one
+    /// starts from a freshly-built valid token, mutates it, and is rejected — the
+    /// four map to four <em>distinct</em> fail-closed reasons.</summary>
+    public static readonly IReadOnlyList<Attack> Attacks = new[]
+    {
+        new Attack("alg", "Downgrade the algorithm",
+            "Rewrite the header's alg to RS256 — the classic algorithm-substitution move."),
+        new Attack("claim", "Tamper a claim",
+            "Escalate role from user to superadmin in the payload, keep the old signature."),
+        new Attack("sig", "Corrupt the signature",
+            "Mangle the base64url signature segment so it no longer decodes."),
+        new Attack("truncate", "Truncate the token",
+            "Drop the signature segment entirely, leaving only header.payload."),
+    };
+
+    /// <summary>
+    /// Run a Break-it attack: build a fresh, valid <em>signed</em> token, apply the
+    /// named tamper, then push it through the same fail-closed validator. The point
+    /// is to show the rejection — and the plain-language reason — for each attack.
+    /// </summary>
+    public AttackResult BreakIt(string attackId)
+    {
+        lock (_gate)
+        {
+            // A known-good signed token (never encrypted, so the payload is plain to
+            // tamper with). Built with the live demo keys so the validator below uses
+            // the matching verification key.
+            var baseToken = new PqJwtBuilder()
+                .WithSubject("user-123")
+                .WithIssuer("https://issuer.example")
+                .WithAudience("https://api.example")
+                .WithClaim("role", "user")
+                .WithLifetime(TimeSpan.FromMinutes(15))
+                .WithKeyId(SigningKid)
+                .SignWith(_signingKey)
+                .Build();
+
+            var parts = baseToken.Split('.');
+            string tampered;
+            string did;
+
+            switch (attackId)
+            {
+                case "alg":
+                    parts[0] = RewriteJsonField(parts[0], "alg", "RS256");
+                    tampered = string.Join('.', parts);
+                    did = "Rewrote the header's \"alg\" from ML-DSA-65 to RS256, then re-sent the same body.";
+                    break;
+
+                case "claim":
+                    parts[1] = RewriteJsonField(parts[1], "role", "superadmin");
+                    tampered = string.Join('.', parts);
+                    did = "Edited the payload to escalate \"role\" from user to superadmin, leaving the original signature in place.";
+                    break;
+
+                case "sig":
+                    parts[2] = CorruptSegment(parts[2]);
+                    tampered = string.Join('.', parts);
+                    did = "Corrupted bytes inside the base64url signature segment.";
+                    break;
+
+                case "truncate":
+                    tampered = parts[0] + "." + parts[1];
+                    did = "Removed the signature segment, leaving a 2-segment header.payload string.";
+                    break;
+
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(attackId), attackId, "Unknown attack.");
+            }
+
+            var title = Attacks.First(a => a.Id == attackId).Title;
+            // Validate() also takes _gate; Monitor is re-entrant, so this is fine.
+            return new AttackResult(attackId, title, did, tampered, Validate(tampered));
+        }
+    }
+
+    // Decode a base64url JSON segment, set one field to a string value, re-encode.
+    private static string RewriteJsonField(string segment, string field, string value)
+    {
+        var node = JsonNode.Parse(DecodeSegment(segment));
+        var obj = node as JsonObject ?? new JsonObject();
+        obj[field] = value;
+        return Base64UrlEncode(Encoding.UTF8.GetBytes(obj.ToJsonString()));
+    }
+
+    // Replace two characters in the middle of a segment with a character outside the
+    // base64url alphabet, so the validator's signature decode fails (SignatureMalformed)
+    // — a distinct outcome from a claim tamper, which fails the signature *check*.
+    private static string CorruptSegment(string segment)
+    {
+        if (segment.Length < 4) return segment + "!!";
+        var chars = segment.ToCharArray();
+        int mid = chars.Length / 2;
+        chars[mid] = '!';
+        chars[mid + 1] = '!';
+        return new string(chars);
+    }
+
+    private static string Base64UrlEncode(byte[] bytes) =>
+        Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
 
     // Decode header (and payload for signed tokens) purely for display.
     // Encrypted tokens have an opaque ciphertext payload, so we only show the header.
