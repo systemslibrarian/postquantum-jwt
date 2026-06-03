@@ -4,6 +4,16 @@ Companion extension for the [**PostQuantum.Jwt**](https://www.nuget.org/packages
 
 This extension does **no cryptography**. It helps you *write* and *understand* PostQuantum.Jwt code, and points you at the live playground for anything that actually signs or validates.
 
+## Install
+
+Search **PostQuantum.Jwt** in the VS Code Extensions view, or install from the command line:
+
+```
+ext install systemslibrarian.postquantum-jwt
+```
+
+Also on the [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=systemslibrarian.postquantum-jwt).
+
 ## Features
 
 ### Snippets (C#)
