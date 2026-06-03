@@ -10,11 +10,21 @@ the API between previews.
 
 ## [1.0.0-preview.5] — 2026-06-03
 
-Documentation, positioning, and supply-chain hardening only — **no library code
-or wire-format change** (the library binary is identical to `1.0.0-preview.3`).
-Supersedes the `1.0.0-preview.4` tag, which was built and verified but **not
-published** to nuget.org (its README still carried the old API-stability
-wording); preview.5 is the first published cut of this work.
+**Published to nuget.org on 2026-06-03** (`PostQuantum.Jwt`,
+`PostQuantum.Jwt.AspNetCore`, `PostQuantum.Jwt.Analyzers`,
+`PostQuantum.Jwt.Templates`). Documentation, positioning, and supply-chain
+hardening only — **no library code or wire-format change** (the library binary
+is identical to `1.0.0-preview.3`). Supersedes the `1.0.0-preview.4` tag, which
+was built and verified but **not published** to nuget.org (its README still
+carried the old API-stability wording); preview.5 is the first published cut of
+this work.
+
+> **Release note (transparency):** this version was published manually via
+> `dotnet nuget push` because the tag-based release workflow's `NUGET_API_KEY`
+> environment secret was stale. As a result, these `.nupkg` files do **not**
+> carry the CI build-provenance attestation that the pipeline normally adds;
+> nuget.org repository signing still applies. Future releases will restore
+> provenance once the environment secret is refreshed.
 
 ### Changed
 
