@@ -34,6 +34,9 @@ Type a prefix and tab through a fully-formed example:
 ### Decode Token
 Select a token (or run the command and paste one) → **PostQuantum.Jwt: Decode Token**. It splits the compact serialization, shows whether it's the 3-part **signed** or 5-part **encrypted** form, decodes the protected header, and flags the expected `ML-DSA-65` / `X-Wing` / `A256GCM` identifiers. Structure and headers only — encrypted claims stay encrypted.
 
+### Inline "Inspect PQ-JWT"
+When a PostQuantum.Jwt token appears in a `.cs`, `.json`, or `.http` file, a **🔍 Inspect PQ-JWT** CodeLens appears right above it — click to decode it without selecting anything. Detection is deliberately strict: a string is only flagged when it has 3 or 5 segments *and* its protected header decodes to this suite's `alg` (`ML-DSA-65` or `X-Wing`), so version strings, hashes, and ordinary base64 blobs don't trigger it.
+
 ### Quick links
 Command palette → "PostQuantum.Jwt:" → open the **Live Playground**, **Docs**, **NuGet**, **GitHub**, or **Generate a Key Pair** (in the playground).
 

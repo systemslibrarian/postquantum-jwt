@@ -61,6 +61,52 @@ function renderSegment(decode: SegmentDecode, label: string): string[] {
   }
 }
 
+// ---------------------------------------------------------------------------
+// In-editor token detection (for the inline "Inspect PQ-JWT" CodeLens)
+// ---------------------------------------------------------------------------
+
+// A compact-serialization shape: a long-ish first segment followed by 2–4 more
+// dot-separated base64url segments (so 3 or 5 total). A fresh regex per call
+// keeps `lastIndex` from leaking across scans.
+const tokenRegex = (): RegExp =>
+  /[A-Za-z0-9_-]{16,}(?:\.[A-Za-z0-9_-]{2,}){2,4}/g;
+
+// Tight gate against false positives (version strings, hashes, base64 blobs):
+// only treat a candidate as a PostQuantum.Jwt token if it has exactly 3 or 5
+// segments AND its protected header decodes to this suite's `alg`.
+export function looksLikePqJwt(candidate: string): boolean {
+  const parts = candidate.split(".");
+  if (parts.length !== 3 && parts.length !== 5) {
+    return false;
+  }
+  const header = decodeSegment(parts[0]);
+  if (header.kind !== "json") {
+    return false;
+  }
+  const alg = (header.value as JoseHeader).alg;
+  return parts.length === 3 ? alg === "ML-DSA-65" : alg === "X-Wing";
+}
+
+export interface FoundToken {
+  value: string;
+  start: number;
+  end: number;
+}
+
+// Find PostQuantum.Jwt tokens within a single line of text.
+export function findPqJwtTokens(text: string): FoundToken[] {
+  const found: FoundToken[] = [];
+  for (const match of text.matchAll(tokenRegex())) {
+    if (match.index === undefined) {
+      continue;
+    }
+    if (looksLikePqJwt(match[0])) {
+      found.push({ value: match[0], start: match.index, end: match.index + match[0].length });
+    }
+  }
+  return found;
+}
+
 export function decodeToken(token: string): string {
   const trimmed = token.trim().replace(/\s+/g, "");
   const parts = trimmed.split(".");
