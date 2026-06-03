@@ -1,0 +1,36 @@
+name: ❓ Question
+description: Ask about using the PostQuantum.Jwt library or the VS Code extension.
+title: "[Question]: "
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for trying **PostQuantum.Jwt**! A few quick pointers first:
+
+        - To *experiment* with signing/validating a token, the [live playground](https://pqjwt.systemslibrarian.dev) is the fastest path — no install.
+        - This suite is **ML-DSA-65 + X-Wing only**, for *controlled* issuer/verifier systems. It is **not** independently audited and its tokens **do not** interoperate with generic JWT tooling — that's by design, not a bug.
+  - type: textarea
+    id: question
+    attributes:
+      label: Your question
+      description: What are you trying to do, and what's unclear or not working as expected?
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Library — signing / validation
+        - ASP.NET Core integration
+        - Encryption (X-Wing / sign-then-encrypt)
+        - VS Code extension
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Package / extension version
+      placeholder: "PostQuantum.Jwt 1.0.0-preview.5 · VS Code extension 0.1.3"

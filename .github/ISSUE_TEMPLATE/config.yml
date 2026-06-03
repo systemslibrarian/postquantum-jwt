@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 💬 Live Playground
+    url: https://pqjwt.systemslibrarian.dev
+    about: Build, validate, and *break* a post-quantum token in your browser — no install, no setup.
+  - name: 📖 Documentation
+    url: https://github.com/systemslibrarian/postquantum-jwt#readme
+    about: README, usage, token format, and the standards / interoperability status.
+  - name: 🔒 Report a security vulnerability
+    url: https://github.com/systemslibrarian/postquantum-jwt/security/policy
+    about: Please do NOT open a public issue for vulnerabilities — follow the private process in SECURITY.md.
