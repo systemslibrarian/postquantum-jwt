@@ -1,11 +1,23 @@
 import * as vscode from "vscode";
 import { LINKS, docUrl } from "./links";
 import { API_DOCS, apiRegex } from "./apiDocs";
-import { decodeToken } from "./decoder";
+import { decodeToken, findPqJwtTokens } from "./decoder";
+
+// Languages where we look for inline tokens to offer an "Inspect" CodeLens.
+const TOKEN_LENS_LANGUAGES = ["csharp", "json", "jsonc", "http"];
 
 // ---------------------------------------------------------------------------
-// Decode command (the only piece that touches the vscode host)
+// Decode commands (the only pieces that touch the vscode host)
 // ---------------------------------------------------------------------------
+async function showDecodedToken(token: string): Promise<void> {
+  const output = decodeToken(token);
+  const doc = await vscode.workspace.openTextDocument({
+    content: output,
+    language: "plaintext",
+  });
+  await vscode.window.showTextDocument(doc, { preview: true });
+}
+
 async function runDecode(): Promise<void> {
   const editor = vscode.window.activeTextEditor;
   let candidate = "";
@@ -23,12 +35,7 @@ async function runDecode(): Promise<void> {
     candidate = input;
   }
 
-  const output = decodeToken(candidate);
-  const doc = await vscode.workspace.openTextDocument({
-    content: output,
-    language: "plaintext",
-  });
-  await vscode.window.showTextDocument(doc, { preview: true });
+  await showDecodedToken(candidate);
 }
 
 // ---------------------------------------------------------------------------
@@ -88,6 +95,30 @@ class PqJwtCodeLensProvider implements vscode.CodeLensProvider {
 }
 
 // ---------------------------------------------------------------------------
+// Inline token CodeLens — detects PostQuantum.Jwt tokens in source/config and
+// offers a one-click "Inspect" without selecting + invoking the command.
+// ---------------------------------------------------------------------------
+class PqJwtTokenLensProvider implements vscode.CodeLensProvider {
+  provideCodeLenses(document: vscode.TextDocument): vscode.CodeLens[] {
+    const lenses: vscode.CodeLens[] = [];
+    for (let line = 0; line < document.lineCount; line++) {
+      const text = document.lineAt(line).text;
+      for (const token of findPqJwtTokens(text)) {
+        const range = new vscode.Range(line, token.start, line, token.end);
+        lenses.push(
+          new vscode.CodeLens(range, {
+            title: "🔍 Inspect PQ-JWT",
+            command: "pqjwt.inspectToken",
+            arguments: [token.value],
+          })
+        );
+      }
+    }
+    return lenses;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Activation
 // ---------------------------------------------------------------------------
 export function activate(context: vscode.ExtensionContext) {
@@ -96,13 +127,15 @@ export function activate(context: vscode.ExtensionContext) {
 
   context.subscriptions.push(
     vscode.commands.registerCommand("pqjwt.decodeToken", runDecode),
+    vscode.commands.registerCommand("pqjwt.inspectToken", (token: string) => showDecodedToken(token)),
     vscode.commands.registerCommand("pqjwt.openPlayground", open(LINKS.playground)),
     vscode.commands.registerCommand("pqjwt.openDocs", open(LINKS.docs)),
     vscode.commands.registerCommand("pqjwt.openNuget", open(LINKS.nuget)),
     vscode.commands.registerCommand("pqjwt.openRepo", open(LINKS.repo)),
     vscode.commands.registerCommand("pqjwt.generateKeyPair", open(LINKS.playground)),
     vscode.languages.registerHoverProvider("csharp", new PqJwtHoverProvider()),
-    vscode.languages.registerCodeLensProvider("csharp", new PqJwtCodeLensProvider())
+    vscode.languages.registerCodeLensProvider("csharp", new PqJwtCodeLensProvider()),
+    vscode.languages.registerCodeLensProvider(TOKEN_LENS_LANGUAGES, new PqJwtTokenLensProvider())
   );
 }
 

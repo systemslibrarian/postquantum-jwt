@@ -1,10 +1,21 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { decodeToken, decodeSegment, base64UrlDecode } from "./decoder";
+import {
+  decodeToken,
+  decodeSegment,
+  base64UrlDecode,
+  looksLikePqJwt,
+  findPqJwtTokens,
+} from "./decoder";
 
 // Helper: encode an object as a base64url segment (no padding), like JOSE.
 function seg(obj: unknown): string {
   return Buffer.from(JSON.stringify(obj)).toString("base64url");
+}
+
+// A realistic-length signed token (first segment must be >= 16 base64url chars).
+function signedToken(): string {
+  return [seg({ alg: "ML-DSA-65", kid: "k1" }), seg({ sub: "user-1" }), "c2lnbmF0dXJl"].join(".");
 }
 
 test("signed token: 3 segments, ML-DSA-65 header + kid + payload", () => {
@@ -65,4 +76,33 @@ test("decodeSegment classifies the failure modes", () => {
 test("base64UrlDecode round-trips JSON (no padding in input)", () => {
   const encoded = Buffer.from('{"a":1}').toString("base64url");
   assert.equal(base64UrlDecode(encoded), '{"a":1}');
+});
+
+test("looksLikePqJwt accepts a real signed/encrypted token", () => {
+  assert.equal(looksLikePqJwt(signedToken()), true);
+  const enc = [seg({ alg: "X-Wing", enc: "A256GCM", cty: "JWT" }), "encKey", "iv", "ct", "tag"].join(".");
+  assert.equal(looksLikePqJwt(enc), true);
+});
+
+test("looksLikePqJwt rejects look-alikes (wrong alg, version strings, hashes)", () => {
+  // Right shape, wrong alg — not our suite.
+  assert.equal(looksLikePqJwt([seg({ alg: "RS256" }), seg({}), "sig"].join(".")), false);
+  // Version string — first segment too short and header not JSON.
+  assert.equal(looksLikePqJwt("1.0.0"), false);
+  // A 4-segment base64url blob is not a 3/5-part token.
+  assert.equal(looksLikePqJwt("aaaaaaaaaaaaaaaa.bbbb.cccc.dddd"), false);
+});
+
+test("findPqJwtTokens locates a token embedded in a line and reports its span", () => {
+  const token = signedToken();
+  const line = `    var jwt = "${token}";`;
+  const found = findPqJwtTokens(line);
+  assert.equal(found.length, 1);
+  assert.equal(found[0].value, token);
+  assert.equal(line.slice(found[0].start, found[0].end), token);
+});
+
+test("findPqJwtTokens ignores lines with no PostQuantum.Jwt token", () => {
+  assert.equal(findPqJwtTokens('const version = "1.0.0-preview.5";').length, 0);
+  assert.equal(findPqJwtTokens("just some prose with words.and.dots here").length, 0);
 });
