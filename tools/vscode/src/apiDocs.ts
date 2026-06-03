@@ -45,3 +45,10 @@ export const API_DOCS: Record<string, ApiDocEntry> = {
 // instance avoids the shared-`lastIndex` state a module-level regex would carry.
 export const apiRegex = (): RegExp =>
   new RegExp(`\\b(${Object.keys(API_DOCS).join("|")})\\b`, "g");
+
+// Look up a symbol's docs entry. Uses an own-property check so inherited Object
+// members (`constructor`, `toString`, `__proto__`, …) never resolve to a truthy
+// native function and produce a broken hover.
+export function lookupApiDoc(word: string): ApiDocEntry | undefined {
+  return Object.prototype.hasOwnProperty.call(API_DOCS, word) ? API_DOCS[word] : undefined;
+}

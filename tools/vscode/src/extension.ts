@@ -1,20 +1,41 @@
 import * as vscode from "vscode";
 import { LINKS, docUrl } from "./links";
-import { API_DOCS, apiRegex } from "./apiDocs";
+import { API_DOCS, apiRegex, lookupApiDoc } from "./apiDocs";
 import { decodeToken, findPqJwtTokens } from "./decoder";
 
 // Languages where we look for inline tokens to offer an "Inspect" CodeLens.
 const TOKEN_LENS_LANGUAGES = ["csharp", "json", "jsonc", "http"];
 
+// Virtual scheme for decode output — gives a titled, read-only tab (documents
+// of a content-provider scheme are not editable) instead of an untitled buffer.
+const DECODE_SCHEME = "pqjwt-decode";
+
+class DecodeContentProvider implements vscode.TextDocumentContentProvider {
+  private readonly store = new Map<string, string>();
+  private counter = 0;
+
+  provideTextDocumentContent(uri: vscode.Uri): string {
+    return this.store.get(uri.toString()) ?? "";
+  }
+
+  // Stash content under a uniquely-keyed URI whose path is the (stable) tab title.
+  add(content: string): vscode.Uri {
+    const uri = vscode.Uri.parse(`${DECODE_SCHEME}:PQ-JWT decode.txt`).with({
+      query: String(this.counter++),
+    });
+    this.store.set(uri.toString(), content);
+    return uri;
+  }
+}
+
+const decodeContent = new DecodeContentProvider();
+
 // ---------------------------------------------------------------------------
 // Decode commands (the only pieces that touch the vscode host)
 // ---------------------------------------------------------------------------
 async function showDecodedToken(token: string): Promise<void> {
-  const output = decodeToken(token);
-  const doc = await vscode.workspace.openTextDocument({
-    content: output,
-    language: "plaintext",
-  });
+  const uri = decodeContent.add(decodeToken(token));
+  const doc = await vscode.workspace.openTextDocument(uri);
   await vscode.window.showTextDocument(doc, { preview: true });
 }
 
@@ -51,7 +72,7 @@ class PqJwtHoverProvider implements vscode.HoverProvider {
       return;
     }
     const word = document.getText(range);
-    const entry = API_DOCS[word];
+    const entry = lookupApiDoc(word);
     if (!entry) {
       return;
     }
@@ -126,6 +147,7 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.env.openExternal(vscode.Uri.parse(url));
 
   context.subscriptions.push(
+    vscode.workspace.registerTextDocumentContentProvider(DECODE_SCHEME, decodeContent),
     vscode.commands.registerCommand("pqjwt.decodeToken", runDecode),
     vscode.commands.registerCommand("pqjwt.inspectToken", (token: string) => showDecodedToken(token)),
     vscode.commands.registerCommand("pqjwt.openPlayground", open(LINKS.playground)),
