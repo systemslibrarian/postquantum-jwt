@@ -106,3 +106,30 @@ test("findPqJwtTokens ignores lines with no PostQuantum.Jwt token", () => {
   assert.equal(findPqJwtTokens('const version = "1.0.0-preview.5";').length, 0);
   assert.equal(findPqJwtTokens("just some prose with words.and.dots here").length, 0);
 });
+
+// --- Regression: bugs reported in bugsgeminifound.md ---
+
+test("bug 2: a header that JSON-parses to null does not throw", () => {
+  // base64url of '      null      ' decodes to a valid JSON null, >= 16 chars.
+  const nullHeader = Buffer.from("      null      ").toString("base64url");
+  const token = [nullHeader, seg({}), "sigsigsig"].join(".");
+  assert.doesNotThrow(() => looksLikePqJwt(token));
+  assert.equal(looksLikePqJwt(token), false);
+  assert.doesNotThrow(() => findPqJwtTokens("var x = " + token));
+  assert.equal(findPqJwtTokens("var x = " + token).length, 0);
+  assert.doesNotThrow(() => decodeToken(token));
+});
+
+test("bug 3: a 3-part token followed by .word.word is still detected", () => {
+  const token = signedToken();
+  const found = findPqJwtTokens(token + ".word1.word2");
+  assert.equal(found.length, 1);
+  assert.equal(found[0].value, token); // trailing junk is not included
+});
+
+test("bug 4: surrounding quotes are stripped before decoding", () => {
+  const out = decodeToken('"' + signedToken() + '"');
+  assert.match(out, /Form: SIGNED/);
+  assert.match(out, /kid = k1/);
+  assert.doesNotMatch(out, /not valid base64url/);
+});
