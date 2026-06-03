@@ -99,7 +99,7 @@ jobs:
           global-json-file: global.json
 
       - name: Set up miniconda + OpenSSL 3.5
-        uses: conda-incubator/setup-miniconda@v3
+        uses: conda-incubator/setup-miniconda@v4
         with:
           auto-update-conda: false
           activate-environment: pq
