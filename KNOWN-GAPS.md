@@ -80,8 +80,13 @@ Last reviewed for: `1.0.0-preview.4`.
   between previews, until the stable `1.0.0`.
 - **No streaming / large-payload API.** Everything operates on in-memory
   `string` / `byte[]`.
-- **No DI / `IServiceCollection` integration, no ASP.NET Core authentication
-  handler.** You wire the builder/validator in yourself.
+- **The core `PostQuantum.Jwt` package has no DI / `IServiceCollection`
+  integration** — you construct the builder/validator yourself. ASP.NET Core
+  authentication *is* available via the companion package: `AddPqJwtBearer(...)`
+  + the fail-closed `PqJwtBearerHandler` + `HttpPqJwtKeyRing` (a JWKS-equivalent
+  for `kid`-based rotation) ship in `PostQuantum.Jwt.AspNetCore`, now superseded
+  by [`PostQuantum.AspNetCore`](https://github.com/systemslibrarian/postquantum-aspnetcore).
+  Adding DI to the core package itself remains a deliberate non-goal.
 
 ## Tooling & environment
 
@@ -102,6 +107,11 @@ Last reviewed for: `1.0.0-preview.4`.
   nuget.org's repository signature alone. Every release also emits GitHub
   build-provenance attestations for the `.nupkg` and the SBOM — verify
   with `gh attestation verify <file> --repo systemslibrarian/postquantum-jwt`.
+  *To close this:* obtain a code-signing certificate (e.g. a DigiCert/Sectigo
+  OV or EV code-signing cert), base64-encode the `.pfx`, and add it as
+  `NUGET_SIGNING_CERT` (+ `NUGET_SIGNING_CERT_PASSWORD`) on the `nuget-publish`
+  environment — the release workflow then author-signs automatically. No code
+  change is required.
 - **CycloneDX SBOM is packed inside the `.nupkg`** (in addition to being
   uploaded as a release artifact and getting its own build-provenance
   attestation). Consumers can inspect `bom.json` directly from the
