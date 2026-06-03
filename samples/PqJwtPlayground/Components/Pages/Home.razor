@@ -2,15 +2,17 @@
 @rendermode InteractiveServer
 @inject PqJwtDemoService Demo
 @inject IJSRuntime JS
+@inject NavigationManager Nav
 
 <PageTitle>Post-Quantum JWT Playground</PageTitle>
 
 <h1 class="screenreader">Post-Quantum JWT Playground</h1>
 
 <div class="warnbar" role="note">
-    These tokens use <code>ML-DSA-65</code> / <code>X-Wing</code> / <code>A256GCM</code> &mdash;
-    <strong>not</strong> IANA-registered. They will not validate in generic JWT tooling.
-    This is preview, unaudited software.
+    These tokens combine <code>ML-DSA-65</code> / <code>X-Wing</code> / <code>A256GCM</code> into a profile
+    that is <strong>not a standardized JOSE/JWE profile</strong> &mdash; ML-DSA-65 and A256GCM are
+    registered identifiers, but the X-Wing key-management piece is not. They will not validate in
+    generic JWT tooling. Preview, unaudited software.
 </div>
 
 <p class="hint" style="margin:0 0 1rem">
@@ -72,7 +74,14 @@
                 Press <kbd>Enter</kbd> on the last row to add another.</p>
         </fieldset>
 
-        <button class="primary" @onclick="DoBuild">Create token</button>
+        <div class="buildbtns">
+            <button class="primary" @onclick="DoBuild">Create token</button>
+            <button class="ghost" @onclick='() => Copy("share", ShareLink())'>
+                @(_copied == "share" ? "Link copied ✓" : "Copy share link")
+            </button>
+        </div>
+        <p class="hint small">Share link restores these claims &amp; options &mdash; <strong>never keys</strong>.
+            Whoever opens it gets a fresh server-side key set of their own.</p>
 
         @if (_buildError is not null)
         {
@@ -288,6 +297,67 @@
         </div>
     </section>
 
+    <!-- 06 COMPARISON -->
+    <section class="card span2" aria-labelledby="cmp-h">
+        <h2 id="cmp-h"><span class="num">06</span> Classic vs hybrid vs pure PQC</h2>
+        <p class="hint">
+            Honest properties, not benchmarks. One clarification first: on <strong>signatures</strong>,
+            this library is already <em>pure</em> post-quantum &mdash; <code>ML-DSA-65</code>, with no classical
+            co-signature. The <em>hybrid</em> is only in the optional <strong>encryption</strong>
+            (<code>X-Wing</code> = X25519 + ML-KEM-768). So the &ldquo;pure PQC&rdquo; column below differs from
+            this library only by dropping that classical encryption hedge.
+        </p>
+
+        <div class="cmp-scroll">
+            <table class="cmp">
+                <thead>
+                    <tr>
+                        <th>Property</th>
+                        <th>Classic JWT<br /><span class="sub">RS256 / ES256 / EdDSA</span></th>
+                        <th class="me">This library<br /><span class="sub">ML-DSA-65 + X-Wing</span></th>
+                        <th>Pure PQC<br /><span class="sub">PQ sig + ML-KEM only</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <th scope="row">Signature vs a quantum computer</th>
+                        <td class="no">Broken by Shor's algorithm on a future CRQC</td>
+                        <td class="me yes">ML-DSA-65 (NIST FIPS&nbsp;204) &mdash; lattice-based, not Shor-breakable</td>
+                        <td class="yes">Also a PQ signature (e.g. ML-DSA)</td>
+                    </tr>
+                    <tr>
+                        <th scope="row">Encrypted-payload confidentiality<br /><span class="sub">vs harvest-now-decrypt-later</span></th>
+                        <td class="no">Classical KEM (RSA / ECDH) &mdash; harvestable now, decryptable once a CRQC exists</td>
+                        <td class="me yes">Hybrid X-Wing: an attacker must break <em>both</em> X25519 and ML-KEM-768</td>
+                        <td class="warn">PQ-only KEM: no classical fallback if the PQ scheme is later weakened</td>
+                    </tr>
+                    <tr>
+                        <th scope="row">Token size</th>
+                        <td class="yes">Small (~0.2&ndash;0.5&nbsp;KB)</td>
+                        <td class="me warn">Large (~3&ndash;6&nbsp;KB) &mdash; PQ signatures &amp; KEM material are big</td>
+                        <td class="warn">Large &mdash; same PQ size pressure</td>
+                    </tr>
+                    <tr>
+                        <th scope="row">Interop &amp; standards</th>
+                        <td class="yes">Broad; IANA-registered, validates in any JWT stack</td>
+                        <td class="me warn">ML-DSA-65 &amp; A256GCM registered; the X-Wing JOSE profile is <em>not</em> &rarr; won't interop</td>
+                        <td class="warn">ML-DSA-for-JOSE registered; KEM-in-JWE profiles still emerging</td>
+                    </tr>
+                    <tr>
+                        <th scope="row">Maturity</th>
+                        <td class="yes">Decades of deployment &amp; review</td>
+                        <td class="me no">Preview, unaudited; controlled issuer/verifier systems only</td>
+                        <td class="warn">Young PQ-JOSE ecosystem across the board</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <p class="hint small">
+            CRQC = cryptographically-relevant quantum computer. Sizes are representative, not measured here
+            (the live token's exact size is shown when you build one above).
+        </p>
+    </section>
+
 </div>
 
 @code {
@@ -316,7 +386,54 @@
     private string _verPub = "";
     private string _recPub = "";
 
-    protected override void OnInitialized() => RefreshKeys();
+    protected override void OnInitialized()
+    {
+        RefreshKeys();
+        ApplyShareFromUrl();
+    }
+
+    // Build a shareable URL from the CURRENT form state. Claims + options only —
+    // no keys ever travel in the link.
+    private string ShareLink()
+    {
+        var claims = _claimRows
+            .Where(r => !string.IsNullOrWhiteSpace(r.Name))
+            .Select(r => new ShareClaim(r.Name.Trim(), r.Value))
+            .ToList();
+        var state = new ShareState(_sub, _iss, _aud, _minutes, _encrypt, _jti, claims);
+        return $"{Nav.BaseUri.TrimEnd('/')}/?c={PqJwtDemoService.EncodeShare(state)}";
+    }
+
+    // If the page was opened from a share link (?c=...), restore the form.
+    private void ApplyShareFromUrl()
+    {
+        var state = PqJwtDemoService.DecodeShare(GetQueryParam(Nav.Uri, "c"));
+        if (state is null) return;
+
+        _sub = state.Sub ?? "";
+        _iss = state.Iss ?? "";
+        _aud = state.Aud ?? "";
+        _minutes = Math.Clamp(state.Minutes, 1, 1440);
+        _encrypt = state.Encrypt;
+        _jti = state.Jti;
+
+        _claimRows.Clear();
+        foreach (var c in state.Claims ?? new())
+            _claimRows.Add(new Row { Name = c.Name, Value = c.Value });
+    }
+
+    private static string? GetQueryParam(string url, string key)
+    {
+        int q = url.IndexOf('?', StringComparison.Ordinal);
+        if (q < 0) return null;
+        foreach (var part in url[(q + 1)..].Split('&'))
+        {
+            int eq = part.IndexOf('=', StringComparison.Ordinal);
+            var k = eq < 0 ? part : part[..eq];
+            if (k == key) return eq < 0 ? "" : Uri.UnescapeDataString(part[(eq + 1)..]);
+        }
+        return null;
+    }
 
     private void RefreshKeys()
     {
