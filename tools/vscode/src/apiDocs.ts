@@ -37,7 +37,11 @@ export const API_DOCS: Record<string, ApiDocEntry> = {
   },
   HttpPqJwtKeyRing: {
     anchor: "#aspnet-core-integration",
-    blurb: "JWKS-equivalent: fetch verification keys from a trusted HTTPS endpoint.",
+    blurb: "JWKS-equivalent: fetch verification keys from a trusted HTTPS endpoint (legacy PostQuantum.Jwt.AspNetCore).",
+  },
+  HttpPostQuantumJwtKeyRing: {
+    anchor: "#aspnet-core-integration",
+    blurb: "JWKS-equivalent: fetch verification keys from a trusted HTTPS endpoint (PostQuantum.AspNetCore).",
   },
 };
 

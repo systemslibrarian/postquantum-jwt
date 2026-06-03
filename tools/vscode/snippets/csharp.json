@@ -119,7 +119,7 @@
       "var builder = WebApplication.CreateBuilder(args);",
       "",
       "builder.Services",
-      "    .AddAuthentication(PqJwtBearerDefaults.AuthenticationScheme)",
+      "    .AddAuthentication(PostQuantumJwtBearerDefaults.AuthenticationScheme)",
       "    .AddPostQuantumJwtBearer(options =>",
       "    {",
       "        var keyBytes = Convert.FromBase64String(",
@@ -152,13 +152,15 @@
   },
   "PostQuantum.Jwt: HTTP key ring (JWKS-equivalent)": {
     "prefix": "pqjwt-keyring",
-    "description": "Resolve verification keys from a trusted HTTPS endpoint (HttpPqJwtKeyRing).",
+    "description": "Resolve verification keys from a trusted HTTPS endpoint (HttpPostQuantumJwtKeyRing).",
     "body": [
-      "builder.Services.AddHttpClient<HttpPqJwtKeyRing>();",
+      "using PostQuantum.AspNetCore;",
+      "",
+      "builder.Services.AddHttpClient<HttpPostQuantumJwtKeyRing>();",
       "builder.Services.AddSingleton(sp =>",
       "{",
-      "    var http = sp.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(HttpPqJwtKeyRing));",
-      "    return new HttpPqJwtKeyRing(http, new Uri(builder.Configuration[\"Auth:KeysEndpoint\"]!));",
+      "    var http = sp.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(HttpPostQuantumJwtKeyRing));",
+      "    return new HttpPostQuantumJwtKeyRing(http, new Uri(builder.Configuration[\"Auth:KeysEndpoint\"]!));",
       "});",
       "$0"
     ]
