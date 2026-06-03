@@ -9,11 +9,12 @@ namespace PostQuantum.Jwt.AspNetCore;
 /// configuration system, or an HTTP fetch from a trusted endpoint.
 /// </summary>
 /// <remarks>
-/// This is the post-quantum analogue of a JWKS endpoint. The standard JWKS
-/// format isn't applicable here (no IANA-registered representation for an
-/// ML-DSA-65 key yet), so the over-the-wire format is intentionally trivial:
-/// a JSON object whose keys are <c>kid</c> strings and whose values are
-/// base64 of the raw ML-DSA-65 public key bytes.
+/// This is the post-quantum analogue of a JWKS endpoint. This library does not
+/// implement the JWK/JWKS representation for ML-DSA keys, so the over-the-wire
+/// format is intentionally trivial: a JSON object whose keys are <c>kid</c>
+/// strings and whose values are base64 of the raw ML-DSA-65 public key bytes.
+/// Like the rest of the suite, this key-distribution format is for controlled
+/// issuer/verifier systems, not generic JWKS interoperability.
 /// </remarks>
 public interface IPqJwtKeyRing
 {

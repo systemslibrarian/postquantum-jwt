@@ -50,8 +50,8 @@ decrypt-later, replay — alongside an honest note on what it does **not** give 
 ## Good to know
 
 - Keys are per-session and in memory; **regenerating, or a server restart, invalidates old tokens** by design.
-- These tokens use non-IANA identifiers (`ML-DSA-65` / `X-Wing` / `A256GCM`) and **will not validate in generic JWT tooling** — that's deliberate; the library is for when you control both issuer and verifier.
-- Preview, unaudited software — not for production.
+- `ML-DSA-65` and `A256GCM` are registered JOSE identifiers, but the `X-Wing` key-management profile that ties them together here is **not** a standardized JOSE/JWE profile, so these tokens **will not validate or decrypt in generic JWT tooling** — that's deliberate; the library is for when you control both issuer and verifier.
+- Production-oriented preview, unaudited — for controlled issuer/verifier systems, not a drop-in OAuth/OIDC/JWT replacement.
 
 ## Use it in your own code
 

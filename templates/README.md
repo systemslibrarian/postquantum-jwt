@@ -4,8 +4,9 @@
 scaffold a runnable starting point that signs with ML-DSA-65 and validates
 fail-closed.
 
-> **Preview release — not for production use.** See the library's
-> [`KNOWN-GAPS.md`](https://github.com/systemslibrarian/postquantum-jwt/blob/main/KNOWN-GAPS.md).
+> **Production-oriented preview for controlled issuer/verifier systems —
+> not independently audited, not a drop-in OAuth/OIDC/JWT replacement.** See the
+> library's [`KNOWN-GAPS.md`](https://github.com/systemslibrarian/postquantum-jwt/blob/main/KNOWN-GAPS.md).
 
 ## Install
 

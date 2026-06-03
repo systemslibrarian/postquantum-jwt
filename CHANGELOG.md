@@ -8,6 +8,52 @@ the API between previews.
 
 ## [Unreleased]
 
+## [1.0.0-preview.4] — 2026-06-03
+
+Documentation, positioning, and supply-chain hardening only — **no library code
+or wire-format change** (the library binary is identical to `1.0.0-preview.3`).
+
+### Changed
+
+- **Clarified standards/interoperability language** across the README, package
+  metadata, `SECURITY.md`, `KNOWN-GAPS.md`, code XML docs, and samples: `ML-DSA-65`
+  (RFC 9964) and `A256GCM` (RFC 7518) are **registered JOSE identifiers**, but the
+  `X-Wing` key-management profile that ties them together is **not** a standardized
+  JOSE/JWE profile. Replaces the earlier, now-inaccurate "none of these are
+  IANA-registered" wording.
+- **Made hybrid language precise** everywhere: *hybrid confidentiality,
+  post-quantum (ML-DSA-65) signatures*. Signatures are ML-DSA-65 only — not a
+  hybrid classical + post-quantum signature.
+- **Repositioned** as a *production-oriented preview for controlled
+  issuer/verifier systems; not independently audited and not a drop-in
+  OAuth/OIDC/JWT replacement* — including the package `Description`, `Title`, and
+  release notes.
+- **Corrected a doc/code mismatch** in `SECURITY.md`: replay protection is a
+  supported (opt-in) feature via `IPqJwtReplayCache` + `RequireReplayProtection`,
+  not an out-of-scope non-goal as the threat model previously stated.
+- **Unified companion-package positioning.** The `PostQuantum.Jwt.AspNetCore` and
+  `PostQuantum.Jwt.Analyzers` package descriptions now use the same
+  "production-oriented preview companion … not independently audited, not a
+  drop-in OAuth/OIDC replacement" framing as the core package.
+- **Corrected stale test counts** in `README.md` and `SECURITY.md` (the library
+  suite is now 119 tests).
+
+### Added
+
+- **`docs/SPEC.md`** — a normative description of the PostQuantum.Jwt v1 token
+  profile (structure, required headers, claims, fail-closed validation order,
+  rejection rules, replay/key-rotation/size/clock-skew rules).
+- **README "Standards and interoperability status"** section and table
+  (including an explicit "independent audit — not yet" row), plus
+  intended-vs-non-use-case guidance and a "what this is / is not" summary.
+- **Production-readiness checklist** folded into `samples/HARDENING-CHECKLIST.md`,
+  and an expanded threat model (threats considered / not solved / required
+  production controls) in `SECURITY.md`.
+- **`KNOWN-GAPS.md`** consolidated limitations summary and a "language we
+  intentionally avoid" section.
+- **`CONTRIBUTING.md`**, **`.github/dependabot.yml`** (NuGet + Actions), and a
+  **CodeQL** workflow (`.github/workflows/codeql.yml`).
+
 ## [1.0.0-preview.3] — 2026-06-02
 
 Docs and packaging only — the library binary is **unchanged** from `1.0.0-preview.2`.

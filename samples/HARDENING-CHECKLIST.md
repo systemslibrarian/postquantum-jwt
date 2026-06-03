@@ -70,13 +70,42 @@ server-side. Carry only `sub` in the token and look up roles/permissions
 server-side (`SECURE-USAGE.md`); a `role: admin` claim is only ever as trustworthy
 as your decision to put it there.
 
+## Production-readiness checklist
+
+Before using PostQuantum.Jwt in a controlled production system, confirm each:
+
+- [ ] You control both the issuer and every verifier.
+- [ ] You are **not** using this as public OAuth/OIDC middleware.
+- [ ] You have read [`SECURITY.md`](../SECURITY.md) and [`KNOWN-GAPS.md`](../KNOWN-GAPS.md).
+- [ ] You accept that the construction has **not** received an independent cryptographic audit.
+- [ ] Issuer (`ValidIssuer`) and audience (`ValidAudience`) validation are enabled.
+- [ ] Expiration is required (`RequireExpiration`); token lifetimes are short.
+- [ ] Not-before / clock-skew behavior is understood and acceptable.
+- [ ] Only the configured algorithm suite is accepted; unknown/`none` `alg` fails closed (this is by design).
+- [ ] Replay protection is configured (`RequireReplayProtection = true` + a `ReplayCache`) where one-time use matters.
+- [ ] The replay cache is **distributed** if more than one node validates tokens (the in-memory cache is dev-only).
+- [ ] Signing keys are rotated on a schedule; old verification keys are retained only for the longest accepted token lifetime.
+- [ ] Private keys are encrypted at rest and never committed to source control.
+- [ ] `kid` resolution uses a fixed key ring/map (never a file path or query built from `kid`).
+- [ ] Logs never contain raw tokens, private keys, shared secrets, or decrypted sensitive claims.
+- [ ] TLS is enforced everywhere; tokens are never sent over `http://` or in query strings.
+- [ ] CI passes, including the negative/fail-closed tests; dependency scanning is enabled.
+- [ ] A vulnerability-disclosure process exists (see [`SECURITY.md`](../SECURITY.md)).
+
+After completing this checklist, the honest claim you can make is:
+**"Production-oriented preview for controlled systems. Not independently
+audited."** Avoid "production-grade crypto", "audited", "battle-tested", or
+"drop-in OIDC replacement".
+
 ## The honest caveat
 
-This library is **preview, unaudited**, and uses **non-IANA-registered**
-identifiers — so its tokens are deliberately **non-interoperable** with standard
-JWT stacks. It's the right tool only when you control both issuer and verifier.
-That non-interoperability is itself a hardening property against tooling that
-expects standard JWTs, but it is a deliberate trade-off, not a free lunch.
+This library is a **production-oriented preview** — **unaudited** — and ties its
+registered JOSE identifiers (`ML-DSA-65`, `A256GCM`) together with an `X-Wing`
+key-management profile that is **not** a standardized JOSE/JWE profile. Its
+tokens are therefore deliberately **non-interoperable** with standard JWT/JWE
+stacks. It's the right tool only when you control both issuer and verifier. That
+non-interoperability is itself a hardening property against tooling that expects
+standard JWTs, but it is a deliberate trade-off, not a free lunch.
 
 ---
 

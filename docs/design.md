@@ -6,8 +6,8 @@ security statements live in [`../SECURITY.md`](../SECURITY.md); gaps in
 
 ## Goals
 
-- Hybrid post-quantum JWTs: ML-DSA-65 signatures, optional X-Wing + AES-256-GCM
-  confidentiality.
+- JOSE-style post-quantum tokens: ML-DSA-65 signatures (post-quantum, not hybrid)
+  with optional hybrid X-Wing + AES-256-GCM confidentiality.
 - Native BCL primitives wherever they exist; one vetted dependency (BouncyCastle)
   for the single gap (X25519 + SHA3-256).
 - Fail-closed validation, small surface, honest docs.

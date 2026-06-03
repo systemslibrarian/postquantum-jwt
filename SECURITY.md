@@ -1,17 +1,22 @@
 # Security Policy
 
-PostQuantum.Jwt is **preview software** (`1.0.0-preview.N`). It is not yet
-suitable for production use and has not been independently audited. The leading
-`1.0` denotes the maturity of the design, not a stable release — the `preview.N`
-suffix means the API may still change before the stable `1.0.0`. This document
-states the security model honestly so you can make an informed decision before
-relying on it.
+PostQuantum.Jwt is a **production-oriented preview** (`1.0.0-preview.N`) for
+**controlled issuer/verifier systems** — environments where the same team owns
+both token issuing and token validation. "Production-oriented" describes the
+hardened defaults (strict validation, fail-closed behavior, replay and
+key-rotation support), **not** an audit sign-off: the construction has **not**
+been independently audited, and this is **not** a drop-in replacement for
+OAuth/OIDC/JWT middleware. The leading `1.0` denotes the maturity of the design,
+not a stable release — the `preview.N` suffix means the API may still change
+before the stable `1.0.0`. This document states the security model honestly so
+you can make an informed decision before relying on it.
 
 ## Supported versions
 
 | Version             | Supported           |
 |---------------------|---------------------|
-| `1.0.0-preview.3`+  | ✅ (latest preview)  |
+| `1.0.0-preview.4`+  | ✅ (latest preview)  |
+| `1.0.0-preview.3`   | ❌ (superseded)      |
 | `0.3.0-preview.*`   | ❌ (superseded)      |
 | `0.2.0-preview.*`   | ❌ (superseded)      |
 | `0.1.0-preview.*`   | ❌ (superseded)      |
@@ -48,14 +53,69 @@ project, timelines are best-effort and stated honestly rather than promised.
 **Non-goals / out of scope**
 
 - **Key management & storage.** Generating, protecting, rotating, and
-  distributing keys is the caller's responsibility.
-- **Replay protection.** `jti` is carried but not tracked; replay defense is the
-  application's job.
+  distributing keys is the caller's responsibility. The library supports
+  `kid`-based key selection for rotation (`SignatureKeyResolver`) but does not
+  store keys or fetch them remotely.
+- **Replay protection enforcement.** The library *supports* replay defense via
+  `IPqJwtReplayCache` (with a bundled single-process `InMemoryReplayCache`) and
+  will fail closed at validator construction when
+  `RequireReplayProtection = true`. But with no cache configured, `jti` is
+  carried and not enforced — providing and operating a suitable (distributed)
+  cache is the application's job.
 - **Side-channel resistance beyond the underlying primitives.** We rely on the
   constant-time properties of the .NET BCL and BouncyCastle; we add no
   guarantees of our own.
-- **Standards interoperability.** Tokens use non-IANA algorithm identifiers and
-  are not meant to validate in generic JWT libraries.
+- **Standards interoperability.** `ML-DSA-65` (RFC 9964) and `A256GCM`
+  (RFC 7518) are registered JOSE identifiers, but the `X-Wing` key-management
+  profile that combines them here is **not** a standardized JOSE/JWE profile.
+  Tokens are not meant to validate or decrypt in generic JWT/JWE libraries.
+- **OAuth / OIDC.** This is not a replacement for OAuth/OpenID Connect or for
+  ASP.NET Core's JWT bearer middleware.
+- **Application authorization.** Authenticating a token is not authorizing a
+  request; enforcing scopes/roles/policies is the application's job.
+
+**Threats considered** (the validator is built to reject these — see the
+fail-closed test suite below)
+
+- Token tampering (header, payload, or signature bytes modified).
+- Signature forgery without the signing private key.
+- Algorithm confusion, `alg: none`, missing `alg`, and unknown/unexpected `alg`.
+- Expired tokens, not-yet-valid (`nbf`) tokens beyond the allowed skew, and
+  missing `exp`.
+- Wrong issuer / wrong audience.
+- Replay of a previously seen `jti` (when a replay cache is configured).
+- Modified ciphertext, authentication tag, AAD, or protected header on encrypted
+  tokens; decryption with the wrong recipient key.
+- Malformed, truncated, or wrong-segment-count token input.
+
+**Threats not solved by the library alone** (your deployment must address these)
+
+- Compromise of the signing private key, or of the issuing/validating server.
+- Weak application-level authorization logic.
+- A missing or misconfigured replay cache (e.g. a single-process cache used
+  across multiple nodes).
+- Absence of TLS, poor secret storage, insider threats, or supply-chain
+  compromise.
+- Client-side risks (XSS/CSRF, insecure token storage in the browser).
+
+**Required production controls** (for a controlled issuer/verifier deployment)
+
+- TLS everywhere; never transmit tokens over plaintext channels.
+- Strong key storage (OS key store, cloud KMS, or vault), private keys encrypted
+  at rest and never committed to source control.
+- Scheduled key rotation, with old verification keys retained only for the
+  longest accepted token lifetime; rotate immediately on suspected compromise.
+- Issuer and audience validation enabled; short token lifetimes.
+- A distributed `IPqJwtReplayCache` whenever more than one node validates tokens,
+  with `RequireReplayProtection = true` so a missing cache fails at startup.
+- Logs that never contain raw tokens, private keys, shared secrets, or decrypted
+  sensitive claims.
+- Dependency scanning and a vulnerability-disclosure process (below).
+
+See [`samples/HARDENING-CHECKLIST.md`](samples/HARDENING-CHECKLIST.md) for a
+copy-pasteable production-readiness checklist and
+[`samples/SECURE-USAGE.md`](samples/SECURE-USAGE.md) for the architecture around
+the token.
 
 ## Cryptographic construction
 
@@ -112,10 +172,14 @@ This is preview cryptographic software written in the open. It has **not** been
 audited. The X-Wing key-generation and decapsulation/combiner paths **are**
 validated against the official known-answer vectors; the encapsulation path is
 not (the native ML-KEM API is randomized — see [`KNOWN-GAPS.md`](KNOWN-GAPS.md)).
-Known limitations are tracked transparently there. Until a 1.0 release and an
-external review, treat this library as suitable for experimentation only.
+Known limitations are tracked transparently there. Until a stable `1.0.0` and an
+external review, treat the lack of an independent audit as the gating concern:
+this library is appropriate for controlled issuer/verifier systems whose owners
+accept that risk with eyes open — not for high-risk deployments, public-facing
+auth, or anywhere generic JWT/JWE interoperability is required.
 
-The fail-closed contract is locked in by **68 tests** (`dotnet test`), including
+The fail-closed contract is locked in by the library test suite (**119 tests**,
+`dotnet test`), including
 explicit checks for `alg: none` substitution, missing `alg`, header JSON
 corruption, payload that is not a JSON object, wrong content-encryption
 (`A128GCM` instead of `A256GCM`), tampered ciphertext, decryption with a

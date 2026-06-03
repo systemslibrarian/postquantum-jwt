@@ -38,7 +38,7 @@ dotnet run    # reads ISSUER_KEYS_URL, defaults to http://localhost:5080/.well-k
   `HttpPqJwtKeyRing` **rejects a non-loopback `http://` endpoint** (the key
   directory is the trust root). In production point `ISSUER_KEYS_URL` at an
   `https://` URL.
-- Preview software, not audited; non-IANA identifiers; non-interoperable tokens.
+- Production-oriented preview, not audited; non-standardized X-Wing key-management profile; tokens not interoperable with generic JWT/JWE tooling.
 
 ---
 

@@ -4,10 +4,18 @@ namespace PostQuantum.Jwt;
 /// Canonical algorithm identifiers used by PostQuantum.Jwt.
 /// </summary>
 /// <remarks>
-/// These identifiers are <b>not</b> registered in the IANA JOSE registry. They
-/// describe a post-quantum hybrid scheme that the standard registry does not yet
-/// cover, so tokens produced by this library are intentionally non-interoperable
-/// with generic JWT tooling. See <c>SECURITY.md</c> for the full posture.
+/// <para>
+/// <c>ML-DSA-65</c> (RFC 9964) and <c>A256GCM</c> (RFC 7518) are registered JOSE
+/// identifiers, but the <c>X-Wing</c> key-management profile that ties them
+/// together here is <b>not</b> a standardized JOSE/JWE profile. Tokens produced
+/// by this library are therefore intentionally non-interoperable with generic
+/// JWT tooling and are intended for controlled issuer/verifier systems.
+/// </para>
+/// <para>
+/// Signing is ML-DSA-65 only (post-quantum, not a hybrid classical + PQ
+/// signature); the hybrid construction applies to the optional confidentiality
+/// path. See <c>SECURITY.md</c> for the full posture.
+/// </para>
 /// </remarks>
 public static class PqJwtAlgorithms
 {

@@ -27,10 +27,13 @@ the library itself — different audience.)
    circumstances — an `alg: none` path. The validator does not trust the token's
    own `alg` to choose a code path; do not write code that does.
 
-3. **The identifiers are NOT IANA-registered.** These tokens will not validate
-   in `System.IdentityModel.Tokens.Jwt`, `jose-jwt`, `python-jose`, Auth0/Okta,
-   or any generic JWT tooling. Do not suggest interop with those stacks. This
-   library is only correct when the same party controls both issuer and verifier.
+3. **The token profile is NOT a standardized JOSE/JWE profile.** `ML-DSA-65` and
+   `A256GCM` are registered JOSE identifiers, but the `X-Wing` key-management
+   profile that combines them here is not standardized. These tokens will not
+   validate or decrypt in `System.IdentityModel.Tokens.Jwt`, `jose-jwt`,
+   `python-jose`, Auth0/Okta, or any generic JWT tooling. Do not suggest interop
+   with those stacks. This library is only correct when the same party controls
+   both issuer and verifier.
 
 4. **`exp` is required.** A token without an expiry is rejected. Always set a
    lifetime (`WithLifetime(...)` or `WithExpiration(...)`).

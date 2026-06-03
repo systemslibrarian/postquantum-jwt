@@ -175,8 +175,9 @@ issuer/verifier you control.
 
 ## 10. Distribute and rotate the verification keys
 
-Because these tokens use non-IANA identifiers and aren't meant to interoperate
-with generic JWT tooling, you own both ends — so you also own how a verifier
+Because these tokens use a non-standardized X-Wing key-management profile and
+aren't meant to interoperate with generic JWT tooling, you own both ends — so
+you also own how a verifier
 learns the issuer's **public** ML-DSA-65 keys. The pattern this library is built
 around:
 
