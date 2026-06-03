@@ -1,0 +1,47 @@
+# CI for the VS Code companion extension (tools/vscode).
+# The existing vscode-release.yml only runs on `vscode-v*` tags; this lane runs
+# on every push/PR that touches the extension so breakage is caught before a
+# release, not during one.
+name: vscode-extension-ci
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "tools/vscode/**"
+      - ".github/workflows/vscode-ci.yml"
+  pull_request:
+    paths:
+      - "tools/vscode/**"
+      - ".github/workflows/vscode-ci.yml"
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: tools/vscode
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: tools/vscode/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test (compiles, then runs node:test)
+        run: npm test
+
+      - name: Package VSIX (smoke-checks manifest + compiled output)
+        run: npx --yes @vscode/vsce package --no-dependencies -o /tmp/pqjwt-extension-ci.vsix
