@@ -77,6 +77,29 @@ export const tests: IntegrationTest[] = [
     },
   },
   {
+    name: "does NOT add an API docs CodeLens on a comment-only line (chatbug 5)",
+    fn: async () => {
+      const doc = await vscode.workspace.openTextDocument({
+        language: "csharp",
+        content: "// PqJwtValidator is the validator\nPqJwtValidator validator;",
+      });
+      await vscode.window.showTextDocument(doc);
+      const lenses =
+        (await vscode.commands.executeCommand<vscode.CodeLens[]>(
+          "vscode.executeCodeLensProvider",
+          doc.uri
+        )) ?? [];
+      // Identify the API-docs lens by its title (its command id resolves to an
+      // internal handler), not by "vscode.open".
+      const summary = lenses.map((l) => `${l.range.start.line}:${l.command?.title}`).join(", ");
+      const docLensLines = lenses
+        .filter((l) => l.command?.title?.includes("docs"))
+        .map((l) => l.range.start.line);
+      assert.ok(!docLensLines.includes(0), `no docs CodeLens on the comment line — got [${summary}]`);
+      assert.ok(docLensLines.includes(1), `docs CodeLens on the real code line — got [${summary}]`);
+    },
+  },
+  {
     name: "does NOT hover inherited Object members (bug 1 regression)",
     fn: async () => {
       const doc = await vscode.workspace.openTextDocument({

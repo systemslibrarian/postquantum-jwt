@@ -139,6 +139,9 @@ export function decodeToken(token: string): string {
     // when highlighting a string literal — strip them so the token still reads.
     .replace(/^['"`]+/, "")
     .replace(/['"`,;]+$/, "")
+    // …or grab a whole "Authorization: Bearer <token>" line from an .http file.
+    .replace(/^authorization\s*:\s*/i, "")
+    .replace(/^bearer\s+/i, "")
     .replace(/\s+/g, "");
   const parts = trimmed.split(".");
   const lines: string[] = [];
