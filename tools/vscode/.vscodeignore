@@ -1,10 +1,13 @@
 .vscode/**
+.vscode-test/**
 src/**
 node_modules/**
 tsconfig.json
 eslint.config.mjs
+MONOREPO-SETUP.md
 .gitignore
 *.vsix
 **/*.map
 out/**/*.test.js
 out/**/*.test.d.ts
+out/test/**

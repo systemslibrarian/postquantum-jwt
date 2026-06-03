@@ -1,5 +1,9 @@
 # PostQuantum.Jwt for VS Code
 
+[![Marketplace Version](https://img.shields.io/visual-studio-marketplace/v/systemslibrarian.postquantum-jwt?label=marketplace&color=blue)](https://marketplace.visualstudio.com/items?itemName=systemslibrarian.postquantum-jwt)
+[![Installs](https://img.shields.io/visual-studio-marketplace/i/systemslibrarian.postquantum-jwt?color=blue)](https://marketplace.visualstudio.com/items?itemName=systemslibrarian.postquantum-jwt)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](https://github.com/systemslibrarian/postquantum-jwt/blob/main/LICENSE)
+
 Companion extension for the [**PostQuantum.Jwt**](https://www.nuget.org/packages/PostQuantum.Jwt) .NET library — ML-DSA-65 signatures with optional X-Wing hybrid confidentiality (X25519 + ML-KEM-768 + AES-256-GCM), for controlled .NET issuer/verifier systems.
 
 This extension does **no cryptography**. It helps you *write* and *understand* PostQuantum.Jwt code, and points you at the live playground for anything that actually signs or validates.
@@ -48,6 +52,10 @@ Hover `PqJwtBuilder`, `PqJwtValidator`, `XWingPrivateKey`, and friends in a `.cs
 The library is .NET 10 only and needs OpenSSL 3.5+ for the native PQ primitives. To build and break a real token in your browser with no install, use the **[live playground](https://pqjwt.systemslibrarian.dev)**.
 
 > PostQuantum.Jwt is a production-oriented preview for controlled systems — **not** independently audited, and **not** a drop-in OAuth/OIDC/JWT replacement. Its tokens intentionally do not interoperate with generic JWT tooling.
+
+## Privacy
+
+This extension sends **no telemetry** and makes **no network calls**. Snippets, token decoding, and the hover/CodeLens helpers all run **locally** — token contents never leave your machine. The only outbound action is opening a link in your browser when *you* explicitly click one (playground, docs, NuGet, GitHub).
 
 ## License
 
