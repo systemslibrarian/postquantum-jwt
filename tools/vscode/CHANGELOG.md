@@ -4,6 +4,22 @@ All notable changes to the **PostQuantum.Jwt for VS Code** extension. This
 extension does no cryptography; it helps you write and understand
 PostQuantum.Jwt code. It sends no telemetry and makes no network calls.
 
+## 0.2.0
+
+- **Added:** a visual **PQ-JWT Inspector** panel. The inline **🔍 Inspect PQ-JWT**
+  CodeLens (and the new **Inspect Token (Visual)** command) now opens a webview
+  that lays out the token as labelled layers — header / payload / signature for
+  the signed form, or header / encrypted-key / IV / ciphertext / tag for the
+  encrypted form — with colour-coded header-field chips (`✓` ML-DSA-65, `✗`
+  `alg:none`, etc.). It is also a *teacher*: expandable sections explain
+  ML-DSA-65, the X-Wing hybrid KEM, sign-then-encrypt, the cheap-checks-first
+  validation path, and fail-closed behaviour — auto-expanded for the token in
+  front of you, so you don't need the browser playground to understand it.
+  Still **no cryptography**: it renders the same structure-and-header inspection
+  as the text decoder (shared, unit-tested logic), never decrypting anything.
+- **Kept:** the text **Decode Token** command (now labelled *Text*) as a
+  lightweight fallback.
+
 ## 0.1.7
 
 - **Fixed:** the `pqjwt-aspnetcore` and `pqjwt-keyring` snippets now use the

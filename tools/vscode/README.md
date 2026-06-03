@@ -35,11 +35,15 @@ Type a prefix and tab through a fully-formed example:
 | `pqjwt-keyring` | `HttpPostQuantumJwtKeyRing` (JWKS-equivalent) |
 | `pqjwt-install` | `<PackageReference>` for the library |
 
-### Decode Token
-Select a token (or run the command and paste one) → **PostQuantum.Jwt: Decode Token**. It splits the compact serialization, shows whether it's the 3-part **signed** or 5-part **encrypted** form, decodes the protected header, and flags the expected `ML-DSA-65` / `X-Wing` / `A256GCM` identifiers. Structure and headers only — encrypted claims stay encrypted.
+### Visual PQ-JWT Inspector
+Select a token (or run **PostQuantum.Jwt: Inspect Token (Visual)** and paste one), or click the inline **🔍 Inspect PQ-JWT** CodeLens — a panel opens that lays the token out as labelled **layers**: header / payload / signature for the 3-part **signed** form, or header / encrypted-key / IV / ciphertext / tag for the 5-part **encrypted** form. Header fields are shown as colour-coded chips (`✓ alg = ML-DSA-65`, `✗ alg = none`, …).
+
+It's also a **teacher**: expandable sections explain ML-DSA-65, the X-Wing hybrid KEM (X25519 + ML-KEM-768), sign-then-encrypt, the cheap-checks-first validation path, and fail-closed behaviour — auto-expanded for the token you're looking at. You don't need the browser playground to understand what's happening. Structure and headers only — encrypted claims stay encrypted; the panel does **no cryptography**.
+
+A lightweight text version (**PostQuantum.Jwt: Decode Token (Text)**) is still available as a fallback.
 
 ### Inline "Inspect PQ-JWT"
-When a PostQuantum.Jwt token appears in a `.cs`, `.json`, or `.http` file, a **🔍 Inspect PQ-JWT** CodeLens appears right above it — click to decode it without selecting anything. Detection is deliberately strict: a string is only flagged when it has 3 or 5 segments *and* its protected header decodes to this suite's `alg` (`ML-DSA-65` or `X-Wing`), so version strings, hashes, and ordinary base64 blobs don't trigger it.
+When a PostQuantum.Jwt token appears in a `.cs`, `.json`, or `.http` file, a **🔍 Inspect PQ-JWT** CodeLens appears right above it — click to open the visual inspector without selecting anything. Detection is deliberately strict: a string is only flagged when it has 3 or 5 segments *and* its protected header decodes to this suite's `alg` (`ML-DSA-65` or `X-Wing`), so version strings, hashes, and ordinary base64 blobs don't trigger it.
 
 ### Quick links
 Command palette → "PostQuantum.Jwt:" → open the **Live Playground**, **Docs**, **NuGet**, **GitHub**, or **Generate a Key Pair** (in the playground).

@@ -6,6 +6,7 @@ import {
   base64UrlDecode,
   looksLikePqJwt,
   findPqJwtTokens,
+  inspectToken,
 } from "./decoder";
 
 // Helper: encode an object as a base64url segment (no padding), like JOSE.
@@ -132,6 +133,98 @@ test("bug 4: surrounding quotes are stripped before decoding", () => {
   assert.match(out, /Form: SIGNED/);
   assert.match(out, /kid = k1/);
   assert.doesNotMatch(out, /not valid base64url/);
+});
+
+// --- Structured inspection (drives the visual webview) ---
+
+test("inspectToken: signed token has 3 labeled segments and an opaque signature", () => {
+  const i = inspectToken(signedToken());
+  assert.equal(i.form, "signed");
+  assert.equal(i.segmentCount, 3);
+  assert.deepEqual(
+    i.segments.map((s) => s.label),
+    ["Protected header", "Payload (claims)", "Signature"]
+  );
+  // header + payload decode to JSON; signature is opaque (no json/text).
+  assert.ok(i.segments[0].json?.includes("ML-DSA-65"));
+  assert.ok(i.segments[1].json?.includes("user-1"));
+  assert.equal(i.segments[2].opaque, true);
+  assert.equal(i.segments[2].json, undefined);
+});
+
+test("inspectToken: signed ML-DSA-65 alg is ok, kid is info, ml-dsa topic surfaced", () => {
+  const i = inspectToken(signedToken());
+  const alg = i.headerFields.find((f) => f.name === "alg");
+  const kid = i.headerFields.find((f) => f.name === "kid");
+  assert.equal(alg?.status, "ok");
+  assert.equal(kid?.value, "k1");
+  assert.equal(kid?.status, "info");
+  assert.ok(i.topics.includes("ml-dsa"));
+  assert.ok(i.topics.includes("validation-path"));
+});
+
+test("inspectToken: alg:none is marked bad and ml-dsa topic is not surfaced", () => {
+  const token = [seg({ alg: "none" }), seg({}), "sigsigsigsig"].join(".");
+  const i = inspectToken(token);
+  const alg = i.headerFields.find((f) => f.name === "alg");
+  assert.equal(alg?.status, "bad");
+  assert.ok(!i.topics.includes("ml-dsa"));
+  assert.ok(i.topics.includes("fail-closed"));
+});
+
+test("inspectToken: unexpected signature alg is warn, not ok", () => {
+  const token = [seg({ alg: "RS256" }), seg({}), "sigsigsigsig"].join(".");
+  const alg = inspectToken(token).headerFields.find((f) => f.name === "alg");
+  assert.equal(alg?.status, "warn");
+});
+
+test("inspectToken: encrypted token has 5 segments, X-Wing/A256GCM/cty fields, opaque body", () => {
+  const token = [seg({ alg: "X-Wing", enc: "A256GCM", cty: "JWT", kid: "r1" }), "encKey", "iv", "ct", "tag"].join(".");
+  const i = inspectToken(token);
+  assert.equal(i.form, "encrypted");
+  assert.equal(i.segmentCount, 5);
+  assert.deepEqual(
+    i.headerFields.filter((f) => f.status === "ok").map((f) => f.name).sort(),
+    ["alg", "enc"]
+  );
+  // Only the header is readable; the other four are opaque.
+  assert.equal(i.segments[0].json !== undefined, true);
+  assert.deepEqual(
+    i.segments.slice(1).map((s) => s.opaque),
+    [true, true, true, true]
+  );
+  assert.ok(i.topics.includes("x-wing"));
+  assert.ok(i.topics.includes("sign-then-encrypt"));
+});
+
+test("inspectToken: wrong segment count yields an invalid inspection with an error", () => {
+  const i = inspectToken("a.b");
+  assert.equal(i.form, "invalid");
+  assert.equal(i.segmentCount, 2);
+  assert.match(i.error ?? "", /3 \(signed\) or 5 \(encrypted\)/);
+  assert.equal(i.segments.length, 0);
+});
+
+test("inspectToken: empty input is invalid, not a throw", () => {
+  const i = inspectToken("   ");
+  assert.equal(i.form, "invalid");
+  assert.match(i.error ?? "", /Paste or select/);
+});
+
+test("inspectToken: Bearer prefix and quotes are normalized like the text path", () => {
+  const i = inspectToken('"Bearer ' + signedToken() + '"');
+  assert.equal(i.form, "signed");
+  const alg = i.headerFields.find((f) => f.name === "alg");
+  assert.equal(alg?.status, "ok");
+});
+
+test("inspectToken: a header that JSON-parses to null does not throw", () => {
+  const nullHeader = Buffer.from("      null      ").toString("base64url");
+  const token = [nullHeader, seg({}), "sigsigsig"].join(".");
+  assert.doesNotThrow(() => inspectToken(token));
+  // null header => no recognized alg => signed form with a warn alg field.
+  const i = inspectToken(token);
+  assert.equal(i.form, "signed");
 });
 
 test("chatbug 4: Bearer / Authorization prefixes are stripped (.http selections)", () => {

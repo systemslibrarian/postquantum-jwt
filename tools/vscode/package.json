@@ -1,8 +1,8 @@
 {
   "name": "postquantum-jwt",
   "displayName": "PostQuantum.Jwt",
-  "description": "Snippets, a token decoder, and quick links for the PostQuantum.Jwt .NET library (ML-DSA-65 signatures + X-Wing hybrid confidentiality).",
-  "version": "0.1.7",
+  "description": "Snippets, a visual token inspector, and quick links for the PostQuantum.Jwt .NET library (ML-DSA-65 signatures + X-Wing hybrid confidentiality).",
+  "version": "0.2.0",
   "publisher": "systemslibrarian",
   "license": "MIT",
   "icon": "images/icon.png",
@@ -54,8 +54,12 @@
     ],
     "commands": [
       {
+        "command": "pqjwt.inspectVisual",
+        "title": "PostQuantum.Jwt: Inspect Token (Visual)"
+      },
+      {
         "command": "pqjwt.decodeToken",
-        "title": "PostQuantum.Jwt: Decode Token"
+        "title": "PostQuantum.Jwt: Decode Token (Text)"
       },
       {
         "command": "pqjwt.openPlayground",
@@ -80,6 +84,11 @@
     ],
     "menus": {
       "editor/context": [
+        {
+          "command": "pqjwt.inspectVisual",
+          "when": "editorHasSelection",
+          "group": "navigation@8"
+        },
         {
           "command": "pqjwt.decodeToken",
           "when": "editorHasSelection",
