@@ -6,10 +6,12 @@ both token issuing and token validation. "Production-oriented" describes the
 hardened defaults (strict validation, fail-closed behavior, replay and
 key-rotation support), **not** an audit sign-off: the construction has **not**
 been independently audited, and this is **not** a drop-in replacement for
-OAuth/OIDC/JWT middleware. The leading `1.0` denotes the maturity of the design,
-not a stable release — the `preview.N` suffix means the API may still change
-before the stable `1.0.0`. This document states the security model honestly so
-you can make an informed decision before relying on it.
+OAuth/OIDC/JWT middleware. The leading `1.0` denotes the maturity of the design
+and a stable public API/wire format across the `preview.*` series; the
+`preview.N` suffix marks the **pending independent audit**, not expected API
+churn (a security review could still force a change before the final `1.0.0`).
+This document states the security model honestly so you can make an informed
+decision before relying on it.
 
 ## Supported versions
 

@@ -8,6 +8,17 @@ the API between previews.
 
 ## [Unreleased]
 
+### Changed
+
+- **Reframed the API-stability wording** in `README.md`, `SECURITY.md`, and
+  `KNOWN-GAPS.md`: the public API and wire format are held stable across the
+  `1.0.0-preview.*` series; the `preview` suffix marks the pending independent
+  audit, not expected API churn (a security review could still force a change).
+  Replaces the self-undermining "the API may change between previews" phrasing.
+- **Author code-signing note** now points open-source projects at the free
+  [SignPath Foundation](https://signpath.org/) certificate rather than implying a
+  commercial cert must be purchased.
+
 ## [1.0.0-preview.4] — 2026-06-03
 
 Documentation, positioning, and supply-chain hardening only — **no library code
