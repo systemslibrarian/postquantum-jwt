@@ -76,8 +76,10 @@ Last reviewed for: `1.0.0-preview.4`.
 
 ## API & lifecycle
 
-- **Preview API.** Public types and method signatures may change without notice
-  between previews, until the stable `1.0.0`.
+- **Preview API.** The public API and wire format are held stable across the
+  `1.0.0-preview.*` series — no breaking changes are planned before the final
+  `1.0.0`. The `preview` suffix reflects the pending independent audit, not
+  expected API churn; only a security review would force a surface change.
 - **No streaming / large-payload API.** Everything operates on in-memory
   `string` / `byte[]`.
 - **The core `PostQuantum.Jwt` package has no DI / `IServiceCollection`
@@ -107,11 +109,14 @@ Last reviewed for: `1.0.0-preview.4`.
   nuget.org's repository signature alone. Every release also emits GitHub
   build-provenance attestations for the `.nupkg` and the SBOM — verify
   with `gh attestation verify <file> --repo systemslibrarian/postquantum-jwt`.
-  *To close this:* obtain a code-signing certificate (e.g. a DigiCert/Sectigo
-  OV or EV code-signing cert), base64-encode the `.pfx`, and add it as
-  `NUGET_SIGNING_CERT` (+ `NUGET_SIGNING_CERT_PASSWORD`) on the `nuget-publish`
-  environment — the release workflow then author-signs automatically. No code
-  change is required.
+  *To close this (no code change required):* obtain a code-signing certificate,
+  base64-encode the `.pfx`, and add it as `NUGET_SIGNING_CERT`
+  (+ `NUGET_SIGNING_CERT_PASSWORD`) on the `nuget-publish` environment — the
+  release workflow then author-signs automatically. Open-source projects can
+  apply for a **free** certificate via the
+  [SignPath Foundation](https://signpath.org/) rather than buying a commercial
+  (DigiCert/Sectigo) cert. Until then, repository signing plus the
+  build-provenance attestations above remain the trust signals.
 - **CycloneDX SBOM is packed inside the `.nupkg`** (in addition to being
   uploaded as a release artifact and getting its own build-provenance
   attestation). Consumers can inspect `bom.json` directly from the

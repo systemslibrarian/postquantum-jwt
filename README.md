@@ -41,8 +41,11 @@ drop-in replacement for OAuth/OIDC/JWT middleware**.
 > for the side-by-side.
 
 > **Status — `1.0.0-preview.4`. Production-oriented preview for controlled
-> systems; not independently audited.** The API may change between previews,
-> before the stable `1.0.0`. "Production-oriented" describes the hardened
+> systems; not independently audited.** The public API and wire format are held
+> stable across the `1.0.0-preview.*` series — the `preview` suffix marks the
+> **pending independent audit**, not API churn; no breaking changes are expected
+> before the final `1.0.0` (a security review could still force one).
+> "Production-oriented" describes the hardened
 > defaults (strict validation, fail-closed, replay and key-rotation support) —
 > **not** an audit sign-off: the cryptographic construction has **not** been
 > independently reviewed. Use it only in systems where you control both issuer
@@ -867,7 +870,7 @@ We aim to be honest about exactly what this library does and does not give you.
   here is not a standardized JOSE/JWE profile. These tokens are therefore
   intentionally **not** interoperable with generic JWT tooling — see
   [Standards and interoperability status](#standards-and-interoperability-status).
-- **Preview.** Treat the API and wire format as unstable until the stable `1.0.0` release; the `1.0.0-preview.*` series may break between previews.
+- **Preview.** The public API and wire format are held stable across the `1.0.0-preview.*` series; the `preview` suffix reflects the pending independent audit, not expected API churn. No breaking changes are planned before the final `1.0.0`, though a security review could still force one.
 
 Full detail lives in [`SECURITY.md`](SECURITY.md) and
 [`KNOWN-GAPS.md`](KNOWN-GAPS.md). To report a vulnerability, see `SECURITY.md`.
