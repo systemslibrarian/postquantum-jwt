@@ -66,6 +66,7 @@ drop-in replacement for OAuth/OIDC/JWT middleware**.
   - [Key rotation and replay protection](#key-rotation-and-replay-protection)
   - [ASP.NET Core integration](#aspnet-core-integration)
 - [Samples](#samples)
+- [Editor tooling](#editor-tooling)
 - [Token format](#token-format)
 - [Public API at a glance](#public-api-at-a-glance)
 - [Compared to System.IdentityModel.Tokens.Jwt](#compared-to-systemidentitymodeltokensjwt)
@@ -657,6 +658,17 @@ See [`samples/README.md`](https://github.com/systemslibrarian/postquantum-jwt/bl
 token, and [`samples/HARDENING-CHECKLIST.md`](https://github.com/systemslibrarian/postquantum-jwt/blob/main/samples/HARDENING-CHECKLIST.md) for
 how each attack is blocked. To host your own playground, see
 [`samples/PqJwtPlayground/DEPLOY.md`](https://github.com/systemslibrarian/postquantum-jwt/blob/main/samples/PqJwtPlayground/DEPLOY.md).
+
+---
+
+## Editor tooling
+
+A companion **[VS Code extension](https://marketplace.visualstudio.com/items?itemName=systemslibrarian.postquantum-jwt)**
+(`ext install systemslibrarian.postquantum-jwt`) adds C# snippets, a structure-only
+token decoder, and quick links for working with PostQuantum.Jwt. It does **no
+cryptography** — it helps you write and read the code, and points at the
+[live playground](https://pqjwt.systemslibrarian.dev) for anything that actually
+signs or validates. Source lives in [`tools/vscode`](tools/vscode).
 
 ---
 
