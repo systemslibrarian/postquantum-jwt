@@ -8,6 +8,75 @@ the API between previews.
 
 ## [Unreleased]
 
+### Added
+
+- **BenchmarkDotNet project** (`benchmarks/PostQuantum.Jwt.Benchmarks`) measuring
+  warm-path throughput + allocations (sign / verify / sign+encrypt /
+  decrypt+verify), cold-start "time to first verified token" (fresh process per
+  launch — the serverless-relevant number), and a `--sizes` token-size report.
+  Includes a measured **classical baseline** — ES256 (ECDSA P-256) via the
+  modern `JsonWebTokenHandler` (`Microsoft.IdentityModel.JsonWebTokens`), chosen
+  over the legacy `JwtSecurityTokenHandler` so the comparison races against the
+  faster, recommended classical path rather than a deprecated one. Measured:
+  ES256 ≈ 315 bytes, signed PQ ≈ 4.6 KB (~15×), encrypted PQ ≈ 7.8 KB (~25×).
+  Refuses to run, with a reason, when native ML-DSA/ML-KEM is unavailable rather
+  than emitting placeholder numbers; deliberately ships no serializer comparison
+  (those aren't signing libraries). Not packed and not part of the `dotnet test`
+  gate.
+- **`SecurityInvariantsTests`** — an executable security contract that pins the
+  validator's orchestration guarantees so they cannot silently drift: unknown
+  `kid` rejected *before* the ML-DSA verify (SPEC step 5→6), the signature
+  verified *before* any payload claim is trusted (step 6→7), and a 5-part X-Wing
+  envelope whose plaintext is not a 3-part signed JWT rejected as `InnerNotSigned`
+  (step 3, no profile downgrade). The last closes a real coverage gap —
+  `InnerNotSigned` previously had no test. No production-code change.
+- **`PqJwtFuzzTests`** — adversarial/negative fuzzing (FsCheck) of the validator
+  over random strings, structurally token-shaped base64url garbage, and
+  structure-aware mutations of valid tokens. Defends two total properties:
+  validation is *fail-closed-total* (only `PqJwtException`/`PqJwtValidationException`
+  ever escape — no `IndexOutOfRange`/`NullReference`/`Format`/`Json`/`Overflow`
+  leak), and *no mutated/garbage input is ever accepted*. This harness surfaced
+  the non-canonical-base64url malleability fixed below.
+- **`Base64UrlTests`** — deterministic locks for the strict, canonical base64url
+  decoding (slack bits, embedded whitespace, and the standard-base64 alphabet
+  are all rejected).
+- **TLA+ model of the validator state machine** (`docs/formal/`) — a small,
+  machine-checkable spec model-checking the protocol invariants: no path reaches
+  Accept without passing signature verification, the header never selects the
+  algorithm, and an encrypted token must decrypt to a signed inner token. Proves
+  the *model*; `SecurityInvariantsTests` keep model and code in step. See
+  `docs/formal/README.md` for scope and honest limitations.
+
+### Security
+
+- **Strict, canonical base64url decoding (RFC 7515 §2).** Decoding now rejects
+  non-canonical encodings — embedded whitespace and non-zero "slack" bits in a
+  segment's final character — that `Convert.FromBase64String` accepts silently.
+  Previously such inputs let a *different* token string decode to identical bytes
+  and still verify/decrypt (token malleability); now exactly one base64url string
+  maps to a given byte sequence. Tokens produced by this library's builder were
+  already canonical and are unaffected; only non-conforming or adversarial inputs
+  are now rejected. Surfaced by `PqJwtFuzzTests`. (Production-code change in
+  `Internal/Base64Url`.)
+
+### Fixed
+
+- **Reconciled a validation-ordering contradiction in the audit docs.**
+  `docs/PQ-JWT-AUDIT-PROMPT.md` §2 and the `CLAUDE.md` audit matrix stated that
+  `exp` is checked *before* ML-DSA signature verification, but both the
+  implementation and the normative `docs/SPEC.md` (steps 6→7) verify the
+  signature first and only then evaluate claims — the verifier never acts on an
+  unauthenticated payload claim. Corrected the two docs to match the spec/code:
+  structural checks (`kid`, format, segment count, `alg`) are the pre-verify
+  cheap guards; `exp`/`nbf`/`iss`/`aud` are deliberately post-verification. The
+  order is now locked by `SecurityInvariantsTests`. No production-code change.
+- **Corrected the encrypted-token size in `README.md`** from "~6.5 KB" to the
+  measured **~7.8 KB**. The previous figure undercounted: the entire signed
+  token becomes the AES-GCM plaintext and is base64url-encoded a second time
+  (~33% inflation of the 4.6 KB inner token), on top of the X-Wing KEM
+  ciphertext. Added a `Performance` note describing the native-lattice-dominated
+  cost model and pointing at the new benchmark project.
+
 ## [1.0.0-preview.5] — 2026-06-03
 
 **Published to nuget.org on 2026-06-03** (`PostQuantum.Jwt`,
