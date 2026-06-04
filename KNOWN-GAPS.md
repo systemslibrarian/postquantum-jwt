@@ -30,6 +30,13 @@ Last reviewed for: `1.0.0-preview.5`.
 - **No independent ML-KEM / ML-DSA KATs in this repo.** We rely on the .NET BCL
   (FIPS-validated) for these primitives and do not re-test them here. If your
   threat model needs in-repo KATs, they are not present yet.
+- **Ecosystem context — formal verification is happening, but not for our exact
+  stack.** Major vendors are formally verifying ML-KEM and ML-DSA at the
+  algorithm level (e.g. Apple's `corecrypto` lists Isabelle-verified ML-KEM/ML-DSA
+  for 2026). That is directional confidence in the *standards* we build on — but
+  it is verification of *those* implementations, not the OpenSSL/BCL code path
+  this library actually calls, and it does not transfer to our glue. We note it
+  as background, not as an assurance about PostQuantum.Jwt.
 - **Constant-time behavior is inherited, not guaranteed.** We make no
   side-channel claims beyond what the BCL and BouncyCastle provide.
 - **One algorithm suite only.** Only ML-DSA-65, ML-KEM-768, and AES-256-GCM are
