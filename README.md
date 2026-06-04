@@ -40,7 +40,7 @@ drop-in replacement for OAuth/OIDC/JWT middleware**.
 > [Compared to System.IdentityModel.Tokens.Jwt](#compared-to-systemidentitymodeltokensjwt)
 > for the side-by-side.
 
-> **Status — `1.0.0-preview.6`. Production-oriented preview for controlled
+> **Status — `1.0.0-preview.7`. Production-oriented preview for controlled
 > systems; not independently audited.** The public API and wire format are held
 > stable across the `1.0.0-preview.*` series — the `preview` suffix marks the
 > **pending independent audit**, not API churn; no breaking changes are expected
@@ -57,6 +57,7 @@ drop-in replacement for OAuth/OIDC/JWT middleware**.
 ## Table of contents
 
 - [Why](#why)
+- [What's new in 1.0.0-preview.7](#whats-new-in-100-preview7)
 - [What's new in 1.0.0-preview.6](#whats-new-in-100-preview6)
 - [Install](#install)
 - [60-second tour](#60-second-tour)
@@ -118,6 +119,30 @@ OAuth/OIDC/JWT middleware or a generic JWT/JWE library.
 | Systems behind an interop-translating gateway | Anywhere generic JWT/JWE interoperability is required |
 
 ---
+
+## What's new in 1.0.0-preview.7
+
+A focused **security** fix continuing the preview.6 fail-closed hardening pass.
+No API change, no wire-format change; the public surface is identical.
+
+- **Security: a JOSE header with duplicate JSON property names is now rejected
+  as `PqJwtValidationException(MalformedJson)`.** `System.Text.Json`'s
+  `JsonNode.Parse` defers building the underlying name→node dictionary until
+  the first property access, so a header like
+  `{"alg":"ML-DSA-65","typ":"JWT","typ":"JWT"}` slipped past the parser's
+  `JsonException` catch and threw `ArgumentException` at the first indexer
+  read — escaping `Validate` as an unsealed exception type. RFC 8259 §4
+  declares duplicate JSON keys non-interoperable and RFC 7515 §4 requires
+  unique JOSE header parameter names, so rejecting these is conformant.
+  Pinned by a regression test (`Header_with_duplicate_keys_reports_MalformedJson`).
+  Builder-minted tokens are unaffected.
+- **Tier 2 coverage-guided fuzz target is now operational.** The
+  `fuzz/PostQuantum.Jwt.Fuzz/` SharpFuzz + libFuzzer target was scaffolded in
+  preview.6 but not yet run; in preview.7 it ran for hours and surfaced the
+  duplicate-key bug above on its first session. A small scaffold fix
+  (defer the instrumented validator construction into the `Fuzzer.LibFuzzer.Run`
+  callback, narrow instrumentation to the parser path) ships with this release.
+  The random-input `PqJwtFuzzTests` from preview.6 are unchanged.
 
 ## What's new in 1.0.0-preview.6
 
@@ -384,13 +409,13 @@ Full notes in [`CHANGELOG.md`](CHANGELOG.md).
 ## Install
 
 ```bash
-dotnet add package PostQuantum.Jwt --version 1.0.0-preview.6
+dotnet add package PostQuantum.Jwt --version 1.0.0-preview.7
 ```
 
 Or in a `.csproj`:
 
 ```xml
-<PackageReference Include="PostQuantum.Jwt" Version="1.0.0-preview.6" />
+<PackageReference Include="PostQuantum.Jwt" Version="1.0.0-preview.7" />
 ```
 
 **Runtime requirement:** the native ML-KEM / ML-DSA primitives need an OpenSSL
@@ -552,7 +577,7 @@ package and call `AddPqJwtBearer(...)` on the standard
 `ML-DSA-65`.
 
 ```bash
-dotnet add package PostQuantum.Jwt.AspNetCore --version 1.0.0-preview.6
+dotnet add package PostQuantum.Jwt.AspNetCore --version 1.0.0-preview.7
 ```
 
 ```csharp

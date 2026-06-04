@@ -8,6 +8,19 @@ the API between previews.
 
 ## [Unreleased]
 
+## [1.0.0-preview.7] — 2026-06-04
+
+Security continuation of the preview.6 fail-closed hardening pass: one targeted
+fix to the header parser, surfaced by the now-operational Tier 2 coverage-guided
+fuzz target. No API change, no wire-format change; tokens minted by this
+library's builder are unaffected.
+
+> **Release note (transparency):** like preview.5 and preview.6, this version
+> is published manually via `dotnet nuget push` because the tag-based release
+> workflow's `NUGET_API_KEY` is still invalid. The `.nupkg` files therefore do
+> **not** carry the CI build-provenance attestation the pipeline normally adds;
+> nuget.org repository signing still applies.
+
 ### Fixed
 
 - **`JoseHeader.Parse` now fails-closed on a header with duplicate JSON property

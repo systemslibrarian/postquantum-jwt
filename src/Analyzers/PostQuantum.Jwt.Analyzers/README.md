@@ -10,7 +10,7 @@ JWT linters don't fit — these analyzers encode the library's actual rules.
 ## Install
 
 ```xml
-<PackageReference Include="PostQuantum.Jwt.Analyzers" Version="1.0.0-preview.6" PrivateAssets="all" />
+<PackageReference Include="PostQuantum.Jwt.Analyzers" Version="1.0.0-preview.7" PrivateAssets="all" />
 ```
 
 `PrivateAssets="all"` keeps the analyzer a build-time-only dependency (it never

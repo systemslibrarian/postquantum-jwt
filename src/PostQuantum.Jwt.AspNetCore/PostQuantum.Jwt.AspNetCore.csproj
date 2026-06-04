@@ -11,7 +11,7 @@
   <!-- NuGet package metadata -->
   <PropertyGroup>
     <PackageId>PostQuantum.Jwt.AspNetCore</PackageId>
-    <Version>1.0.0-preview.6</Version>
+    <Version>1.0.0-preview.7</Version>
     <Title>PostQuantum.Jwt.AspNetCore — post-quantum JWT bearer auth for ASP.NET Core</Title>
     <Authors>Paul Clark</Authors>
     <Description>[SUPERSEDED — use PostQuantum.AspNetCore instead.] ASP.NET Core authentication handler for PostQuantum.Jwt — adds AddPqJwtBearer() so post-quantum (ML-DSA-65) tokens slot into the standard authentication pipeline. Includes an HTTP-fetched key ring (a JWKS-equivalent) for kid-based rotation across services. Fail-closed by construction. This package has been replaced by PostQuantum.AspNetCore (cleaner naming, dedicated release cadence, event-hook surface, hosted-service warmup, SignalR support). The new package is wire-compatible — tokens minted under either validate in the other. Migration guide: https://github.com/systemslibrarian/postquantum-aspnetcore/blob/main/docs/MIGRATION.md. Production-oriented preview companion package for controlled issuer/verifier systems; not independently audited and not a drop-in OAuth/OIDC replacement.</Description>
