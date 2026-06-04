@@ -2,7 +2,7 @@
   "name": "postquantum-jwt",
   "displayName": "PostQuantum.Jwt",
   "description": "Visual token inspector, hybrid-construction & validation-flow diagrams, snippets, and quick links for the PostQuantum.Jwt .NET library (ML-DSA-65 + X-Wing).",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "publisher": "systemslibrarian",
   "license": "MIT",
   "icon": "images/icon.png",

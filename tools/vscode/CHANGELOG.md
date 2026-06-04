@@ -4,6 +4,26 @@ All notable changes to the **PostQuantum.Jwt for VS Code** extension. This
 extension does no cryptography; it helps you write and understand
 PostQuantum.Jwt code. It sends no telemetry and makes no network calls.
 
+## 0.2.2
+
+Privacy-honesty correction and webview hardening.
+
+- **Privacy honesty (corrects 0.2.1).** *Open in Playground* on a signed token
+  encodes that token's **decoded claims** into the link so the playground can
+  pre-fill its form — claim values that do leave your machine. The Privacy
+  section now states this plainly (instead of "token contents never leave your
+  machine"), and the button reads *"Open in Playground (sends decoded claims)"*
+  when claims will be shared. No key material is ever encoded; encrypted tokens
+  (opaque payload) open the playground plainly.
+- **Hardening.** The webview CSP no longer allows remote (`https:`) images —
+  only the extension's own assets and `data:`, so the panel makes no network
+  requests; the CSP nonce now comes from the host CSPRNG (`crypto.randomBytes`,
+  not `Math.random()`); and the playground button asks the host to open its own
+  pre-computed link rather than handing a URL back from the webview (removing the
+  open-redirect surface). Trusted-static HTML paths are marked so token data is
+  never routed through them.
+- **Tests:** unit 46 → 49, integration 5 → 6.
+
 ## 0.2.1
 
 A redesign and major expansion of the 0.2.0 visual inspector: the single panel
