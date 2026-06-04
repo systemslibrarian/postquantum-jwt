@@ -16,6 +16,13 @@ fuzz suite — plus an executable assurance layer (fuzz tests, security
 invariants, a model-checked TLA+ spec) and a BenchmarkDotNet suite. Tokens
 produced by this library's builder are unaffected by the stricter decoding.
 
+> **Release note (transparency):** like preview.5, this version was published
+> manually via `dotnet nuget push` because the tag-based release workflow's
+> `NUGET_API_KEY` was invalid. The `.nupkg` files therefore do **not** carry the
+> CI build-provenance attestation the pipeline normally adds; nuget.org
+> repository signing still applies. Provenance will be restored once the CI
+> secret is refreshed.
+
 ### Added
 
 - **BenchmarkDotNet project** (`benchmarks/PostQuantum.Jwt.Benchmarks`) measuring
