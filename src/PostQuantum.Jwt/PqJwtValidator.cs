@@ -20,6 +20,13 @@ public sealed class PqJwtValidator
     private const int SignedPartCount = 3;
     private const int EncryptedPartCount = 5;
 
+    // The v1 encrypted profile fixes these AES-256-GCM parameter sizes (bytes);
+    // they match what PqJwtBuilder emits (AesGcm.NonceByteSizes.MaxSize /
+    // TagByteSizes.MaxSize). The validator pins them rather than trusting the
+    // token's segment lengths — see Decrypt for why.
+    private const int GcmNonceSize = 12;
+    private const int GcmTagSize = 16;
+
     // Upper bound on accepted token length (characters). ~20x the largest expected
     // token (encrypted ≈ 6.5 KB), so legitimate tokens are never affected; it exists
     // only to cap pre-verification work on adversarial oversized input.
@@ -227,9 +234,26 @@ public sealed class PqJwtValidator
             var ciphertext = Base64Url.Decode(parts[3]);
             var tag = Base64Url.Decode(parts[4]);
             var aad = Encoding.ASCII.GetBytes(parts[0]);
+
+            // The v1 profile fixes a 12-byte nonce and a FULL 16-byte GCM tag (the
+            // builder always emits these). The tag length MUST come from the
+            // profile, never from the token: AesGcm accepts any 12–16 byte tag, so
+            // honouring a shorter attacker-supplied tag would silently downgrade
+            // authentication strength (a 96-bit tag is far easier to forge than a
+            // 128-bit one) and make the token malleable (a truncated tag is a
+            // different string that still authenticates against its 120/112/…-bit
+            // prefix). Pin both lengths before constructing AesGcm. (Surfaced by
+            // PqJwtFuzzTests.)
+            if (nonce.Length != GcmNonceSize || tag.Length != GcmTagSize)
+            {
+                throw new PqJwtValidationException(
+                    PqJwtFailureReason.DecryptionFailed,
+                    "Token nonce or authentication tag is not the required length.");
+            }
+
             plaintext = new byte[ciphertext.Length];
 
-            using (var gcm = new AesGcm(sharedSecret, tag.Length))
+            using (var gcm = new AesGcm(sharedSecret, GcmTagSize))
             {
                 gcm.Decrypt(nonce, ciphertext, tag, plaintext, aad);
             }

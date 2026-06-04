@@ -93,7 +93,12 @@ rather than degrade on any failure:
    rejected.
 3. **Decrypt (encrypted form only).** A decryption key MUST be configured; check
    `alg`/`enc`; X-Wing decapsulate; AES-256-GCM decrypt with the header as AAD.
-   A tag mismatch MUST reject. The result MUST be a 3-segment signed token.
+   The nonce MUST be exactly 12 bytes and the tag exactly 16 bytes; any other
+   length MUST be rejected. The tag length is taken from this profile, never from
+   the token — AES-GCM accepts 12–16 byte tags, so honouring a shorter
+   attacker-supplied tag would downgrade authentication strength and make the
+   token malleable. A tag mismatch MUST reject. The result MUST be a 3-segment
+   signed token.
 4. **Algorithm.** `alg` MUST equal `ML-DSA-65`; any other value (including
    `none` or a missing `alg`) MUST be rejected. The verifier MUST NOT use the
    header `alg` to *select* a verification path — it accepts exactly one suite.
