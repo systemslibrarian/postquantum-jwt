@@ -14,8 +14,10 @@ Analyze the code and report PASS or FAIL for the following architectural mandate
 * **Check:** Identify where the `kid` is extracted. Prove that the verification key is resolved from a trusted, internal in-memory map or key ring, and NOT from external URLs or token-provided public keys.
 
 ## 2. Validation Sequencing (Pre-Parsing DoS)
-* **Requirement:** Post-quantum signature verification is computationally expensive. Cheap checks must happen first.
-* **Check:** Verify the exact sequence of operations. The code must reject unknown `kid`s, expired tokens (`exp`), and malformed formats BEFORE attempting the ML-DSA-65 signature verification. Cite the line numbers showing this order.
+* **Requirement:** Post-quantum signature verification is computationally expensive. Cheap *structural* checks must happen first; *payload claims* must be evaluated only after the signature is verified.
+* **Check:** Verify the exact sequence of operations and cite the line numbers showing the order.
+  * **Before** the ML-DSA-65 verify (cheap, structural, no payload trust): oversized-input bound, segment count, `alg` allowlist, and unknown-`kid` rejection. These reject without trusting any payload bytes.
+  * **After** the verify (payload claims): `exp`/`nbf` lifetime, `iss`, `aud`, and replay/`jti`. The verifier MUST NOT evaluate `exp` (or any other claim) before the signature is checked — acting on an unauthenticated claim, even to reject early, is a finding. So `exp` is deliberately a post-verification check; this matches `docs/SPEC.md` steps 5→6→7 and is locked by `SecurityInvariantsTests`.
 
 ## 3. Observable Failures (Telemetry)
 * **Requirement:** Validation failures must emit coarse metrics without logging sensitive key material or payloads.

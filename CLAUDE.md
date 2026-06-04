@@ -92,8 +92,12 @@ the tooling overview is [`docs/SECURITY-AUDIT-TOOLS.md`](docs/SECURITY-AUDIT-TOO
   suggest HMAC-secret hygiene or `alg: none` checks; they don't apply.
 - **Audit matrix** (report PASS/FAIL with evidence): ① header ignorance — the
   verification key comes from a trusted internal key ring, never the token's
-  `alg`/`jwk`/`jku`/`x5u`/`x5c`; ② sequencing — cheap checks (unknown `kid`,
-  `exp`, malformed/oversized format) reject *before* the expensive ML-DSA verify;
+  `alg`/`jwk`/`jku`/`x5u`/`x5c`; ② sequencing — *structural* cheap checks
+  (malformed/oversized format, segment count, `alg` allowlist, unknown `kid`)
+  reject *before* the expensive ML-DSA verify, while *payload claims*
+  (`exp`/`nbf`/`iss`/`aud`) are validated *after* the signature — the verifier
+  never evaluates an unauthenticated payload claim, so `exp` is deliberately a
+  post-verification check (matches `docs/SPEC.md` steps 5→6→7);
   ③ telemetry — failures emit coarse `System.Diagnostics.Metrics` (`signature_mismatch`,
   `unknown_kid`) with no token/key material; ④ replay/revocation — replay
   protection (distributed cache) or strict `exp` lifetime is enforced.
