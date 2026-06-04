@@ -117,6 +117,10 @@ rather than degrade on any failure:
 - Expired tokens; `nbf` further in the future than the allowed clock skew.
 - Malformed Base64Url; malformed JSON header or payload; a payload that is not a
   JSON object; a malformed time claim.
+- **Non-canonical Base64Url** (RFC 7515 §2): embedded whitespace or non-zero
+  "slack" bits in a segment's final character. Decoding is strict — exactly one
+  base64url string maps to a given byte sequence — so token strings are
+  non-malleable.
 - Wrong segment count; truncated or oversized input.
 - Invalid signature; invalid ciphertext authentication tag; modified AAD/header
   on encrypted tokens; decryption with the wrong recipient key.

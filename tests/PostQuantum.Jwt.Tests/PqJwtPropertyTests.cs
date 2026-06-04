@@ -1,4 +1,3 @@
-using System.Security.Cryptography;
 using FsCheck;
 using FsCheck.Xunit;
 using PostQuantum.Jwt.Cryptography;
@@ -122,20 +121,5 @@ public sealed class PqJwtPropertyTests
         var (senderSecret, ciphertext) = XWing.Encapsulate(recipient.PublicKey);
         var recipientSecret = XWing.Decapsulate(recipient, ciphertext);
         return senderSecret.SequenceEqual(recipientSecret);
-    }
-
-    /// <summary>
-    /// Wraps FsCheck's PropertyAttribute so the property is skipped (with a clear
-    /// reason) on hosts that lack native ML-KEM / ML-DSA — matches PqcFact.
-    /// </summary>
-    private sealed class PqcPropertyAttribute : PropertyAttribute
-    {
-        public PqcPropertyAttribute()
-        {
-            if (!MLKem.IsSupported || !MLDsa.IsSupported)
-            {
-                Skip = "Requires native ML-KEM / ML-DSA support (OpenSSL 3.5+).";
-            }
-        }
     }
 }
