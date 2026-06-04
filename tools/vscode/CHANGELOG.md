@@ -4,21 +4,47 @@ All notable changes to the **PostQuantum.Jwt for VS Code** extension. This
 extension does no cryptography; it helps you write and understand
 PostQuantum.Jwt code. It sends no telemetry and makes no network calls.
 
+## 0.2.1
+
+A redesign and major expansion of the 0.2.0 visual inspector: the single panel
+becomes a tabbed tool (Token · Hybrid construction · Validation flow), and the
+token analysis is refactored into one pure, well-tested model shared by every
+surface.
+
+- **New — Visual Token Inspector.** A sandboxed webview (strict CSP, no network)
+  that color-codes each segment, decodes the header, lists claims as a table,
+  shows algorithm badges, and clearly distinguishes 3-segment **signed** from
+  5-segment **encrypted** tokens. Open it with **Inspect Token (Visual)** or the
+  **🔍 Inspect PQ-JWT** CodeLens.
+- **New — Hybrid Construction view.** A step-by-step diagram of sign → X-Wing
+  encapsulate → AES-256-GCM, including the X-Wing combiner formula, so
+  sign-then-encrypt is intuitive. Jump to it with **Show Hybrid Construction
+  Diagram**.
+- **New — Validation Flow view.** The validator's 8 fail-closed checks, in order,
+  each with the reasons it rejects. Steps annotate themselves against the loaded
+  token. Jump to it with **Show Validation Flow**.
+- **New — smarter playground link.** *Open in Playground* reconstructs the build
+  form (issuer, audience, subject, lifetime, jti, custom claims) from a signed
+  token and deep-links it. No key material is ever encoded.
+- **New — walkthrough.** "Understand post-quantum JWTs" in *Get Started*.
+- **New — settings:** `pqjwt.codeLens.enabled`, `pqjwt.inspector.openToSide`.
+- **New — richer hovers** with a short concept note per API symbol.
+- **Internal:** token analysis refactored into a pure, well-tested `model`
+  (single source of truth for the text decode, inspector, hovers, and deep-link);
+  added unit tests for the model, the HTML renderer (incl. injection-escaping),
+  and the playground share encoding. Still no cryptography, no telemetry, no
+  network calls.
+
 ## 0.2.0
 
-- **Added:** a visual **PQ-JWT Inspector** panel. The inline **🔍 Inspect PQ-JWT**
-  CodeLens (and the new **Inspect Token (Visual)** command) now opens a webview
-  that lays out the token as labelled layers — header / payload / signature for
-  the signed form, or header / encrypted-key / IV / ciphertext / tag for the
-  encrypted form — with colour-coded header-field chips (`✓` ML-DSA-65, `✗`
-  `alg:none`, etc.). It is also a *teacher*: expandable sections explain
-  ML-DSA-65, the X-Wing hybrid KEM, sign-then-encrypt, the cheap-checks-first
-  validation path, and fail-closed behaviour — auto-expanded for the token in
-  front of you, so you don't need the browser playground to understand it.
-  Still **no cryptography**: it renders the same structure-and-header inspection
-  as the text decoder (shared, unit-tested logic), never decrypting anything.
-- **Kept:** the text **Decode Token** command (now labelled *Text*) as a
-  lightweight fallback.
+The first visual release. Adds an **Inspect PQ-JWT** webview panel that lays a
+token out as labelled layers (header / payload / signature, or header /
+encrypted-key / IV / ciphertext / tag) with colour-coded header-field chips and
+expandable explanations of ML-DSA-65, the X-Wing hybrid KEM, sign-then-encrypt,
+the validation path, and fail-closed behaviour — auto-expanded for the inspected
+token. The text **Decode Token** command is kept (labelled *Text*) as a fallback.
+Sandboxed (strict CSP), no cryptography, no telemetry, no network calls.
+(Superseded by the tabbed redesign in 0.2.1.)
 
 ## 0.1.7
 

@@ -4,25 +4,63 @@
 [![Installs](https://img.shields.io/visual-studio-marketplace/i/systemslibrarian.postquantum-jwt?color=blue)](https://marketplace.visualstudio.com/items?itemName=systemslibrarian.postquantum-jwt)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](https://github.com/systemslibrarian/postquantum-jwt/blob/main/LICENSE)
 
-Companion extension for the [**PostQuantum.Jwt**](https://www.nuget.org/packages/PostQuantum.Jwt) .NET library — ML-DSA-65 signatures with optional X-Wing hybrid confidentiality (X25519 + ML-KEM-768 + AES-256-GCM), for controlled .NET issuer/verifier systems.
+The companion extension for the [**PostQuantum.Jwt**](https://www.nuget.org/packages/PostQuantum.Jwt) .NET library — ML-DSA-65 signatures with optional X-Wing hybrid confidentiality (X25519 + ML-KEM-768 + AES-256-GCM), for controlled .NET issuer/verifier systems.
 
-This extension does **no cryptography**. It helps you *write* and *understand* PostQuantum.Jwt code, and points you at the live playground for anything that actually signs or validates.
+It helps you both **write** and **understand** post-quantum JWTs: a visual token inspector, diagrams of the hybrid construction and validation flow, snippets, hovers, and a one-click jump to the live playground.
+
+> **This extension does no cryptography.** It inspects the compact-serialization structure and the unencrypted protected header only. Encrypted payloads stay encrypted — it never signs, validates, encrypts, or decrypts. Anything that touches real keys happens in the browser playground or your own code.
+
+## What's new in 0.2
+
+- 🔍 **Visual Token Inspector** — a rich webview that color-codes each segment, decodes the header, lists claims, and flags the expected algorithm identifiers. Distinguishes 3-segment **signed** from 5-segment **encrypted** tokens at a glance.
+- 🧩 **Hybrid Construction view** — a step-by-step diagram of sign → X-Wing encapsulate → AES-256-GCM, including the X-Wing combiner, so the sign-then-encrypt design is intuitive.
+- 🛡️ **Validation Flow view** — the validator's 8 fail-closed checks, in order, with exactly what makes each one reject.
+- 🚀 **Smarter playground link** — "Open in Playground" reconstructs the build form (issuer, audience, claims, lifetime) from a signed token and deep-links it.
+- 📚 **Walkthrough** — a guided "Understand post-quantum JWTs" tour in *Get Started*.
 
 ## Install
 
 - **Extensions view:** open Extensions (`Ctrl+Shift+X` / `Cmd+Shift+X`), search **PostQuantum.Jwt**, and click *Install*.
 - **Quick Open:** press `Ctrl+P` / `Cmd+P` and run `ext install systemslibrarian.postquantum-jwt`.
-- **Command line:**
-
-  ```bash
-  code --install-extension systemslibrarian.postquantum-jwt
-  ```
+- **Command line:** `code --install-extension systemslibrarian.postquantum-jwt`
 
 Or install from the [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=systemslibrarian.postquantum-jwt) page.
 
 ## Features
 
+### 🔍 Visual Token Inspector
+
+Run **PostQuantum.Jwt: Inspect Token (Visual)** — or click the **🔍 Inspect PQ-JWT** CodeLens above any token — to open the inspector. It has three tabs:
+
+**Token** — the token, with each segment color-coded by role:
+
+| Form | Segments | Lanes |
+| --- | --- | --- |
+| **Signed** | 3 | `header` · `payload` · `signature` |
+| **Encrypted** | 5 | `header` · `kem_ct` · `iv` · `ciphertext` · `tag` |
+
+Each segment expands to show decoded JSON (header/payload) or its byte length and role (opaque bytes). Algorithm **badges** confirm `ML-DSA-65` / `X-Wing` / `A256GCM`, the claims set is shown as a table (registered claims tagged), and `alg: none` is called out as a hard rejection. Encrypted payloads are clearly marked — they are never decrypted.
+
+**Hybrid construction** — the three steps that build an encrypted token, with the X-Wing combiner:
+
+```
+ss = SHA3-256( ss_ML-KEM ‖ ss_X25519 ‖ ct_X25519 ‖ pk_X25519 ‖ label )
+```
+
+**Validation flow** — the validator's ordered, fail-closed checks (bounds → segments → decrypt → algorithm → key → signature → claims → replay), each with the reasons it rejects. Steps annotate themselves against the loaded token (e.g. *decrypt* is marked "not for signed tokens").
+
+You can also jump straight to a view: **Show Hybrid Construction Diagram** and **Show Validation Flow** (they use your selection if it's a token, otherwise a sample).
+
+### ≡ Text decode
+
+Prefer plain text? **PostQuantum.Jwt: Decode Token (Text)** (or the **≡ Text decode** CodeLens) opens a read-only report — the same structure/header analysis without the webview.
+
+### 🚀 Open in Playground (pre-filled)
+
+From the inspector, **Open in Playground ▸** reconstructs the playground's build form from a signed token's claims (subject, issuer, audience, lifetime, jti, and custom claims) and deep-links it. No keys or secrets are ever encoded — only the claim form. Encrypted tokens (opaque payload) open the playground plainly.
+
 ### Snippets (C#)
+
 Type a prefix and tab through a fully-formed example:
 
 | Prefix | Inserts |
@@ -35,21 +73,24 @@ Type a prefix and tab through a fully-formed example:
 | `pqjwt-keyring` | `HttpPostQuantumJwtKeyRing` (JWKS-equivalent) |
 | `pqjwt-install` | `<PackageReference>` for the library |
 
-### Visual PQ-JWT Inspector
-Select a token (or run **PostQuantum.Jwt: Inspect Token (Visual)** and paste one), or click the inline **🔍 Inspect PQ-JWT** CodeLens — a panel opens that lays the token out as labelled **layers**: header / payload / signature for the 3-part **signed** form, or header / encrypted-key / IV / ciphertext / tag for the 5-part **encrypted** form. Header fields are shown as colour-coded chips (`✓ alg = ML-DSA-65`, `✗ alg = none`, …).
-
-It's also a **teacher**: expandable sections explain ML-DSA-65, the X-Wing hybrid KEM (X25519 + ML-KEM-768), sign-then-encrypt, the cheap-checks-first validation path, and fail-closed behaviour — auto-expanded for the token you're looking at. You don't need the browser playground to understand what's happening. Structure and headers only — encrypted claims stay encrypted; the panel does **no cryptography**.
-
-A lightweight text version (**PostQuantum.Jwt: Decode Token (Text)**) is still available as a fallback.
-
-### Inline "Inspect PQ-JWT"
-When a PostQuantum.Jwt token appears in a `.cs`, `.json`, or `.http` file, a **🔍 Inspect PQ-JWT** CodeLens appears right above it — click to open the visual inspector without selecting anything. Detection is deliberately strict: a string is only flagged when it has 3 or 5 segments *and* its protected header decodes to this suite's `alg` (`ML-DSA-65` or `X-Wing`), so version strings, hashes, and ordinary base64 blobs don't trigger it.
-
-### Quick links
-Command palette → "PostQuantum.Jwt:" → open the **Live Playground**, **Docs**, **NuGet**, **GitHub**, or **Generate a Key Pair** (in the playground).
-
 ### Hover & CodeLens
-Hover `PqJwtBuilder`, `PqJwtValidator`, `XWingPrivateKey`, and friends in a `.cs` file for a one-line description plus a jump to the relevant docs section.
+
+Hover `PqJwtBuilder`, `PqJwtValidator`, `XWingPrivateKey`, and friends in a `.cs` file for a one-line description, a short concept note, and a jump to the relevant docs section. API symbols and inline tokens get CodeLenses (toggle with `pqjwt.codeLens.enabled`).
+
+### Inline detection
+
+In a `.cs`, `.json`, or `.http` file, a token gets **🔍 Inspect** / **≡ Text decode** CodeLenses. Detection is deliberately strict: a string is only flagged when it has 3 or 5 segments **and** its protected header decodes to this suite's `alg` (`ML-DSA-65` or `X-Wing`), so version strings, hashes, and ordinary base64 blobs don't trigger it.
+
+## Settings
+
+| Setting | Default | Description |
+| --- | --- | --- |
+| `pqjwt.codeLens.enabled` | `true` | Show the inline Inspect / docs CodeLenses. |
+| `pqjwt.inspector.openToSide` | `true` | Open the inspector beside the editor instead of replacing it. |
+
+## Commands
+
+`PostQuantum.Jwt:` → Inspect Token (Visual) · Decode Token (Text) · Show Hybrid Construction Diagram · Show Validation Flow · Open Live Playground · Open Docs · Open on NuGet · Open GitHub Repository · Generate a Key Pair (in Playground).
 
 ## Try it without installing anything
 
@@ -59,7 +100,20 @@ The library is .NET 10 only and needs OpenSSL 3.5+ for the native PQ primitives.
 
 ## Privacy
 
-This extension sends **no telemetry** and makes **no network calls**. Snippets, token decoding, and the hover/CodeLens helpers all run **locally** — token contents never leave your machine. The only outbound action is opening a link in your browser when *you* explicitly click one (playground, docs, NuGet, GitHub).
+This extension sends **no telemetry** and makes **no network calls**. Snippets, token decoding, the visual inspector, and the hover/CodeLens helpers all run **locally** — token contents never leave your machine, and the inspector webview is sandboxed with a strict Content-Security-Policy (no remote resources). The only outbound action is opening a link in your browser when *you* explicitly click one (playground, docs, NuGet, GitHub).
+
+## Build from source
+
+```bash
+cd tools/vscode
+npm ci
+npm run compile        # tsc → out/
+npm run lint
+npm test               # unit tests (node:test)
+npx @vscode/vsce package   # → postquantum-jwt-<version>.vsix
+```
+
+The extension is plain TypeScript with **no runtime dependencies**; the webview is built from static assets in `media/`. See [`MONOREPO-SETUP.md`](MONOREPO-SETUP.md) for how it lives inside the library repo.
 
 ## License
 
