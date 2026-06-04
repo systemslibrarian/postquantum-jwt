@@ -8,6 +8,14 @@ the API between previews.
 
 ## [Unreleased]
 
+## [1.0.0-preview.6] — 2026-06-04
+
+Security and assurance update for the encrypted path (the signed-token wire
+format is unchanged). Two hardening fixes — both surfaced by the new adversarial
+fuzz suite — plus an executable assurance layer (fuzz tests, security
+invariants, a model-checked TLA+ spec) and a BenchmarkDotNet suite. Tokens
+produced by this library's builder are unaffected by the stricter decoding.
+
 ### Added
 
 - **BenchmarkDotNet project** (`benchmarks/PostQuantum.Jwt.Benchmarks`) measuring

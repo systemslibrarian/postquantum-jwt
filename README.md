@@ -40,7 +40,7 @@ drop-in replacement for OAuth/OIDC/JWT middleware**.
 > [Compared to System.IdentityModel.Tokens.Jwt](#compared-to-systemidentitymodeltokensjwt)
 > for the side-by-side.
 
-> **Status — `1.0.0-preview.5`. Production-oriented preview for controlled
+> **Status — `1.0.0-preview.6`. Production-oriented preview for controlled
 > systems; not independently audited.** The public API and wire format are held
 > stable across the `1.0.0-preview.*` series — the `preview` suffix marks the
 > **pending independent audit**, not API churn; no breaking changes are expected
@@ -57,7 +57,7 @@ drop-in replacement for OAuth/OIDC/JWT middleware**.
 ## Table of contents
 
 - [Why](#why)
-- [What's new in 1.0.0-preview.5](#whats-new-in-100-preview5)
+- [What's new in 1.0.0-preview.6](#whats-new-in-100-preview6)
 - [Install](#install)
 - [60-second tour](#60-second-tour)
 - [Usage](#usage)
@@ -118,6 +118,33 @@ OAuth/OIDC/JWT middleware or a generic JWT/JWE library.
 | Systems behind an interop-translating gateway | Anywhere generic JWT/JWE interoperability is required |
 
 ---
+
+## What's new in 1.0.0-preview.6
+
+A **security and assurance** update. Two encrypted-path hardening fixes — both
+surfaced by a new adversarial fuzz suite — plus a deeper, executable assurance
+layer. The signed-token path is unchanged on the wire.
+
+- **Security: AES-GCM tag length is pinned to the profile.** The validator no
+  longer derives the authentication-tag length from the token; it requires the
+  full 16-byte (128-bit) tag and a 12-byte nonce. Previously an attacker could
+  truncate the tag (e.g. to 120 bits) and have it still authenticate against its
+  prefix — an authentication-strength downgrade and token malleability. Tokens
+  from this library's builder are unaffected.
+- **Security: strict canonical base64url decoding** (RFC 7515 §2). Embedded
+  whitespace and non-zero "slack" bits — which would let a *different* string
+  decode to identical bytes and still verify/decrypt — are now rejected. Token
+  strings are non-malleable.
+- **Adversarial fuzzing + executable security invariants.** New `PqJwtFuzzTests`
+  (fail-closed totality + no spurious acceptance) and `SecurityInvariantsTests`
+  (signature-before-claims ordering, header-never-selects-algorithm, no profile
+  downgrade) lock the orchestration guarantees. A **TLA+ model** of the validator
+  (`docs/formal/`) is model-checked with TLC.
+- **BenchmarkDotNet suite** (`benchmarks/`): throughput, serverless cold-start,
+  and measured token sizes vs. a classical ES256 baseline.
+- **Docs:** corrected encrypted-token size (~7.8 KB, was understated), a new
+  `SECURITY.md` "Parser & protocol robustness" section, and a reconciled
+  validation-ordering contract across `SPEC.md`, the audit prompt, and the docs.
 
 ## What's new in 1.0.0-preview.5
 
@@ -357,13 +384,13 @@ Full notes in [`CHANGELOG.md`](CHANGELOG.md).
 ## Install
 
 ```bash
-dotnet add package PostQuantum.Jwt --version 1.0.0-preview.5
+dotnet add package PostQuantum.Jwt --version 1.0.0-preview.6
 ```
 
 Or in a `.csproj`:
 
 ```xml
-<PackageReference Include="PostQuantum.Jwt" Version="1.0.0-preview.5" />
+<PackageReference Include="PostQuantum.Jwt" Version="1.0.0-preview.6" />
 ```
 
 **Runtime requirement:** the native ML-KEM / ML-DSA primitives need an OpenSSL
@@ -525,7 +552,7 @@ package and call `AddPqJwtBearer(...)` on the standard
 `ML-DSA-65`.
 
 ```bash
-dotnet add package PostQuantum.Jwt.AspNetCore --version 1.0.0-preview.5
+dotnet add package PostQuantum.Jwt.AspNetCore --version 1.0.0-preview.6
 ```
 
 ```csharp
