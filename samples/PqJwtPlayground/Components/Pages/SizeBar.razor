@@ -17,7 +17,9 @@
     <p class="hint small">
         Measured this build: <strong>@PqBytes bytes</strong>
         (@(Multiple(PqBytes, es256))&times; an ES256 token).
-        ML-DSA-65 signatures are ~3.3&nbsp;KB; X-Wing encryption adds ~1.5&nbsp;KB.
+        ML-DSA-65 signatures are ~3.3&nbsp;KB; encryption roughly doubles the token
+        (the whole signed JWT becomes the AES-GCM plaintext and is re-encoded, plus
+        ~1.5&nbsp;KB of X-Wing KEM material).
         Comfortable in an <code>Authorization</code> header; usually too large for cookies.
     </p>
 </div>

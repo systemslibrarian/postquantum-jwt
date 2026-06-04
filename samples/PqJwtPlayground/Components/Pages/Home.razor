@@ -290,6 +290,8 @@
                 <p>Hybrid X-Wing: an attacker must break <em>both</em> X25519 and ML-KEM-768 to recover an encrypted payload.</p></div>
             <div class="prop"><span class="ok-dot"></span><strong>Stale &amp; replayed tokens</strong>
                 <p><code>exp</code> is required; <code>nbf</code> enforced; optional <code>jti</code> replay cache rejects reuse.</p></div>
+            <div class="prop"><span class="ok-dot"></span><strong>Malformed &amp; malleable input</strong>
+                <p>Strict canonical base64url (RFC&nbsp;7515): no slack bits, no whitespace &mdash; one string per token. Every malformed input fails closed.</p></div>
             <div class="prop warn"><span class="warn-dot"></span><strong>Not protected: interop</strong>
                 <p>Non-IANA identifiers mean these tokens are deliberately non-interoperable with standard JWT stacks.</p></div>
             <div class="prop warn"><span class="warn-dot"></span><strong>Not protected: audited assurance</strong>
@@ -334,7 +336,7 @@
                     <tr>
                         <th scope="row">Token size</th>
                         <td class="yes">Small (~0.2&ndash;0.5&nbsp;KB)</td>
-                        <td class="me warn">Large (~3&ndash;6&nbsp;KB) &mdash; PQ signatures &amp; KEM material are big</td>
+                        <td class="me warn">Large (~4.6&nbsp;KB signed, ~7.8&nbsp;KB encrypted) &mdash; PQ signatures &amp; KEM material are big</td>
                         <td class="warn">Large &mdash; same PQ size pressure</td>
                     </tr>
                     <tr>
