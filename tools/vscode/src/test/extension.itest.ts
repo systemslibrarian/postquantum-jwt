@@ -43,6 +43,21 @@ export const tests: IntegrationTest[] = [
     },
   },
   {
+    // Drives the real Webview path: nonce minting, asWebviewUri resolution, and
+    // html assignment. A throw in the renderer or panel host surfaces here.
+    name: "opens the inspector and diagram panels without error",
+    fn: async () => {
+      const ext = vscode.extensions.getExtension(EXT_ID);
+      await ext?.activate();
+      await vscode.commands.executeCommand("pqjwt.inspectToken", SIGNED_TOKEN);
+      await vscode.commands.executeCommand("pqjwt.showHybridConstruction");
+      await vscode.commands.executeCommand("pqjwt.showValidationFlow");
+      // Re-invoking reuses the single panel rather than stacking duplicates.
+      await vscode.commands.executeCommand("pqjwt.inspectToken", SIGNED_TOKEN);
+      await vscode.commands.executeCommand("workbench.action.closeAllEditors");
+    },
+  },
+  {
     name: "offers an Inspect CodeLens for an embedded token",
     fn: async () => {
       const doc = await vscode.workspace.openTextDocument({

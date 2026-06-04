@@ -22,14 +22,15 @@ export interface RenderOptions {
   cssUri: string;
   /** `webview.cspSource` for the content security policy. */
   cspSource: string;
-  /** Pre-computed playground deep-link for this token. */
-  playgroundUrl: string;
   /** Tab to show first (defaults to "token"). */
   activeTab?: TabName;
 }
 
 // ---------------------------------------------------------------------------
 // Escaping — every piece of token-derived text goes through one of these.
+// The only HTML interpolated *without* escaping is trusted static content from
+// content.ts (stage.body, XWING_FACTS, ICONS), which intentionally contains
+// markup. Never route token-derived data through those paths.
 // ---------------------------------------------------------------------------
 function esc(text: string): string {
   return text
@@ -163,12 +164,20 @@ function tokenTab(model: TokenModel): string {
            </section>`
         : "";
 
+  // The playground link encodes this token's decoded claims so the playground can
+  // pre-fill its form — so the button says so plainly when that will happen.
+  const sharesClaims = model.form === "signed" && (model.claims?.length ?? 0) > 0;
+  const playgroundLabel = sharesClaims ? "Open in Playground (sends decoded claims) ▸" : "Open in Playground ▸";
+  const playgroundTitle = sharesClaims
+    ? "Opens the live playground with this token's decoded claims encoded in the link"
+    : "Opens the live playground";
+
   return `<div class="tab-panel">
     <section class="block">
       <div class="strip-head">
         <span class="form-chip form-${model.form}">${model.form === "signed" ? "SIGNED · 3 segments" : "ENCRYPTED · 5 segments"}</span>
         <div class="actions">
-          <button class="btn primary" data-cmd="playground">Open in Playground ▸</button>
+          <button class="btn primary" data-cmd="playground" title="${attr(playgroundTitle)}">${esc(playgroundLabel)}</button>
           <button class="btn" data-cmd="copyHeader">Copy header JSON</button>
         </div>
       </div>
@@ -290,7 +299,9 @@ function validationTab(model: TokenModel): string {
 export function renderInspectorHtml(model: TokenModel, opts: RenderOptions): string {
   const csp = [
     `default-src 'none'`,
-    `img-src ${opts.cspSource} https: data:`,
+    // Only the extension's own bundled assets (cspSource) and inline data: URIs —
+    // no remote origins, so the panel can make no network requests.
+    `img-src ${opts.cspSource} data:`,
     `style-src ${opts.cspSource} 'nonce-${opts.nonce}'`,
     `script-src 'nonce-${opts.nonce}'`,
     `font-src ${opts.cspSource}`,
@@ -341,7 +352,6 @@ export function renderInspectorHtml(model: TokenModel, opts: RenderOptions): str
 
   <script nonce="${attr(opts.nonce)}">
     const vscode = acquireVsCodeApi();
-    const playgroundUrl = ${JSON.stringify(opts.playgroundUrl)};
 
     // Tab switching
     document.querySelectorAll('.tab').forEach((tab) => {
@@ -365,7 +375,8 @@ export function renderInspectorHtml(model: TokenModel, opts: RenderOptions): str
       if (!btn) return;
       const cmd = btn.getAttribute('data-cmd');
       if (cmd === 'playground') {
-        vscode.postMessage({ type: 'openExternal', url: playgroundUrl });
+        // The host opens its own trusted, pre-computed playground link.
+        vscode.postMessage({ type: 'openPlayground' });
       } else if (cmd === 'copyHeader') {
         vscode.postMessage({ type: 'copyHeader' });
       }

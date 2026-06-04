@@ -100,7 +100,14 @@ The library is .NET 10 only and needs OpenSSL 3.5+ for the native PQ primitives.
 
 ## Privacy
 
-This extension sends **no telemetry** and makes **no network calls**. Snippets, token decoding, the visual inspector, and the hover/CodeLens helpers all run **locally** — token contents never leave your machine, and the inspector webview is sandboxed with a strict Content-Security-Policy (no remote resources). The only outbound action is opening a link in your browser when *you* explicitly click one (playground, docs, NuGet, GitHub).
+This extension sends **no telemetry**, and **decodes tokens entirely locally** — your tokens are never uploaded to inspect them. Snippets, token decoding, the visual inspector, and the hover/CodeLens helpers all run **on your machine**, and the inspector webview is sandboxed with a strict Content-Security-Policy (no remote origins; scripts run only with a per-render nonce).
+
+The only data that leaves your machine is when **you** click a link:
+
+- **Open in Playground** on a *signed* token reconstructs the playground's build form from that token's **decoded claims** (subject, issuer, audience, lifetime, `jti`, and any custom claims) and encodes them into the link, so the playground can pre-fill them. **Those claim values travel in the URL to the playground** — the button says *"sends decoded claims"* when this applies, and the playground regenerates its own keys (no key material is ever encoded). Encrypted tokens have an opaque payload and open the playground plainly.
+- The other links (docs, NuGet, GitHub, plain playground) carry no token data.
+
+If you don't want any claim values to leave your machine, don't use *Open in Playground* on a token whose claims are sensitive.
 
 ## Build from source
 

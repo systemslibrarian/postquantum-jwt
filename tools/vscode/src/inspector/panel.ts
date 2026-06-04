@@ -4,17 +4,15 @@
 // host actions (open external link, copy header). All rendering is delegated to
 // the pure renderer in `html.ts`.
 import * as vscode from "vscode";
+import { randomBytes } from "crypto";
 import { buildTokenModel, type TokenModel } from "../model";
 import { buildPlaygroundUrl } from "../playground";
 import { renderInspectorHtml, type TabName } from "./html";
 
+// 32 hex chars from the host CSPRNG, fresh per render — a CSP nonce must be
+// unguessable, so it must not come from Math.random().
 function makeNonce(): string {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-  let value = "";
-  for (let i = 0; i < 32; i++) {
-    value += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return value;
+  return randomBytes(16).toString("hex");
 }
 
 interface ShowOptions {
@@ -28,6 +26,10 @@ export class InspectorPanel {
 
   private model: TokenModel;
   private activeTab: TabName;
+  // The playground link is computed host-side per render; the webview asks to
+  // open "the playground", and we open this trusted value — never a URL the
+  // webview hands back.
+  private playgroundUrl = "";
   private readonly disposables: vscode.Disposable[] = [];
 
   /** Open (or reuse) the inspector for a token. */
@@ -87,11 +89,11 @@ export class InspectorPanel {
           ? "PQ-JWT Inspector — signed"
           : "PQ-JWT Inspector";
 
+    this.playgroundUrl = buildPlaygroundUrl(this.model);
     webview.html = renderInspectorHtml(this.model, {
       nonce: makeNonce(),
       cssUri,
       cspSource: webview.cspSource,
-      playgroundUrl: buildPlaygroundUrl(this.model),
       activeTab: this.activeTab,
     });
   }
@@ -100,22 +102,13 @@ export class InspectorPanel {
     if (typeof message !== "object" || message === null) {
       return;
     }
-    const msg = message as { type?: string; url?: string };
+    const msg = message as { type?: string };
     switch (msg.type) {
-      case "openExternal":
-        // Defense-in-depth: the webview is our own nonce'd script and only ever
-        // posts the host-computed playground URL, but never hand an arbitrary
-        // posted string to openExternal — restrict to http(s).
-        if (typeof msg.url === "string") {
-          let parsed: vscode.Uri | undefined;
-          try {
-            parsed = vscode.Uri.parse(msg.url, true);
-          } catch {
-            parsed = undefined;
-          }
-          if (parsed && (parsed.scheme === "https" || parsed.scheme === "http")) {
-            await vscode.env.openExternal(parsed);
-          }
+      case "openPlayground":
+        // Open only the trusted, host-computed link — never a URL supplied by
+        // the webview message.
+        if (this.playgroundUrl) {
+          await vscode.env.openExternal(vscode.Uri.parse(this.playgroundUrl));
         }
         break;
       case "copyHeader": {

@@ -7,7 +7,6 @@ const opts: RenderOptions = {
   nonce: "nonce123",
   cssUri: "https://example/inspector.css",
   cspSource: "vscode-resource:",
-  playgroundUrl: "https://pqjwt.systemslibrarian.dev/?c=abc",
 };
 
 function seg(obj: unknown): string {
@@ -67,4 +66,30 @@ test("unknown input renders the friendly empty state, still a full doc", () => {
   const html = renderInspectorHtml(buildTokenModel("a.b"), opts);
   assert.match(html, /Not a PostQuantum\.Jwt token/);
   assert.match(html, /^<!DOCTYPE html>/);
+});
+
+test("CSP allows no remote origins (img-src is local + data: only)", () => {
+  const html = renderInspectorHtml(buildTokenModel(signed({ sub: "u" })), opts);
+  const csp = html.match(/Content-Security-Policy" content="([^"]+)"/)?.[1] ?? "";
+  assert.match(csp, /default-src 'none'/);
+  assert.doesNotMatch(csp, /https:/, "img-src must not allow remote https origins");
+  assert.match(csp, /img-src vscode-resource: data:/);
+});
+
+test("the playground button asks the host to open its own trusted link", () => {
+  const html = renderInspectorHtml(buildTokenModel(signed({ sub: "u" })), opts);
+  assert.match(html, /type: 'openPlayground'/);
+  // No URL is handed from the webview back to the host to open.
+  assert.doesNotMatch(html, /type: 'openExternal'/);
+  assert.doesNotMatch(html, /const playgroundUrl/);
+});
+
+test("the playground button discloses when it will send decoded claims", () => {
+  const withClaims = renderInspectorHtml(buildTokenModel(signed({ sub: "u", role: "admin" })), opts);
+  assert.match(withClaims, /Open in Playground \(sends decoded claims\)/);
+
+  // An encrypted token has no readable claims, so nothing is shared — no warning.
+  const enc = [seg({ alg: "X-Wing", enc: "A256GCM", cty: "JWT" }), "ek", "iv", "ct", "tag"].join(".");
+  const encrypted = renderInspectorHtml(buildTokenModel(enc), opts);
+  assert.doesNotMatch(encrypted, /sends decoded claims/);
 });
