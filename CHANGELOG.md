@@ -8,6 +8,34 @@ the API between previews.
 
 ## [Unreleased]
 
+### Fixed
+
+- **`JoseHeader.Parse` now fails-closed on a header with duplicate JSON property
+  names.** `JsonNode.Parse` returns lazily without materializing the underlying
+  dictionary, so duplicate-key detection didn't fire until the first indexer
+  access in `JoseHeader.Parse`, which then threw `ArgumentException` — a type
+  not caught by the surrounding `JsonException` filter, so it escaped `Validate`
+  as an unsealed exception (violation of the fail-closed totality contract).
+  Wrapped the indexer block to surface as
+  `PqJwtValidationException(MalformedJson)`. RFC 8259 §4 declares duplicate JSON
+  keys non-interoperable and RFC 7515 §4 requires JOSE header parameter names to
+  be unique, so rejecting these is conformant. Surfaced by the Tier 2
+  coverage-guided fuzz target (`fuzz/PostQuantum.Jwt.Fuzz/`) on its first run;
+  regression-locked by `Header_with_duplicate_keys_reports_MalformedJson` in
+  `PqJwtFailureReasonTests`.
+
+### Changed
+
+- **Tier 2 fuzz scaffold (`fuzz/PostQuantum.Jwt.Fuzz/Program.cs`) deferred
+  `PqJwtValidator` construction into the `Fuzzer.LibFuzzer.Run` callback.**
+  SharpFuzz coverage hooks write to libFuzzer's shared memory, which is only
+  mapped *inside* `Run`; constructing any instrumented type at startup hit a
+  null trace pointer and crashed before any input was fuzzed. The `sharpfuzz`
+  CLI invocation also narrows instrumentation to the `PostQuantum.Jwt.PqJwt`
+  and `PostQuantum.Jwt.Internal` prefixes — the parser/validator path — so the
+  cryptographic key generation (`PostQuantum.Jwt.Cryptography.*`) runs
+  uninstrumented at startup as intended.
+
 ## [1.0.0-preview.6] — 2026-06-04
 
 Security and assurance update for the encrypted path (the signed-token wire

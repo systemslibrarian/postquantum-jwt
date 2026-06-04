@@ -29,20 +29,31 @@ if (!MLDsa.IsSupported || !MLKem.IsSupported)
 // Keys are random per process — safe, because no fuzzer input can produce a valid
 // signature against them. Lifetime checks off so we exercise structure and
 // cryptography rather than the clock.
+//
+// Why these are local (not static field-initializers): SharpFuzz instruments
+// every method in the target assembly, including ctors. Any instrumented code
+// run *before* Fuzzer.LibFuzzer.Run maps libFuzzer's coverage shared memory
+// hits a null trace-pointer and crashes with AccessViolationException. So the
+// validator (an instrumented type) MUST be constructed inside the callback,
+// after Run has wired up shared memory. The keys above use only BCL types
+// (MLDsa, XWingPrivateKey lives in PostQuantum.Jwt.Cryptography which we keep
+// out of the sharpfuzz prefix list) so they're safe to build at startup.
 using var signingKey = MLDsa.GenerateKey(MLDsaAlgorithm.MLDsa65);
 using var verificationKey = MLDsa.ImportMLDsaPublicKey(
     MLDsaAlgorithm.MLDsa65, signingKey.ExportMLDsaPublicKey());
 using var recipient = XWingPrivateKey.Generate();
 
-var validator = new PqJwtValidator(new PqJwtValidationParameters
-{
-    SignatureVerificationKey = verificationKey,
-    DecryptionKey = recipient,
-    ValidateLifetime = false,
-});
+PqJwtValidator? validator = null;
 
 Fuzzer.LibFuzzer.Run(bytes =>
 {
+    validator ??= new PqJwtValidator(new PqJwtValidationParameters
+    {
+        SignatureVerificationKey = verificationKey,
+        DecryptionKey = recipient,
+        ValidateLifetime = false,
+    });
+
     var token = Encoding.UTF8.GetString(bytes);
     if (token.Length == 0)
     {

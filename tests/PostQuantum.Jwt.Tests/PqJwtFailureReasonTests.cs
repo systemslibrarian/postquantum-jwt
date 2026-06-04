@@ -76,6 +76,20 @@ public sealed class PqJwtFailureReasonTests
         Assert.Equal(PqJwtFailureReason.MalformedJson, reason);
     }
 
+    // Regression: Tier 2 coverage-guided fuzzing (SharpFuzz + libFuzzer) produced a
+    // 5-segment "encrypted" token whose header JSON had duplicate "enc"/"typ"/"cty"
+    // members. JsonNode.Parse accepted it (lazy), but the first indexer access in
+    // JoseHeader.Parse triggered JsonObject.InitializeDictionary → ArgumentException,
+    // which slipped past the JsonException catch and escaped Validate as an unsealed
+    // exception type. The fix wraps that path; this test pins the closed reason.
+    [Fact]
+    public void Header_with_duplicate_keys_reports_MalformedJson()
+    {
+        const string duplicates = "{\"alg\":\"ML-DSA-65\",\"typ\":\"JWT\",\"typ\":\"JWT\"}";
+        var reason = ReasonOf(() => ResolverValidator(null).Validate($"{B64(duplicates)}.{B64("{}")}.sig"));
+        Assert.Equal(PqJwtFailureReason.MalformedJson, reason);
+    }
+
     [Fact]
     public void Wrong_signature_algorithm_reports_AlgorithmNotAccepted()
     {

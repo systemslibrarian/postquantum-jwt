@@ -38,7 +38,28 @@ internal sealed class JoseHeader
                 PqJwtFailureReason.InvalidHeader, "Token header is not a JSON object.");
         }
 
-        var alg = AsString(obj["alg"]);
+        // JsonNode.Parse is lazy: JsonObject defers building its name→node dictionary
+        // until the first indexer access, and only at that point detects duplicate
+        // member names (RFC 8259 §4 declares duplicate JSON keys non-interoperable;
+        // RFC 7515 §4 requires JOSE header parameter names to be unique). The
+        // resulting ArgumentException is not a JsonException, so it slips past the
+        // catch above — wrap it here to keep Validate fail-closed.
+        string? alg, enc, typ, cty, kid;
+        try
+        {
+            alg = AsString(obj["alg"]);
+            enc = AsString(obj["enc"]);
+            typ = AsString(obj["typ"]);
+            cty = AsString(obj["cty"]);
+            kid = AsString(obj["kid"]);
+        }
+        catch (ArgumentException ex)
+        {
+            throw new PqJwtValidationException(
+                PqJwtFailureReason.MalformedJson,
+                "Token header has duplicate JSON property names.", ex);
+        }
+
         if (string.IsNullOrEmpty(alg))
         {
             throw new PqJwtValidationException(
@@ -48,10 +69,10 @@ internal sealed class JoseHeader
         return new JoseHeader
         {
             Algorithm = alg,
-            Encryption = AsString(obj["enc"]),
-            Type = AsString(obj["typ"]),
-            ContentType = AsString(obj["cty"]),
-            KeyId = AsString(obj["kid"]),
+            Encryption = enc,
+            Type = typ,
+            ContentType = cty,
+            KeyId = kid,
         };
     }
 
