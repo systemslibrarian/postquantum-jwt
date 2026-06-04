@@ -10,4 +10,7 @@
     <Project Path="tests/PostQuantum.Jwt.Tests/PostQuantum.Jwt.Tests.csproj" />
     <Project Path="tests/PostQuantum.Jwt.Analyzers.Tests/PostQuantum.Jwt.Analyzers.Tests.csproj" />
   </Folder>
+  <Folder Name="/benchmarks/">
+    <Project Path="benchmarks/PostQuantum.Jwt.Benchmarks/PostQuantum.Jwt.Benchmarks.csproj" />
+  </Folder>
 </Solution>

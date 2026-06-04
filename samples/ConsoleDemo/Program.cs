@@ -525,7 +525,7 @@ internal static class Program
             "• Fail-closed: any validation failure throws PqJwtValidationException. No alg:none, no unsigned path.\n" +
             "• Replay protection requires a shared cache across all validating nodes.\n" +
             "• X-Wing encryption is one recipient per token.\n" +
-            "• Signed token ≈ 4.5 KB; encrypted ≈ 6.5 KB — fine for Authorization headers, likely too big for cookies.")
+            "• Signed token ≈ 4.6 KB; encrypted ≈ 7.8 KB — fine for Authorization headers, likely too big for cookies.")
             .Border(BoxBorder.Rounded).Padding(1, 1));
         AnsiConsole.MarkupLine("\n[dim]Full detail: KNOWN-GAPS.md and SECURITY.md in the repository.[/]");
     }

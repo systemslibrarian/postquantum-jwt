@@ -783,13 +783,30 @@ for controlled systems rather than generic interop.
 Honest, decision-useful notes for the moment you're deciding whether to wire
 this in.
 
-**Token size.** A plain HS256 JWT is ~200 bytes. A signed PostQuantum.Jwt token
-is **~4.5 KB**: ML-DSA-65 signatures are 3,309 bytes (vs. 32–64 for HMAC/EdDSA),
-and that's after base64url encoding. A sign-then-encrypt token adds another
-**~1.5 KB** (1,120-byte X-Wing ciphertext + 12-byte nonce + 16-byte AES-GCM
-tag, base64url-encoded). Plan for ~5 KB signed, ~6.5 KB encrypted. This matters
-if you put tokens in cookies, query strings, or constrained headers — for most
-`Authorization: Bearer` flows it's fine, for cookies it likely is not.
+**Token size.** A classical ES256 JWT with the same claims is **315 bytes**
+(measured). A signed PostQuantum.Jwt token is **~4.6 KB** — about **15×** larger;
+the sign-then-encrypt form is **~7.8 KB**, about **25×**. ML-DSA-65 signatures
+are 3,309 bytes (vs. ~64 for ES256), and that's after base64url encoding. The
+encrypted token is bigger than "signed + the X-Wing ciphertext" alone because
+the *entire* signed token becomes the AES-GCM plaintext and is then base64url-
+encoded a second time (a ~33% inflation of the 4.6 KB inner token), on top of
+the ~1.5 KB X-Wing KEM ciphertext (1,120 bytes) plus a 12-byte nonce and 16-byte
+GCM tag. Plan for **~4.6 KB signed, ~7.8 KB encrypted**. This matters if you put
+tokens in cookies, query strings, or constrained headers — for most
+`Authorization: Bearer` flows it's fine, for cookies it likely is not. Reproduce
+these numbers with
+`dotnet run -c Release --project benchmarks/PostQuantum.Jwt.Benchmarks -- --sizes`.
+
+**Performance.** Sign/verify cost is dominated almost entirely by the native BCL
+lattice operation (ML-DSA-65), and encryption by ML-KEM-768; the library's own
+work — base64url, JSON, header assembly — is negligible beside a 3.3 KB
+signature. Two practical consequences: per-token CPU is higher than HMAC/EdDSA
+but fits comfortably in a `Bearer` validation path, and **first-call latency**
+carries a one-time native-init + JIT cost that matters on serverless cold
+starts. The [`benchmarks/PostQuantum.Jwt.Benchmarks`](benchmarks/PostQuantum.Jwt.Benchmarks)
+project measures warm throughput, cold-start "time to first verified token", and
+token size with BenchmarkDotNet — run it on your target hardware rather than
+trusting a quoted figure.
 
 **When to reach for encryption.** The `sign-then-encrypt` form is the right
 choice only when the claims themselves are confidential (PII, account IDs you
