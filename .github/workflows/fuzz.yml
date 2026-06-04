@@ -1,0 +1,58 @@
+# Scheduled deep fuzz: runs the FsCheck adversarial fuzz suite at a high
+# iteration count (PQJWT_FUZZ_MAXTEST) on a PQ-capable runner. This is where the
+# "rare seed" cases live — the kind that the GCM-tag-truncation bug surfaced in
+# CI at test #23. Kept OUT of PR CI so pull requests stay fast.
+name: Deep fuzz
+
+on:
+  schedule:
+    - cron: "0 7 * * *" # nightly, 07:00 UTC
+  workflow_dispatch:
+    inputs:
+      maxtest:
+        description: "FsCheck iterations per fuzz property (PQJWT_FUZZ_MAXTEST)"
+        required: false
+        default: "50000"
+
+permissions:
+  contents: read
+
+jobs:
+  deep-fuzz:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -el {0}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      - name: Set up miniconda + OpenSSL 3.5
+        uses: conda-incubator/setup-miniconda@v4
+        with:
+          auto-update-conda: false
+          activate-environment: pq
+          channels: conda-forge
+
+      - name: Install OpenSSL 3.5+ from conda-forge
+        run: |
+          conda install -y -n pq -c conda-forge "openssl>=3.5"
+          echo "PQ_OPENSSL_LIB=$CONDA/envs/pq/lib" >> "$GITHUB_ENV"
+
+      - name: Build (Release)
+        run: dotnet build tests/PostQuantum.Jwt.Tests/PostQuantum.Jwt.Tests.csproj -c Release
+
+      - name: Deep fuzz (high iteration count)
+        env:
+          PQJWT_FUZZ_MAXTEST: ${{ github.event.inputs.maxtest || '50000' }}
+        run: |
+          set -o pipefail
+          echo "Running fuzz suite at PQJWT_FUZZ_MAXTEST=$PQJWT_FUZZ_MAXTEST"
+          LD_LIBRARY_PATH="$PQ_OPENSSL_LIB${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
+            dotnet test tests/PostQuantum.Jwt.Tests/PostQuantum.Jwt.Tests.csproj -c Release --no-build \
+            --filter "FullyQualifiedName~PqJwtFuzzTests" \
+            --logger "console;verbosity=minimal"

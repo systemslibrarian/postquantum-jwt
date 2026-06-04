@@ -1,4 +1,6 @@
+using System.Globalization;
 using System.Security.Cryptography;
+using System.Text;
 using PostQuantum.Jwt.Cryptography;
 using PostQuantum.Jwt.Internal;
 
@@ -34,7 +36,7 @@ public sealed class PqJwtFuzzTests
 
     /// <summary>Arbitrary strings, fed straight in. FsCheck's string generator
     /// produces control characters, surrogate pairs, and other nasties.</summary>
-    [PqcProperty(MaxTest = 500)]
+    [FuzzProperty(500)]
     public bool Validation_is_fail_closed_for_arbitrary_strings(string? input)
     {
         // The documented null/empty argument guard is the one permitted
@@ -51,7 +53,7 @@ public sealed class PqJwtFuzzTests
     /// random bytes, in 3-part (signed) and 5-part (encrypted) layouts. This
     /// drives past the segment-count and base64url gates into the JSON / header /
     /// cryptographic-material paths that arbitrary strings rarely reach.</summary>
-    [PqcProperty(MaxTest = 300)]
+    [FuzzProperty(300)]
     public bool Validation_is_fail_closed_for_segmented_base64url_garbage(
         byte[]? a, byte[]? b, byte[]? c, byte[]? d, byte[]? e, bool fiveParts)
     {
@@ -67,7 +69,7 @@ public sealed class PqJwtFuzzTests
     /// segments. Any mutation that actually changes the bytes must be rejected —
     /// the signature (and, for encrypted tokens, the AES-GCM tag and the
     /// header-as-AAD binding) covers every byte that matters.</summary>
-    [PqcProperty(MaxTest = 100)]
+    [FuzzProperty(100)]
     public bool Mutating_a_valid_token_never_makes_it_validate(bool encrypted, int kind, int position)
     {
         var token = encrypted ? Shared.Value.ValidEncryptedToken() : Shared.Value.ValidSignedToken();
@@ -84,6 +86,50 @@ public sealed class PqJwtFuzzTests
         return RejectedCleanly(mutated);
     }
 
+    /// <summary>Fuzzes the <c>exp</c> claim through every JSON shape (in/out-of-range
+    /// integer, fractional, string, bool, array) on a <i>properly signed</i> token,
+    /// with lifetime checks on. This drives the time-claim parser (the range- and
+    /// format-guarded <c>GetUnixTime</c>) directly. The only acceptable outcomes are
+    /// a valid result (well-formed, in-range, unexpired) or a fail-closed rejection —
+    /// never an unwrapped exception (e.g. <c>FromUnixTimeSeconds</c> overflow).</summary>
+    [FuzzProperty(400)]
+    public bool Time_claim_shapes_are_fail_closed(long raw, int kind)
+    {
+        var n = raw.ToString(CultureInfo.InvariantCulture);
+        var expJson = (((kind % 5) + 5) % 5) switch
+        {
+            0 => n,                                                  // integer (often out of DateTimeOffset range)
+            1 => (raw / 3.0).ToString("R", CultureInfo.InvariantCulture), // fractional number
+            2 => $"\"{n}\"",                                         // string
+            3 => "true",                                            // boolean
+            _ => $"[{n}]",                                          // array
+        };
+        var token = Shared.Value.SignRawPayload($"{{\"sub\":\"x\",\"exp\":{expJson}}}");
+        return TotalOutcome(Shared.Value.LifetimeValidator, token);
+    }
+
+    /// <summary>Drives the decapsulation + AES-GCM decryption path directly: a
+    /// well-formed encrypted protected header (so it passes the alg/enc/cty gates)
+    /// over random KEM ciphertext, nonce, ciphertext, and tag. Random key-agreement
+    /// material can never decrypt to a validly signed inner token, so this must
+    /// always fail closed — exercising the X-Wing decapsulate, the pinned
+    /// nonce/tag-length check, and the GCM tag verification.</summary>
+    [FuzzProperty(300)]
+    public bool Encrypted_envelope_with_random_key_material_is_fail_closed(
+        byte[]? kem, byte[]? nonce, byte[]? ciphertext, byte[]? tag)
+    {
+        var header =
+            $$"""{"alg":"{{PqJwtAlgorithms.XWing}}","enc":"{{PqJwtAlgorithms.Aes256Gcm}}","typ":"{{PqJwtAlgorithms.TokenType}}","cty":"{{PqJwtAlgorithms.TokenType}}"}""";
+        var token = string.Join(
+            '.',
+            Base64Url.EncodeUtf8(header),
+            Base64Url.Encode(kem ?? []),
+            Base64Url.Encode(nonce ?? []),
+            Base64Url.Encode(ciphertext ?? []),
+            Base64Url.Encode(tag ?? []));
+        return RejectedCleanly(token);
+    }
+
     // Returns true iff the validator rejected the token through the fail-closed
     // contract. Returns false (a counterexample) if it ACCEPTED the token. Any
     // exception type other than PqJwtException propagates out — FsCheck reports
@@ -98,6 +144,22 @@ public sealed class PqJwtFuzzTests
         catch (PqJwtException)
         {
             return true; // PqJwtValidationException is a PqJwtException subtype
+        }
+    }
+
+    // Like RejectedCleanly, but acceptance is ALSO a valid outcome (the token is
+    // genuinely signed, so a well-formed claim set may legitimately validate).
+    // Only a non-PqJwtException escaping is a counterexample.
+    private static bool TotalOutcome(PqJwtValidator validator, string token)
+    {
+        try
+        {
+            validator.Validate(token);
+            return true;
+        }
+        catch (PqJwtException)
+        {
+            return true;
         }
     }
 
@@ -141,17 +203,37 @@ public sealed class PqJwtFuzzTests
         private readonly MLDsa _signingKey = TestKeys.NewSigningKey();
         private readonly XWingPrivateKey _recipient = XWingPrivateKey.Generate();
 
+        // Lifetime checks OFF: probes structure/cryptography, not the clock.
         public PqJwtValidator Validator { get; }
 
-        public Fixture() =>
-            // Lifetime checks off: this harness probes structure and cryptography,
-            // not the clock (expiry is covered deterministically elsewhere).
+        // Lifetime checks ON: used by the time-claim fuzz so exp/nbf actually parse.
+        public PqJwtValidator LifetimeValidator { get; }
+
+        public Fixture()
+        {
+            var verificationKey = TestKeys.PublicKeyOf(_signingKey);
             Validator = new PqJwtValidator(new PqJwtValidationParameters
             {
-                SignatureVerificationKey = TestKeys.PublicKeyOf(_signingKey),
+                SignatureVerificationKey = verificationKey,
                 DecryptionKey = _recipient,
                 ValidateLifetime = false,
             });
+            LifetimeValidator = new PqJwtValidator(new PqJwtValidationParameters
+            {
+                SignatureVerificationKey = verificationKey,
+            });
+        }
+
+        // Signs an arbitrary payload JSON with the real key, mirroring the builder's
+        // signing input (ASCII of the two base64url segments) so the signature is
+        // valid and validation reaches the claim-parsing stage.
+        public string SignRawPayload(string payloadJson)
+        {
+            var header = $$"""{"alg":"{{PqJwtAlgorithms.MLDsa65}}","typ":"{{PqJwtAlgorithms.TokenType}}"}""";
+            var signingInput = $"{Base64Url.EncodeUtf8(header)}.{Base64Url.EncodeUtf8(payloadJson)}";
+            var signature = _signingKey.SignData(Encoding.ASCII.GetBytes(signingInput));
+            return $"{signingInput}.{Base64Url.Encode(signature)}";
+        }
 
         public string ValidSignedToken() =>
             new PqJwtBuilder()

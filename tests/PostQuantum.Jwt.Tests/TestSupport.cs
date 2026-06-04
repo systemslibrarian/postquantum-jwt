@@ -49,6 +49,29 @@ public sealed class PqcPropertyAttribute : PropertyAttribute
     }
 }
 
+/// <summary>
+/// Property attribute for the adversarial fuzz suite. Iteration count defaults to
+/// <c>baseMaxTest</c> (kept low enough for PR CI), but the
+/// <c>PQJWT_FUZZ_MAXTEST</c> environment variable overrides it — the scheduled
+/// deep-fuzz workflow sets it high (e.g. 50000) for far broader coverage without
+/// slowing every pull request. Skips itself, like <see cref="PqcPropertyAttribute"/>,
+/// when native ML-KEM / ML-DSA is unavailable.
+/// </summary>
+public sealed class FuzzPropertyAttribute : PropertyAttribute
+{
+    public FuzzPropertyAttribute(int baseMaxTest)
+    {
+        if (!MLKem.IsSupported || !MLDsa.IsSupported)
+        {
+            Skip = "Requires native ML-KEM / ML-DSA support (OpenSSL 3.5+).";
+        }
+
+        MaxTest = int.TryParse(Environment.GetEnvironmentVariable("PQJWT_FUZZ_MAXTEST"), out var n) && n > 0
+            ? n
+            : baseMaxTest;
+    }
+}
+
 /// <summary>A deterministic clock for lifetime tests.</summary>
 internal sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
 {
