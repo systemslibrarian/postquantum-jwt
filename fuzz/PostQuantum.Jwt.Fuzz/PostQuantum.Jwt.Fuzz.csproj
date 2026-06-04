@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Coverage-guided fuzz target for PqJwtValidator.Validate, driven by SharpFuzz
+    (libFuzzer for .NET). This is a developer tool: NOT packed, NOT in the
+    solution or the PR-CI build, and it requires a one-time native toolchain
+    setup (clang + the sharpfuzz instrumenter). See README.md to build and run.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <!-- This project is built standalone (`dotnet publish`) for instrumentation,
+         not under the repo's strict-warnings gate. -->
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <AssemblyName>PostQuantum.Jwt.Fuzz</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="SharpFuzz" Version="2.1.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/PostQuantum.Jwt/PostQuantum.Jwt.csproj" />
+  </ItemGroup>
+
+</Project>

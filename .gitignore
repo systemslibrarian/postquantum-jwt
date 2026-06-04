@@ -22,6 +22,12 @@ docs/formal/states/
 *.tla2tools.jar
 tla2tools.jar
 
+# SharpFuzz output (fuzz/): published target, instrumented assemblies, crashes
+fuzz/bin/
+crash-*
+fuzz/crash-*
+libfuzzer-dotnet
+
 # IDE
 .vs/
 .vscode/*
