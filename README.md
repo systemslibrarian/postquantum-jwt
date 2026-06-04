@@ -715,7 +715,9 @@ tooling — see [Standards and interoperability status](#standards-and-interoper
 
 The normative token profile (headers, claims, validation order, rejection rules)
 is in [`docs/SPEC.md`](docs/SPEC.md); full wire-format and combiner details are in
-[`docs/design.md`](docs/design.md).
+[`docs/design.md`](docs/design.md). For measured token sizes, verification cost,
+replay-protection posture, and an ASP.NET Core migration path, see
+[**Post-quantum JWTs in .NET 10: cost and migration**](docs/PQ-JWT-COST-AND-MIGRATION.md).
 
 ---
 
