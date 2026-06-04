@@ -49,6 +49,15 @@ the API between previews.
 
 ### Security
 
+- **AES-GCM tag/nonce length is pinned to the profile, not read from the token.**
+  The validator now requires a 12-byte nonce and a full 16-byte (128-bit) tag and
+  rejects any other length before decryption. Previously it derived the tag length
+  from the token (`new AesGcm(secret, tag.Length)`); since `AesGcm` accepts any
+  12–16 byte tag, an attacker could truncate the tag (e.g. to 120 bits) and have
+  it still authenticate against its prefix — a silent authentication-strength
+  downgrade and token malleability. Tokens from this library's builder (always a
+  16-byte tag) are unaffected. Surfaced by `PqJwtFuzzTests`. (Production-code
+  change in `PqJwtValidator.Decrypt`.)
 - **Strict, canonical base64url decoding (RFC 7515 §2).** Decoding now rejects
   non-canonical encodings — embedded whitespace and non-zero "slack" bits in a
   segment's final character — that `Convert.FromBase64String` accepts silently.

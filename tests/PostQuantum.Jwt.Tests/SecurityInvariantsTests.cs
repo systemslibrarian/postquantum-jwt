@@ -112,6 +112,41 @@ public sealed class SecurityInvariantsTests
         Assert.Equal(PqJwtFailureReason.InnerNotSigned, ex.Reason);
     }
 
+    /// <summary>
+    /// The AES-GCM authentication tag and nonce lengths come from the v1 profile,
+    /// not from the token. A 16-byte tag encodes to 22 base64url characters; the
+    /// first 20 decode to a clean 15-byte (120-bit) prefix that AES-GCM would
+    /// otherwise accept as a valid shorter tag. Honouring it would downgrade
+    /// authentication strength and make the token malleable, so a tag that is not
+    /// exactly 16 bytes is rejected. (Regression for a finding from PqJwtFuzzTests.)
+    /// </summary>
+    [PqcFact]
+    public void Truncated_gcm_tag_is_rejected()
+    {
+        using var signingKey = TestKeys.NewSigningKey();
+        using var recipient = XWingPrivateKey.Generate();
+
+        var token = new PqJwtBuilder()
+            .WithSubject("subject")
+            .SignWith(signingKey)
+            .EncryptFor(recipient.PublicKey)
+            .Build();
+
+        var parts = token.Split('.');
+        parts[^1] = parts[^1][..20]; // 22 base64url chars (16 bytes) -> 20 (15 bytes)
+        var truncated = string.Join('.', parts);
+
+        var validator = new PqJwtValidator(new PqJwtValidationParameters
+        {
+            SignatureVerificationKey = TestKeys.PublicKeyOf(signingKey),
+            DecryptionKey = recipient,
+            ValidateLifetime = false,
+        });
+
+        var ex = Assert.Throws<PqJwtValidationException>(() => validator.Validate(truncated));
+        Assert.Equal(PqJwtFailureReason.DecryptionFailed, ex.Reason);
+    }
+
     // Flips the last character of the signature segment so the ML-DSA signature
     // no longer verifies, without disturbing header or payload.
     private static string TamperSignature(string token)

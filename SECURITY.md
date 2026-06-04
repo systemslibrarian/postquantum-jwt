@@ -167,6 +167,14 @@ security-invariant test suites rather than merely asserted:
   rejected with a fail-closed error. This anti-malleability property was added
   after `PqJwtFuzzTests` surfaced the lenient-decode behaviour.
 
+- **AES-GCM parameters are pinned to the profile, not read from the token.** The
+  nonce must be exactly 12 bytes and the authentication tag exactly 16 bytes
+  (128-bit); any other length is rejected before decryption. `AesGcm` itself
+  accepts any 12–16 byte tag, so deriving the tag length from the token would let
+  an attacker truncate it to 120/112/… bits — downgrading authentication strength
+  and making the token malleable (a truncated tag still authenticates against its
+  prefix). This was also surfaced by `PqJwtFuzzTests`.
+
 The validator is also a **total function** over its input: every malformed,
 truncated, oversized, or adversarial token is funnelled into the documented
 fail-closed exception types (`PqJwtValidationException` / `PqJwtException`); no
