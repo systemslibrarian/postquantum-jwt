@@ -112,6 +112,39 @@ rather than degrade on any failure:
 8. **Replay.** When a replay cache is configured, the `jti` MUST be present and
    not previously seen; a missing `jti` or a repeat MUST be rejected.
 
+The validator is a fail-closed state machine. This is the same flow the TLA+
+model in [`formal/`](formal/) model-checks — note that an encrypted token rejoins
+the *same* signed-token checks, and that the signature (step 6) is verified before
+any claim (step 7) is trusted:
+
+```mermaid
+flowchart TD
+    A([Validate token]) --> B{"length ≤ 128 KiB?"}
+    B -- no --> R[["reject · PqJwtValidationException"]]
+    B -- yes --> C{"segment count"}
+    C -- other --> R
+    C -- "5 · encrypted" --> D{"decryption key configured?"}
+    D -- no --> X[["reject · PqJwtException (misconfig)"]]
+    D -- yes --> E{"alg=X-Wing · enc=A256GCM · cty=JWT?"}
+    E -- no --> R
+    E -- yes --> F{"X-Wing decap + AES-GCM decrypt<br/>nonce=12B · tag=16B · AAD=header"}
+    F -- "fail / wrong length" --> R
+    F -- ok --> G{"inner = 3 segments?"}
+    G -- no --> R
+    G -- yes --> H
+    C -- "3 · signed" --> H{"alg = ML-DSA-65?"}
+    H -- no --> R
+    H -- yes --> I{"kid resolves to a trusted key?"}
+    I -- no --> R
+    I -- yes --> J{"ML-DSA-65 signature valid?"}
+    J -- no --> R
+    J -- yes --> K{"exp/nbf within skew? · iss/aud match?"}
+    K -- no --> R
+    K -- yes --> L{"jti present & unseen?<br/>(only if replay cache configured)"}
+    L -- no --> R
+    L -- yes --> ACC([accept · return claims])
+```
+
 ## Explicitly rejected
 
 - `alg: none`, missing `alg`, unknown `alg`, or any `alg` other than the

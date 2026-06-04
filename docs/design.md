@@ -38,6 +38,33 @@ BASE64URL(ciphertext) "." BASE64URL(tag)
 - AAD = `ASCII(BASE64URL(header))`
 - AES-256-GCM key = the 32-byte X-Wing shared secret (used directly)
 
+### At a glance
+
+**Signed (3 segments).** The ML-DSA-65 signature covers the *exact transmitted*
+header and payload bytes, so a header/payload parser differential cannot forge an
+accepted token:
+
+```mermaid
+flowchart LR
+    subgraph SI["signing input — ML-DSA-65 covers these exact bytes"]
+        direction LR
+        h1["header<br/>alg=ML-DSA-65<br/>typ=JWT · kid?"] --> p1["payload<br/>claims JSON"]
+    end
+    p1 --> sig["signature<br/>ML-DSA-65 · 3309 B"]
+```
+
+**Encrypted (5 segments, sign-then-encrypt).** The *entire* signed token is the
+AES-256-GCM plaintext — which is why an encrypted token (~7.8 KB) is larger than a
+signed one (~4.6 KB) plus the KEM material alone:
+
+```mermaid
+flowchart LR
+    h2["header<br/>alg=X-Wing · enc=A256GCM<br/>typ=JWT · cty=JWT"] --> kc["kem_ct<br/>1120 B"] --> iv["iv<br/>12 B"] --> ct["ciphertext"] --> tg["tag<br/>16 B"]
+    signed["full signed token<br/>(the 3-part JWS above)"] -- "AES-256-GCM<br/>AAD=header · key=X-Wing secret" --> ct
+```
+
+Segments are joined by `.` (JOSE compact serialization).
+
 ## X-Wing (`draft-connolly-cfrg-xwing-kem`)
 
 Shared secret:
