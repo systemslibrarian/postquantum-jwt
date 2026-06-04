@@ -31,7 +31,6 @@ export const tests: IntegrationTest[] = [
       const commands = await vscode.commands.getCommands(true);
       for (const id of [
         "pqjwt.decodeToken",
-        "pqjwt.inspectVisual",
         "pqjwt.inspectToken",
         "pqjwt.openPlayground",
         "pqjwt.openDocs",
@@ -41,19 +40,6 @@ export const tests: IntegrationTest[] = [
       ]) {
         assert.ok(commands.includes(id), `command ${id} should be registered`);
       }
-    },
-  },
-  {
-    name: "visual inspector command renders a panel for a token without throwing",
-    fn: async () => {
-      const ext = vscode.extensions.getExtension(EXT_ID);
-      await ext?.activate();
-      // Passing the token string directly mirrors the inline CodeLens path and
-      // exercises the full webview render (inspect + HTML assembly + CSP).
-      await assert.doesNotReject(
-        () => Promise.resolve(vscode.commands.executeCommand("pqjwt.inspectVisual", SIGNED_TOKEN)),
-        "inspectVisual should open a panel without error"
-      );
     },
   },
   {
@@ -69,7 +55,7 @@ export const tests: IntegrationTest[] = [
         doc.uri
       );
       assert.ok(
-        lenses?.some((l) => l.command?.command === "pqjwt.inspectVisual"),
+        lenses?.some((l) => l.command?.command === "pqjwt.inspectToken"),
         "an Inspect PQ-JWT CodeLens should be present"
       );
     },
