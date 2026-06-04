@@ -61,6 +61,22 @@ internal static class Base64Url
             default: break;
         }
 
-        return Convert.FromBase64String(sb.ToString());
+        var bytes = Convert.FromBase64String(sb.ToString());
+
+        // Strict / canonical enforcement (RFC 7515 §2): exactly one base64url
+        // string may map to a given byte sequence. Convert.FromBase64String is
+        // lenient — it silently ignores embedded whitespace and tolerates
+        // non-zero "slack" bits in the final character of a segment whose
+        // byte-length is not a multiple of three. Both make a token malleable: a
+        // *different* string decodes to identical bytes and so still verifies or
+        // decrypts. We reject anything that is not the one canonical encoding by
+        // requiring a byte-exact re-encode round-trip, so token identity is the
+        // string identity. (Surfaced by PqJwtFuzzTests.)
+        if (!string.Equals(ToString(bytes), value, StringComparison.Ordinal))
+        {
+            throw new FormatException("Non-canonical base64url encoding.");
+        }
+
+        return bytes;
     }
 }

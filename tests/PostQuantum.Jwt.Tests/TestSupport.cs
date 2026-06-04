@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using FsCheck.Xunit;
 using Xunit;
 
 namespace PostQuantum.Jwt.Tests;
@@ -24,6 +25,22 @@ public sealed class PqcFactAttribute : FactAttribute
 public sealed class PqcTheoryAttribute : TheoryAttribute
 {
     public PqcTheoryAttribute()
+    {
+        if (!MLKem.IsSupported || !MLDsa.IsSupported)
+        {
+            Skip = "Requires native ML-KEM / ML-DSA support (OpenSSL 3.5+).";
+        }
+    }
+}
+
+/// <summary>
+/// Wraps FsCheck's <see cref="PropertyAttribute"/> so the property is skipped
+/// (with a clear reason) on hosts that lack native ML-KEM / ML-DSA — the
+/// property-based counterpart of <see cref="PqcFactAttribute"/>.
+/// </summary>
+public sealed class PqcPropertyAttribute : PropertyAttribute
+{
+    public PqcPropertyAttribute()
     {
         if (!MLKem.IsSupported || !MLDsa.IsSupported)
         {

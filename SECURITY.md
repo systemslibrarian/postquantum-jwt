@@ -141,6 +141,39 @@ concatenated **last**, per `draft-connolly-cfrg-xwing-kem`. This shared secret
 is used directly as the AES-256-GCM key. The JWE protected header is bound as
 AES-GCM additional authenticated data (AAD).
 
+## Parser & protocol robustness
+
+Most JWT vulnerabilities are protocol-orchestration and parser flaws, not breaks
+of the underlying mathematics. Two structural properties are what make this
+library's parsing watertight, and both are exercised by the fuzz and
+security-invariant test suites rather than merely asserted:
+
+- **The signature covers the exact transmitted bytes.** The ML-DSA-65 signing
+  input is the ASCII string `base64url(header) "." base64url(payload)` — the
+  literal encoded segments as they appear on the wire, not a re-serialization of
+  the decoded objects. Any byte an attacker changes to exploit a header/payload
+  parser differential (whitespace, key ordering, duplicate members, encoding
+  tricks) changes the signing input and so fails verification. Combined with the
+  ordering guarantee that the signature is verified **before** any claim is
+  trusted (`docs/SPEC.md` steps 6→7, locked by `SecurityInvariantsTests`), a
+  "firewall sees one token, app sees another" differential cannot forge an
+  accepted token.
+
+- **Canonical base64url — token strings are non-malleable.** Decoding is strict
+  (RFC 7515 §2): exactly one base64url string maps to a given byte sequence.
+  Embedded whitespace and non-zero "slack" bits in a segment's final character
+  (which a lenient decoder would silently accept, and which would let a
+  *different* string decode to identical bytes and still verify/decrypt) are
+  rejected with a fail-closed error. This anti-malleability property was added
+  after `PqJwtFuzzTests` surfaced the lenient-decode behaviour.
+
+The validator is also a **total function** over its input: every malformed,
+truncated, oversized, or adversarial token is funnelled into the documented
+fail-closed exception types (`PqJwtValidationException` / `PqJwtException`); no
+other exception escapes. `PqJwtFuzzTests` checks this over random strings,
+structurally token-shaped garbage, and structure-aware mutations of valid
+tokens.
+
 ## Dependency rationale
 
 The **only** third-party dependency is **BouncyCastle.Cryptography**, used
