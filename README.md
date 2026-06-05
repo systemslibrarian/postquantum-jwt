@@ -704,7 +704,7 @@ only bearer auth, or restrict each scheme to specific routes with
 
 ## Samples
 
-Nine runnable samples live in
+Ten runnable samples live in
 [`samples/`](https://github.com/systemslibrarian/postquantum-jwt/tree/main/samples)
 — a menu-driven console tour, a real ASP.NET Core service, an interactive Blazor
 playground, refresh-token rotation, a distributed replay cache, and more. Each
@@ -730,6 +730,7 @@ current source (CI builds the whole sample solution on every push).
 | [`PqJwtPlayground`](https://github.com/systemslibrarian/postquantum-jwt/tree/main/samples/PqJwtPlayground) | Interactive Blazor UI — the [live demo](https://pqjwt.systemslibrarian.dev) above |
 | [`RefreshTokenDemo`](https://github.com/systemslibrarian/postquantum-jwt/tree/main/samples/RefreshTokenDemo) | Access/refresh split, rotation, reuse detection |
 | [`DistributedReplayCache`](https://github.com/systemslibrarian/postquantum-jwt/tree/main/samples/DistributedReplayCache) | `IPqJwtReplayCache` over Redis / `IDistributedCache` |
+| [`ProductionDeploymentDemo`](https://github.com/systemslibrarian/postquantum-jwt/tree/main/samples/ProductionDeploymentDemo) | Full issuer/verifier deployment runbook — scripted encrypted-token, tamper, replay, audience, expiry, and key-rotation checks |
 | [`SpecByExample`](https://github.com/systemslibrarian/postquantum-jwt/tree/main/samples/SpecByExample) | xUnit tests whose names are the lessons |
 | [`TestingSupport`](https://github.com/systemslibrarian/postquantum-jwt/tree/main/samples/TestingSupport) | A no-crypto test auth handler for your own `[Authorize]` endpoints |
 

@@ -10,6 +10,7 @@ Runnable demonstrations of the [PostQuantum.Jwt](../README.md) library.
 | `PqJwtPlayground`    | Blazor Server interactive UI                | Building/validating in a browser  |
 | `SpecByExample`      | xUnit tests whose names are the lessons     | Learning by stepping through code |
 | `DistributedReplayCache` | Redis / IDistributedCache `IPqJwtReplayCache` | Multi-node replay defense |
+| `ProductionDeploymentDemo` | Full issuer/verifier deployment runbook with scripted encrypted-token, tamper, replay, audience, expiry, and key-rotation checks | Operators and reviewers |
 | `TestingSupport`     | No-crypto test auth handler                 | Testing your own `[Authorize]` endpoints |
 | `RefreshTokenDemo`   | Access/refresh split with rotation + reuse detection | Logout & revocation around the token |
 | `Pq.Samples.Shared`  | Tiny shared library (`RejectionExplainer`)  | One source of truth for one thing |

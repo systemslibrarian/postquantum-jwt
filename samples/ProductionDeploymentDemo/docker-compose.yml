@@ -1,0 +1,58 @@
+# ProductionDeploymentDemo
+#
+# Build context is the REPOSITORY ROOT. Run from the repo root:
+#
+#   docker compose -f samples/ProductionDeploymentDemo/docker-compose.yml up --build
+#
+# This uses HTTP inside the private Docker Compose network for demo convenience.
+# Production key directories should use HTTPS, mTLS, a service mesh identity layer,
+# signed config, or another authenticated channel.
+
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    networks: [pqjwt-production-demo]
+
+  orders-api:
+    build:
+      context: ../..
+      dockerfile: samples/ProductionDeploymentDemo/OrdersApi/Dockerfile
+    environment:
+      ASPNETCORE_HTTP_PORTS: "8080"
+      PQJWT_ISSUER: "https://issuer.production-demo.local"
+      PQJWT_AUDIENCE: "https://orders.production-demo.local"
+      ISSUER_KEYS_URL: "http://issuer-api:8080/.well-known/pqjwt-keys"
+      # Demo-only: the key directory is HTTP inside a private Docker network.
+      # Production should use HTTPS/mTLS or another authenticated transport.
+      ALLOW_INSECURE_KEY_DIRECTORY: "true"
+      PQJWT_KEY_REFRESH_SECONDS: "1"
+      REDIS_CONNECTION: "redis:6379"
+    depends_on:
+      - redis
+    ports:
+      - "5190:8080"
+    networks: [pqjwt-production-demo]
+
+  issuer-api:
+    build:
+      context: ../..
+      dockerfile: samples/ProductionDeploymentDemo/IssuerApi/Dockerfile
+    environment:
+      ASPNETCORE_HTTP_PORTS: "8080"
+      PQJWT_ISSUER: "https://issuer.production-demo.local"
+      PQJWT_AUDIENCE: "https://orders.production-demo.local"
+      # v2 feature: default to sign-then-encrypt for issued tokens.
+      PQJWT_ENCRYPTED_TOKENS: "true"
+      ORDERS_RECIPIENT_KEY_URL: "http://orders-api:8080/.well-known/pqjwt-recipient-key"
+      PQJWT_RECIPIENT_KEY_REFRESH_SECONDS: "30"
+    depends_on:
+      - orders-api
+    ports:
+      - "5180:8080"
+    networks: [pqjwt-production-demo]
+
+networks:
+  pqjwt-production-demo:
+    driver: bridge

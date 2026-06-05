@@ -7,6 +7,8 @@
     <Project Path="ConsoleDemo/ConsoleDemo.csproj" />
     <Project Path="DistributedReplayCache/DistributedReplayCache.csproj" />
     <Project Path="PqJwtPlayground/PqJwtPlayground.csproj" />
+    <Project Path="ProductionDeploymentDemo/IssuerApi/IssuerApi.csproj" />
+    <Project Path="ProductionDeploymentDemo/OrdersApi/OrdersApi.csproj" />
     <Project Path="RefreshTokenDemo/RefreshTokenDemo.csproj" />
     <Project Path="Shared/Pq.Samples.Shared.csproj" />
     <Project Path="SpecByExample/SpecByExample.csproj" />

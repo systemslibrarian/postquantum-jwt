@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <AssemblyName>PostQuantum.Jwt.ProductionDeploymentDemo.OrdersApi</AssemblyName>
+    <RootNamespace>PostQuantum.Jwt.Samples.ProductionDeploymentDemo.OrdersApi</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\PostQuantum.Jwt\PostQuantum.Jwt.csproj" />
+    <ProjectReference Include="..\..\..\src\PostQuantum.Jwt.AspNetCore\PostQuantum.Jwt.AspNetCore.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="StackExchange.Redis" Version="2.8.16" />
+  </ItemGroup>
+
+</Project>
