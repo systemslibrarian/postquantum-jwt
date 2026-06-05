@@ -429,7 +429,14 @@ public sealed class PqJwtValidator
         switch (GetUnixTime(claims, "exp", out var exp))
         {
             case TimeClaim.Present:
-                if (now > exp + skew)
+                // `exp + skew` would overflow when `exp` is at or near
+                // DateTimeOffset.MaxValue, escaping the validator as
+                // ArgumentOutOfRangeException — a fail-closed totality
+                // violation. Guard the arithmetic: an `exp` past the
+                // max-minus-skew threshold is effectively infinite (no
+                // realistic `now` can exceed it), so the lifetime check
+                // passes by definition.
+                if (exp <= DateTimeOffset.MaxValue - skew && now > exp + skew)
                 {
                     throw new PqJwtValidationException(
                         PqJwtFailureReason.Expired, $"Token expired at {exp:O}.");
@@ -452,7 +459,11 @@ public sealed class PqJwtValidator
         switch (GetUnixTime(claims, "nbf", out var nbf))
         {
             case TimeClaim.Present:
-                if (now < nbf - skew)
+                // Symmetric guard: `nbf - skew` would underflow when `nbf`
+                // is at or near DateTimeOffset.MinValue. An `nbf` that far
+                // in the past has effectively no not-yet-valid window
+                // remaining, so the check passes by definition.
+                if (nbf >= DateTimeOffset.MinValue + skew && now < nbf - skew)
                 {
                     throw new PqJwtValidationException(
                         PqJwtFailureReason.NotYetValid, $"Token is not valid before {nbf:O}.");
