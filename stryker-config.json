@@ -1,0 +1,27 @@
+{
+  "stryker-config": {
+    "project": "PostQuantum.Jwt.csproj",
+    "test-projects": [
+      "tests/PostQuantum.Jwt.Tests/PostQuantum.Jwt.Tests.csproj"
+    ],
+    "solution": "PostQuantum.Jwt.slnx",
+    "mutate": [
+      "**/PqJwtValidator.cs",
+      "**/Internal/JoseHeader.cs",
+      "**/Internal/Base64Url.cs"
+    ],
+    "reporters": [
+      "progress",
+      "html",
+      "cleartext",
+      "json"
+    ],
+    "thresholds": {
+      "high": 85,
+      "low": 70,
+      "break": 0
+    },
+    "concurrency": 4,
+    "verbosity": "info"
+  }
+}
