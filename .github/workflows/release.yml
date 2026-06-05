@@ -194,3 +194,26 @@ jobs:
           --api-key "$NUGET_API_KEY"
           --source https://api.nuget.org/v3/index.json
           --skip-duplicate
+
+      # The analyzers package depends only on the core library identity (consumers
+      # add it alongside PostQuantum.Jwt), so it pushes after core has indexed.
+      - name: Push Roslyn analyzers
+        env:
+          PKG_VERSION: ${{ needs.pack.outputs.package_version }}
+        run: >
+          dotnet nuget push "artifacts/PostQuantum.Jwt.Analyzers.${PKG_VERSION}.nupkg"
+          --api-key "$NUGET_API_KEY"
+          --source https://api.nuget.org/v3/index.json
+          --skip-duplicate
+
+      # The dotnet-new template package scaffolds projects that PackageReference
+      # both core + AspNetCore at the same version (enforced by
+      # scripts/check-version-sync.sh), so it's pushed last after both have indexed.
+      - name: Push dotnet new templates
+        env:
+          PKG_VERSION: ${{ needs.pack.outputs.package_version }}
+        run: >
+          dotnet nuget push "artifacts/PostQuantum.Jwt.Templates.${PKG_VERSION}.nupkg"
+          --api-key "$NUGET_API_KEY"
+          --source https://api.nuget.org/v3/index.json
+          --skip-duplicate
