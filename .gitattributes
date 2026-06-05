@@ -1,0 +1,6 @@
+# Shell scripts must keep LF endings regardless of the user's core.autocrlf
+# setting. Windows checkouts that CRLF-ify scripts/check-version-sync.sh (or
+# fuzz/run.sh) cause "set: pipefail: invalid option name" inside WSL/Linux
+# because bash sees a trailing carriage return on the option name.
+*.sh   text eol=lf
+*.bash text eol=lf
