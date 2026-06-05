@@ -1,13 +1,22 @@
-@* Token-size comparison. Uses representative classical sizes and the ACTUAL
-   measured PQ token size from this build, on a shared scale, so the gap is
-   honest rather than illustrative. *@
+@* Token-size comparison. Uses MEASURED classical sizes and the ACTUAL measured
+   PQ token size from this build, on a shared scale, so the gap is honest rather
+   than illustrative. *@
 <div class="sizebar">
     <h3>Token size vs classical</h3>
     @{
-        // Representative compact-JWT sizes for the same small claim set.
-        const int hs256 = 180;   // HMAC-SHA256
-        const int es256 = 230;   // ECDSA P-256
-        const int eddsa = 240;   // Ed25519
+        // Measured against the standard iss/aud/sub/exp claim set the benchmark
+        // suite uses (benchmarks/PostQuantum.Jwt.Benchmarks/TokenSizeReport.cs).
+        // ES256 is the directly measured value from JsonWebTokenHandler on .NET
+        // 10; HS256 and EdDSA share that header + payload and only differ in
+        // signature length (HMAC-SHA256: 32 B raw → 43 base64url chars; Ed25519
+        // and ECDSA P-256: 64 B raw → 86 base64url chars), so they are computed
+        // by signature-delta from the ES256 anchor. A user's token will differ
+        // by tens of bytes from these if they type longer/shorter claim values
+        // — the comparison is against a representative real-world claim set,
+        // not against the exact bytes the playground just produced.
+        const int hs256 = 272;   // HMAC-SHA256  (ES256 - (86 - 43) = 272)
+        const int es256 = 315;   // ECDSA P-256  (measured, JsonWebTokenHandler)
+        const int eddsa = 315;   // Ed25519      (same signature length as ES256)
         int max = Math.Max(PqBytes, 1);
     }
     <div class="bar"><span class="lbl">HS256</span><span class="track"><span class="fill c1" style="width:@Pct(hs256, max)%"></span></span><span class="val">~@hs256 B</span></div>
