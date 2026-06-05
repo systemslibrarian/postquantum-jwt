@@ -22,6 +22,7 @@ repo and why.
 | **X-Wing determinism seam** | [`XWingDeterministicTests.cs`](../tests/PostQuantum.Jwt.Tests/XWingDeterministicTests.cs) | Exercises the combiner direction and the X25519 ephemeral half through an internal seam (production always uses the OS CSPRNG). |
 | **Failure-reason taxonomy** | [`PqJwtFailureReasonTests.cs`](../tests/PostQuantum.Jwt.Tests/PqJwtFailureReasonTests.cs) | Every `throw new PqJwtValidationException(...)` site is pinned to its `PqJwtFailureReason` enum value, so the typed `reason` metric tag stays sound and the bounded cardinality holds. |
 | **Security invariants** | [`SecurityInvariantsTests.cs`](../tests/PostQuantum.Jwt.Tests/SecurityInvariantsTests.cs) | Executable validator-orchestration contract: unknown `kid` rejected *before* ML-DSA verify (cheap-check-first DoS guard); signature verified *before* any claim is trusted; a 5-part encrypted token whose inner plaintext isn't a 3-part signed JWT rejected as `InnerNotSigned` (no profile downgrade). |
+| **Named red-team scenarios** | [`RedTeamScenarios.cs`](../tests/PostQuantum.Jwt.Tests/RedTeamScenarios.cs) | Structural attacks named so reviewers can find them: header `jku`/`jwk`/`x5u`/`x5c` ignored for key selection (PQJWT001's runtime counterpart); encrypted envelope with tampered inner signature → `SignatureMismatch`; header swap after encryption breaks the AEAD AAD binding → `DecryptionFailed`; `kid` collision (same string, different actual key) → `SignatureMismatch`. The class docstring cross-references already-covered attacks elsewhere in the suite so the discoverability layer is complete. |
 | **Property-based** | [`PqJwtPropertyTests.cs`](../tests/PostQuantum.Jwt.Tests/PqJwtPropertyTests.cs) | FsCheck-quantified properties over generated inputs. |
 | **Tier 1 fuzz (random)** | [`PqJwtFuzzTests.cs`](../tests/PostQuantum.Jwt.Tests/PqJwtFuzzTests.cs) | FsCheck adversarial: random strings, structurally-shaped base64url garbage, and structure-aware mutations of valid tokens. Two total properties — **fail-closed totality** (only `PqJwtException` may escape `Validate`) and **no spurious acceptance** (a fuzzer can't forge an ML-DSA-65 signature, so acceptance is a finding). Scales via the `PQJWT_FUZZ_MAXTEST` env var. |
 | **Tier 2 fuzz (coverage-guided)** | [`fuzz/PostQuantum.Jwt.Fuzz/`](../fuzz/PostQuantum.Jwt.Fuzz/) (SharpFuzz + libFuzzer) | Same two total properties as Tier 1, but driven by coverage feedback. **In its first operational run it found a real bug** (duplicate-key JOSE header escaping `Validate` as `ArgumentException`); fix shipped in `1.0.0-preview.7`. ~21M+ iterations across two follow-up runs with 0 net findings. |
@@ -37,9 +38,9 @@ repo and why.
 
 As of `1.0.0-preview.7` (+ in-flight boundary tests):
 
-- **155 tests passing, 0 skipped** — 144 in `PostQuantum.Jwt.Tests` (133 from
-  preview.7 + 11 Stryker-driven boundary tests) + 11 in
-  `PostQuantum.Jwt.Analyzers.Tests`.
+- **159 tests passing, 0 skipped** — 148 in `PostQuantum.Jwt.Tests` (133 from
+  preview.7 + 11 Stryker-driven boundary tests + 4 named red-team scenarios)
+  + 11 in `PostQuantum.Jwt.Analyzers.Tests`.
 - **Mutation kill rate** (Stryker.NET on parser + validator path): 66.31% raw,
   ~87% on behaviorally-meaningful mutations after filtering the exception-
   message-string survivors. The first Stryker run surfaced a fail-closed
