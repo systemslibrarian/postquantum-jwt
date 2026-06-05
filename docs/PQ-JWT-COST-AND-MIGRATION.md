@@ -33,11 +33,14 @@ All figures come from the repo's BenchmarkDotNet suite
 report, measured on **.NET 10**.
 
 - **Sizes are exact and reproducible** — they don't depend on hardware.
-- **Latencies are *indicative*, not authoritative.** They were taken with
-  BenchmarkDotNet's `ShortRun` job inside a shared CI/dev container, so the
-  confidence intervals are wide (signing in particular). Treat them as
-  order-of-magnitude truth and **run the suite on your own hardware** before
-  capacity-planning:
+- **Latencies are measured, not indicative.** Taken with BenchmarkDotNet's
+  `DefaultJob` (warm path: ~100 iterations per benchmark, 99.9% CI within ~1-5%
+  of the mean; cold path: 20 fresh-process launches) on **Windows 11 / .NET
+  10.0.8 / x64 RyuJIT AVX2 / Workstation GC**. The host CPU is desktop-class
+  AVX2; BenchmarkDotNet reports it as "Unknown processor" so the table below is
+  representative of that class rather than a specific SKU. Your numbers will
+  vary with the CPU's AVX2 throughput and the host OpenSSL build —
+  **re-run the suite on your own hardware** before capacity-planning:
 
   ```bash
   # sizes (exact)
@@ -76,38 +79,45 @@ around.
 
 ## 2. Verification cost
 
-Warm latency, *indicative* (ShortRun, shared container — see method note):
+Warm latency, measured (BenchmarkDotNet `DefaultJob`; see "How these numbers
+were produced" for the host):
 
 | Operation | ES256 | PQ (ML-DSA-65 / X-Wing) | Ratio |
 |---|---:|---:|---:|
-| Sign | ~36 µs | ~1.2 ms | ~34× |
-| **Verify** | ~78 µs | **~0.24 ms** | **~3×** |
-| Sign + encrypt | — | ~1.6 ms | — |
-| Decrypt + verify | — | ~0.49 ms | — |
+| Sign | 129 µs | 550 µs | 4.3× |
+| **Verify** | 115 µs | **86 µs** | **0.75× (PQ is faster)** |
+| Sign + encrypt | — | 773 µs | — |
+| Decrypt + verify | — | 214 µs | — |
 
-Allocations per op (indicative): PQ verify ~62 KB, sign ~42 KB, encrypt ~119 KB,
-decrypt+verify ~178 KB; ES256 verify ~4 KB.
+Allocations per op: PQ verify 61.6 KB, sign 42.2 KB, encrypt 118.9 KB,
+decrypt+verify 177.9 KB; ES256 sign 2.3 KB, verify 3.1 KB.
 
-Two honest framings:
+Three honest framings:
 
 - **>95% of the time is the native BCL lattice operation**, which this library
   calls but does not implement. "Verification cost" is really "what ML-DSA-65
   verification costs"; the library's own glue (base64url, JSON, header assembly)
   is a rounding error against a 3.3 KB signature. You cannot tune it, and there's
   nothing to tune.
-- **The asymmetry favours real auth workloads.** APIs *verify* far more than they
-  *sign*, and verify is the cheap PQ operation (~0.24 ms, ~3× ES256). The
-  expensive operation — signing at ~1.2 ms — is the issuer's, done once per login
-  / token mint.
+- **Verify is the cheap PQ operation — and on a modern AVX2 host it's actually
+  *faster* than ES256 verify** (86 µs vs. 115 µs in the table above; ECDSA
+  modular arithmetic doesn't vectorize the way lattice matrix-vector products
+  do). The asymmetry favours real auth workloads, which verify far more than
+  they sign. The expensive operation — signing at ~550 µs (4.3× ES256) — is
+  the issuer's, done once per login / token mint.
+- **Allocations matter for GC pressure under load.** PQ verify allocates ~62 KB
+  per call vs. ~3 KB for ES256 verify; at high RPS this is the practical cost
+  to plan for (sustained Gen0 churn), not the wall-clock. The encrypted path
+  is more expensive again (~178 KB for decrypt+verify).
 
 ### Cold start (serverless)
 
 For Azure Functions / AWS Lambda, time-to-first-request often matters more than
 steady-state throughput. Measured **time to first verified token in a fresh
 process** (generate key → sign → verify, including JIT and one-time native
-ML-DSA initialisation): **~36 ms** (high variance). That one-time cost is paid
-per cold process, not per request; steady-state verifies fall back to the ~0.24 ms
-above.
+ML-DSA initialisation): **~21 ms** (BenchmarkDotNet ColdStart, 20 fresh-process
+launches, mean 20.64 ms ± 1.6 ms). That one-time cost is paid per cold process,
+not per request; steady-state verifies fall back to the 86 µs above.
 
 ## 3. Replay protection
 
