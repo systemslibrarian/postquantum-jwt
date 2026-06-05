@@ -961,8 +961,10 @@ We aim to be honest about exactly what this library does and does not give you.
 - **Preview.** The public API and wire format are held stable across the `1.0.0-preview.*` series; the `preview` suffix reflects the pending independent audit, not expected API churn. No breaking changes are planned before the final `1.0.0`, though a security review could still force one.
 
 Full detail lives in [`SECURITY.md`](SECURITY.md),
-[`KNOWN-GAPS.md`](KNOWN-GAPS.md), and — for the test pyramid (KATs, fuzz, TLA+
-model, invariant tests, how to run each layer) — [`docs/TESTING.md`](docs/TESTING.md).
+[`KNOWN-GAPS.md`](KNOWN-GAPS.md), the test pyramid in
+[`docs/TESTING.md`](docs/TESTING.md), and — for verifying what you just
+installed (build-provenance attestations, embedded SBOM, `SHA256SUMS`,
+SourceLink, deterministic builds) — [`docs/SUPPLY-CHAIN.md`](docs/SUPPLY-CHAIN.md).
 To report a vulnerability, see `SECURITY.md`.
 
 ---
