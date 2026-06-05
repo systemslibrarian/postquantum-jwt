@@ -1,6 +1,17 @@
 # PostQuantum.Jwt ProductionDeploymentDemo
 
+> ⚠ **DEMO ONLY.** Tokens minted by the live deployment use *ephemeral* keys that
+> reset on every cold start. Public ingress is rate-limited (10/min issuer,
+> 20/min orders, per IP). Never trust these tokens for anything that matters —
+> they exist so reviewers can poke at a real running PostQuantum.Jwt
+> deployment, not for production use.
+
 A production-shaped, intentionally boring, service-to-service deployment demo for `PostQuantum.Jwt`.
+
+> **▶ Live (when deployed):** the [Issuer landing page](https://pqjwt-demo-issuer.azurecontainerapps.io/)
+> is an interactive HTML UI hosted by the IssuerApi process itself, with
+> live buttons for every demo step. See [`azure/`](azure/) for the
+> deploy-it-yourself Bicep + scripts (15 min, idle cost rounds to $0).
 
 This sample is different from the smaller samples in this repository. It does not merely show how to call the builder or validator. It shows the operational pattern around the token:
 
@@ -53,6 +64,74 @@ This is not:
 PostQuantum.Jwt intentionally targets controlled issuer/verifier systems. Generic JWT libraries do not understand this profile.
 
 ## Architecture
+
+```mermaid
+flowchart LR
+    client([Client])
+
+    subgraph env["Container Apps Environment (or Docker Compose)"]
+        direction LR
+
+        subgraph issuer["IssuerApi"]
+            issuerEndpoints["POST /token<br>POST /token/wrong-audience<br>POST /token/expired<br>POST /keys/rotate<br>GET /.well-known/pqjwt-keys"]
+        end
+
+        subgraph orders["OrdersApi"]
+            ordersEndpoints["GET /orders/123<br>GET /.well-known/pqjwt-recipient-key<br>GET /health"]
+        end
+
+        redis[(Redis<br>replay cache)]
+    end
+
+    client -- "HTTPS, rate-limited" --> issuer
+    client -- "HTTPS + Authorization: Bearer" --> orders
+    orders -- "polls JWKS-equivalent" --> issuer
+    issuer -- "fetches recipient X-Wing public key" --> orders
+    orders -- "atomic SET NX (jti, exp)" --> redis
+
+    classDef svc fill:#1c2440,stroke:#3a4480,color:#e8ecf6
+    classDef store fill:#141a30,stroke:#3a4480,color:#e8ecf6
+    class issuer,orders svc
+    class redis store
+```
+
+### Sequence — a single signed-and-encrypted token, end to end
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant C as Client
+    participant I as IssuerApi
+    participant O as OrdersApi
+    participant R as Redis
+
+    Note over I,O: At startup OrdersApi polls IssuerApi's JWKS so verification keys are warm.
+    O->>I: GET /.well-known/pqjwt-keys
+    I-->>O: { keys: [{kid, alg, key}] }
+
+    Note over I: IssuerApi also fetches OrdersApi's X-Wing recipient public key for encryption.
+    I->>O: GET /.well-known/pqjwt-recipient-key
+    O-->>I: { kid, alg: X-Wing, key }
+
+    C->>I: POST /token { sub, role, scope }
+    I->>I: Build ML-DSA-65-signed inner JWT
+    I->>I: X-Wing encrypt (sign-then-encrypt) with Orders recipient key
+    I-->>C: 200 OK { access_token, kid, encrypted: true }
+
+    C->>O: GET /orders/123 (Authorization: Bearer access_token)
+    O->>O: Decrypt with X-Wing private key
+    O->>O: Verify ML-DSA-65 signature by kid
+    O->>O: Check iss, aud, exp, nbf, claims
+    O->>R: SET NX replay:{jti} ttl=exp-now
+    R-->>O: OK / EXISTS
+    alt jti unseen
+        O-->>C: 200 OK { orderId, sub, role }
+    else replay
+        O-->>C: 401 { reason: ReplayDetected }
+    end
+```
+
+### ASCII fallback (for environments that don't render Mermaid)
 
 ```text
 +---------------------+                         +----------------------+
@@ -148,6 +227,29 @@ The Orders API:
 - uses Redis for atomic replay defense when configured
 - owns the X-Wing private key for encrypted tokens
 - returns generic 401/403 problem details without leaking validator internals
+
+## Deploy to Azure Container Apps (live demo)
+
+For a public, internet-reachable instance of this demo, the
+[`azure/`](azure/) folder has Bicep + one-shot deploy scripts. Three
+Container Apps (issuer, orders, redis sidecar) inside one managed
+Environment, scale-to-zero, public ingress with per-IP rate limiting.
+
+```powershell
+cd samples/ProductionDeploymentDemo/azure
+.\deploy.ps1                                # ~4-6 min; idle cost ≈ $0
+```
+```bash
+cd samples/ProductionDeploymentDemo/azure
+./deploy.sh                                 # ~4-6 min; idle cost ≈ $0
+```
+
+The script prints the public URLs on success. Open the Issuer landing page
+to drive the demo from a browser — every endpoint has a button. Container
+images are public on `ghcr.io/systemslibrarian/pqjwt-demo-{issuer,orders}`
+so no registry credentials are required. See
+[`azure/README.md`](azure/README.md) for cost, logs, custom domains, and
+teardown.
 
 ## Run with Docker Compose
 

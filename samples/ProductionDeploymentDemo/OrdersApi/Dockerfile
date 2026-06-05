@@ -26,11 +26,24 @@ RUN tdnf install -y gawk && tdnf clean all && \
 
 # ---- runtime ----
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-azurelinux3.0 AS runtime
+
+LABEL org.opencontainers.image.title="pqjwt-demo-orders" \
+      org.opencontainers.image.description="PostQuantum.Jwt ProductionDeploymentDemo — OrdersApi (ML-DSA-65 verification, X-Wing decryption, Redis-backed replay protection, fail-closed). Demo only — never trust these tokens for anything that matters." \
+      org.opencontainers.image.source="https://github.com/systemslibrarian/postquantum-jwt" \
+      org.opencontainers.image.url="https://github.com/systemslibrarian/postquantum-jwt/tree/main/samples/ProductionDeploymentDemo" \
+      org.opencontainers.image.documentation="https://github.com/systemslibrarian/postquantum-jwt/blob/main/samples/ProductionDeploymentDemo/README.md" \
+      org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.vendor="systemslibrarian"
+
 COPY --from=openssl /opt/conda/envs/pq /opt/conda/envs/pq
 ENV LD_LIBRARY_PATH=/opt/conda/envs/pq/lib
 
 WORKDIR /app
 COPY --from=build /app .
+
+RUN chown -R app:app /app
+USER app
+
 ENV ASPNETCORE_HTTP_PORTS=8080
 EXPOSE 8080
 ENTRYPOINT ["dotnet", "PostQuantum.Jwt.ProductionDeploymentDemo.OrdersApi.dll"]

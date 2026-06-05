@@ -25,11 +25,27 @@ RUN tdnf install -y gawk && tdnf clean all && \
 
 # ---- runtime ----
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-azurelinux3.0 AS runtime
+
+# OCI image labels — surface in GHCR / docker inspect.
+LABEL org.opencontainers.image.title="pqjwt-demo-issuer" \
+      org.opencontainers.image.description="PostQuantum.Jwt ProductionDeploymentDemo — IssuerApi (ML-DSA-65 signed tokens, optional X-Wing sign-then-encrypt, key rotation). Demo only — never trust these tokens for anything that matters." \
+      org.opencontainers.image.source="https://github.com/systemslibrarian/postquantum-jwt" \
+      org.opencontainers.image.url="https://github.com/systemslibrarian/postquantum-jwt/tree/main/samples/ProductionDeploymentDemo" \
+      org.opencontainers.image.documentation="https://github.com/systemslibrarian/postquantum-jwt/blob/main/samples/ProductionDeploymentDemo/README.md" \
+      org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.vendor="systemslibrarian"
+
 COPY --from=openssl /opt/conda/envs/pq /opt/conda/envs/pq
 ENV LD_LIBRARY_PATH=/opt/conda/envs/pq/lib
 
 WORKDIR /app
 COPY --from=build /app .
+
+# Run as non-root. The runtime image already includes an `app` user (UID 1654)
+# starting with .NET 8; we chown the working directory to it and drop perms.
+RUN chown -R app:app /app
+USER app
+
 ENV ASPNETCORE_HTTP_PORTS=8080
 EXPOSE 8080
 ENTRYPOINT ["dotnet", "PostQuantum.Jwt.ProductionDeploymentDemo.IssuerApi.dll"]

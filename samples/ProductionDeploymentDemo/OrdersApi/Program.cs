@@ -1,4 +1,7 @@
 using System.Diagnostics;
+using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.RateLimiting;
 using PostQuantum.Jwt;
 using PostQuantum.Jwt.AspNetCore;
 using PostQuantum.Jwt.Cryptography;
@@ -58,6 +61,44 @@ builder.Services.AddSingleton<IPqJwtReplayCache>(sp =>
     return new InMemoryReplayCache();
 });
 
+// Trust X-Forwarded-* from the Container Apps ingress so per-IP rate limiting
+// and audit logs see the real client address instead of the LB.
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
+});
+
+// Demo rate limit. OrdersApi sees more traffic per demo run (every verified
+// request hits it), so the default is slightly higher than IssuerApi.
+// Tighten for the live deployment via env (Container App sets
+// RATE_LIMIT_PERMITS=20, RATE_LIMIT_WINDOW_SECONDS=60). Set
+// RATE_LIMIT_PERMITS=0 to disable entirely (local testing).
+var rateLimitPermits = int.TryParse(builder.Configuration["RATE_LIMIT_PERMITS"], out var parsedPermits)
+    ? Math.Max(0, parsedPermits)
+    : 60;
+var rateLimitWindowSeconds = int.TryParse(builder.Configuration["RATE_LIMIT_WINDOW_SECONDS"], out var parsedWindow)
+    ? Math.Clamp(parsedWindow, 1, 3600)
+    : 60;
+
+if (rateLimitPermits > 0)
+{
+    builder.Services.AddRateLimiter(options =>
+    {
+        options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+        options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
+            RateLimitPartition.GetFixedWindowLimiter(
+                partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                factory: _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = rateLimitPermits,
+                    Window = TimeSpan.FromSeconds(rateLimitWindowSeconds),
+                    QueueLimit = 0,
+                }));
+    });
+}
+
 builder.Services
     .AddAuthentication(PqJwtBearerDefaults.AuthenticationScheme)
     .AddPqJwtBearer(_ => { });
@@ -93,11 +134,20 @@ app.Logger.LogWarning(
     "ProductionDeploymentDemo OrdersApi uses an EPHEMERAL X-Wing recipient key for demonstration. " +
     "Production verifiers should load recipient private keys from a vault, HSM, or sealed secret.");
 app.Logger.LogInformation(
-    "Issuer={Issuer}; Audience={Audience}; IssuerKeysUrl={IssuerKeysUrl}; KeyRefreshSeconds={RefreshSeconds}",
+    "Issuer={Issuer}; Audience={Audience}; IssuerKeysUrl={IssuerKeysUrl}; KeyRefreshSeconds={RefreshSeconds}; RateLimit={Permits}/{Window}s",
     issuer,
     audience,
     issuerKeysUrl,
-    refreshSeconds);
+    refreshSeconds,
+    rateLimitPermits,
+    rateLimitWindowSeconds);
+
+app.UseForwardedHeaders();
+
+if (rateLimitPermits > 0)
+{
+    app.UseRateLimiter();
+}
 
 app.Use(async (ctx, next) =>
 {

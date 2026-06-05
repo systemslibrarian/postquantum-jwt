@@ -16,6 +16,14 @@ patterns, and hardened usage guidance. Built on the native .NET BCL
 post-quantum primitives. It is **not independently audited** and is **not a
 drop-in replacement for OAuth/OIDC/JWT middleware**.
 
+> **▶ Live playground — <https://pqjwt.systemslibrarian.dev>** — build a token
+> (claims, lifetime, optional X-Wing encryption), validate one, and *break* one
+> in your browser, no install. The
+> [how-to guide](https://github.com/systemslibrarian/postquantum-jwt/blob/main/samples/PqJwtPlayground/USING.md)
+> walks through building, validating, and tampering. Hosted scale-to-zero to
+> keep costs near nothing — the first request after idle can take up to a
+> minute to wake; reload if needed.
+
 > ### Read this first — these tokens target controlled systems, not generic JWT interop
 >
 > PostQuantum.Jwt signs with `alg = ML-DSA-65` and (optionally) encrypts with

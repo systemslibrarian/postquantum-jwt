@@ -1,4 +1,7 @@
 using System.Diagnostics;
+using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.RateLimiting;
 using PostQuantum.Jwt;
 using PostQuantum.Jwt.Samples.ProductionDeploymentDemo.IssuerApi;
 
@@ -25,18 +28,65 @@ builder.Services.AddSingleton(sp => new RecipientKeyClient(
     TimeSpan.FromSeconds(recipientKeyRefreshSeconds),
     sp.GetRequiredService<ILogger<RecipientKeyClient>>()));
 
+// Trust X-Forwarded-* from the Container Apps ingress so per-IP rate limiting
+// sees the real client address instead of the ingress LB. KnownNetworks /
+// KnownProxies are cleared because Container Apps' edge is not a fixed CIDR.
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
+});
+
+// Demo rate limit. Defaults are generous enough for the run-demo script's
+// ~14 calls; tighten for the live deployment via env (the Container App sets
+// RATE_LIMIT_PERMITS=10, RATE_LIMIT_WINDOW_SECONDS=60). Set
+// RATE_LIMIT_PERMITS=0 to disable entirely (local testing).
+var rateLimitPermits = int.TryParse(builder.Configuration["RATE_LIMIT_PERMITS"], out var parsedPermits)
+    ? Math.Max(0, parsedPermits)
+    : 30;
+var rateLimitWindowSeconds = int.TryParse(builder.Configuration["RATE_LIMIT_WINDOW_SECONDS"], out var parsedWindow)
+    ? Math.Clamp(parsedWindow, 1, 3600)
+    : 60;
+
+if (rateLimitPermits > 0)
+{
+    builder.Services.AddRateLimiter(options =>
+    {
+        options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+        options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
+            RateLimitPartition.GetFixedWindowLimiter(
+                partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                factory: _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = rateLimitPermits,
+                    Window = TimeSpan.FromSeconds(rateLimitWindowSeconds),
+                    QueueLimit = 0,
+                }));
+    });
+}
+
 var app = builder.Build();
 
 app.Logger.LogWarning(
     "ProductionDeploymentDemo IssuerApi uses an IN-MEMORY signing key ring for demonstration. " +
     "Production issuers should use a vault, HSM, sealed secret, or another controlled key-management system.");
 app.Logger.LogInformation(
-    "Issuer={Issuer}; Audience={Audience}; EncryptedByDefault={Encrypted}; RecipientKeyUrl={RecipientKeyUrl}; RecipientKeyRefreshSeconds={RefreshSeconds}",
+    "Issuer={Issuer}; Audience={Audience}; EncryptedByDefault={Encrypted}; RecipientKeyUrl={RecipientKeyUrl}; RecipientKeyRefreshSeconds={RefreshSeconds}; RateLimit={Permits}/{Window}s",
     issuer,
     audience,
     encryptedByDefault,
     recipientKeyUrl,
-    recipientKeyRefreshSeconds);
+    recipientKeyRefreshSeconds,
+    rateLimitPermits,
+    rateLimitWindowSeconds);
+
+app.UseForwardedHeaders();
+
+if (rateLimitPermits > 0)
+{
+    app.UseRateLimiter();
+}
 
 app.Use(async (ctx, next) =>
 {
@@ -61,9 +111,7 @@ app.MapGet("/health", () => Results.Ok(new
     audience,
 }));
 
-app.MapGet("/", () => Results.Text(
-    "PostQuantum.Jwt ProductionDeploymentDemo IssuerApi. " +
-    "POST /token, GET /.well-known/pqjwt-keys, POST /keys/rotate."));
+app.MapGet("/", () => Results.Content(LandingPage.Html, "text/html; charset=utf-8"));
 
 app.MapPost("/token", async (
     DemoTokenRequest? request,
