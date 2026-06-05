@@ -94,4 +94,4 @@ Write-Host ""
 Write-Host "    Tail logs           :  az containerapp logs show -g $ResourceGroup -n $NamePrefix-issuer --follow"
 Write-Host "    Tear down           :  .\cleanup.ps1 -ResourceGroup $ResourceGroup"
 Write-Host ""
-Write-Host "    DEMO ONLY — keys are ephemeral and reset on cold start. Never trust these tokens." -ForegroundColor Yellow
+Write-Host "    DEMO ONLY - keys are ephemeral and reset on cold start. Never trust these tokens." -ForegroundColor Yellow

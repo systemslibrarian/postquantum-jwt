@@ -1,4 +1,4 @@
-# Tears down the demo resource group. Idempotent — runs `az group delete` with
+# Tears down the demo resource group. Idempotent - runs `az group delete` with
 # `--yes --no-wait`. Costs stop accruing immediately even though the actual
 # deletion takes a few minutes in the background.
 
