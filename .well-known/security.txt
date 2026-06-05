@@ -1,0 +1,18 @@
+# RFC 9116 security.txt for PostQuantum.Jwt.
+#
+# Host this file at https://<your-domain>/.well-known/security.txt when the
+# project gains a canonical web domain (today the playground lives at
+# https://pqjwt.systemslibrarian.dev). Keeping a copy in the repo also serves
+# automated supply-chain scanners that fetch security.txt out of the default
+# branch via the raw GitHub URL.
+#
+# Bump the Expires field on every refresh — a stale security.txt is worse than
+# none, because scanners treat an expired file as "no policy."
+
+Contact: https://github.com/systemslibrarian/postquantum-jwt/security/advisories/new
+Contact: https://github.com/systemslibrarian
+Expires: 2027-06-05T00:00:00.000Z
+Preferred-Languages: en
+Policy: https://github.com/systemslibrarian/postquantum-jwt/blob/main/SECURITY.md
+Acknowledgments: https://github.com/systemslibrarian/postquantum-jwt/blob/main/CHANGELOG.md
+Canonical: https://github.com/systemslibrarian/postquantum-jwt/blob/main/.well-known/security.txt

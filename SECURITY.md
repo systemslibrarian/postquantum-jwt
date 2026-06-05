@@ -17,7 +17,8 @@ decision before relying on it.
 
 | Version             | Supported           |
 |---------------------|---------------------|
-| `1.0.0-preview.5`+  | ✅ (latest preview)  |
+| `1.0.0-preview.8`   | ✅ (latest preview)  |
+| `1.0.0-preview.5`–`preview.7` | ❌ (superseded; security fixes ship in the latest preview only) |
 | `1.0.0-preview.4`   | ❌ (tagged, not published) |
 | `1.0.0-preview.3`   | ❌ (superseded)      |
 | `0.3.0-preview.*`   | ❌ (superseded)      |
@@ -32,13 +33,46 @@ During the `1.0.0-preview.*` series only the most recent preview receives fixes.
 Please report security issues **privately** — do not open a public issue for an
 exploitable flaw.
 
-- Use GitHub's **"Report a vulnerability"** (Security → Advisories) on the
-  repository, **or**
-- email the maintainer listed on the GitHub profile.
+- **Preferred:** GitHub's **"Report a vulnerability"** (Security → Advisories) on
+  the [repository](https://github.com/systemslibrarian/postquantum-jwt/security/advisories/new).
+  This routes through GitHub's coordinated-disclosure flow, keeps the report
+  private, and lets us request a CVE if one is warranted.
+- **Alternative:** email the maintainer listed on the GitHub profile.
 
 Please include a description, affected version, and a reproduction if possible.
-We aim to acknowledge within **5 business days**. As an unfunded preview
-project, timelines are best-effort and stated honestly rather than promised.
+
+### What we'll do
+
+| Step | Target time | Notes |
+|---|---|---|
+| Acknowledge receipt | within **5 business days** | A human will reply, not a bot. |
+| Initial triage (confirm / not-a-bug / out-of-scope) | within **14 days** | We'll tell you which. |
+| Fix in a private branch + draft advisory | as fast as we can | You're CC'd on the advisory. |
+| Coordinated release (patched preview + advisory + CVE if applicable) | typically within **60 days** of triage | Pre-disclosure embargo honoured; reporters are credited unless they decline. |
+
+As an unfunded preview project these are **best-effort targets**, not SLAs.
+We'll keep you informed if anything slips.
+
+### What counts as a security issue
+
+| ✅ In scope | ❌ Out of scope |
+|---|---|
+| Signature-bypass, signature-forgery, `alg`-confusion, or any way to make `Validate` return success on a token the legitimate signer did not produce | Issues that the library already documents as caller-controlled (key storage, distributed replay cache, TLS, application authorization) |
+| Decryption of an encrypted token without the recipient private key, or any AEAD bypass on the encrypted profile | The lack of an independent audit (transparently documented; this is the gating concern, not a vulnerability per se) |
+| A token that escapes `Validate` with an exception type **other than** `PqJwtException` / `PqJwtValidationException` (a fail-closed totality violation) | The lack of formal constant-time guarantees beyond what the BCL + BouncyCastle provide (transparently documented in `KNOWN-GAPS.md`) |
+| Information leak of the token, claim values, key material, or replay-cache contents via the optional metrics surface | The single-process `InMemoryReplayCache` being inappropriate for multi-node deployments (documented; `IPqJwtReplayCache` is a contract for the caller) |
+| Memory-zeroization gaps for key material | Generic JOSE-library bugs in `Microsoft.IdentityModel.Tokens` or `BouncyCastle.Cryptography` (please report upstream) |
+| Supply-chain issues affecting the `PostQuantum.Jwt*` packages | Reports against unsupported versions (see "Supported versions" above) |
+
+If you're unsure whether something is in scope, **report it anyway** — we'd
+rather triage a non-issue than miss a real one.
+
+### Acknowledgements
+
+PostQuantum.Jwt is an unfunded preview project with no bug bounty. Reporters
+who follow coordinated disclosure are credited by name (or pseudonym, your
+choice) in the published advisory and in `CHANGELOG.md` for the release that
+ships the fix. We're grateful for every report.
 
 ## Threat model
 
@@ -222,13 +256,18 @@ this library is appropriate for controlled issuer/verifier systems whose owners
 accept that risk with eyes open — not for high-risk deployments, public-facing
 auth, or anywhere generic JWT/JWE interoperability is required.
 
-The fail-closed contract is locked in by the library test suite (**119 tests**,
-`dotnet test`), including
+The fail-closed contract is locked in by the library test suite
+(**176 tests in the default `dotnet test` run**, plus an opt-in
+constant-time timing-distribution probe via `--filter Category=Timing`),
+including
 explicit checks for `alg: none` substitution, missing `alg`, header JSON
 corruption, payload that is not a JSON object, wrong content-encryption
 (`A128GCM` instead of `A256GCM`), tampered ciphertext, decryption with a
 different recipient key, replay across encrypted tokens, and `nbf`/`exp` skew
 boundaries. If a future change weakens any of these, the suite goes red.
+See [`docs/TESTING.md`](docs/TESTING.md) for the per-layer test pyramid and
+[`docs/SUPPLY-CHAIN.md`](docs/SUPPLY-CHAIN.md) for how to verify what you
+installed.
 
 ---
 
