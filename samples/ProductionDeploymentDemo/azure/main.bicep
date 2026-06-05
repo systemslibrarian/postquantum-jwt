@@ -84,7 +84,6 @@ resource redis 'Microsoft.App/containerApps@2024-03-01' = {
         targetPort: 6379
         exposedPort: 6379
         transport: 'tcp'
-        allowInsecure: true
       }
     }
     template: {
