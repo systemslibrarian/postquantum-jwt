@@ -24,7 +24,7 @@ deliberately not signed yet" below.
 
 ## Verifying what you just installed
 
-`<version>` below is whatever you installed — for example `1.0.0-preview.7`.
+`<version>` below is whatever you installed — for example `1.0.0-preview.8`.
 
 ### 1. Build provenance (every `.nupkg`)
 

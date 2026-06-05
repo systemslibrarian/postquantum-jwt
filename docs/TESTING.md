@@ -36,7 +36,7 @@ repo and why.
 
 ## Current numbers
 
-As of `1.0.0-preview.7` (+ in-flight boundary tests):
+As of `1.0.0-preview.8`:
 
 - **159 tests passing, 0 skipped** — 148 in `PostQuantum.Jwt.Tests` (133 from
   preview.7 + 11 Stryker-driven boundary tests + 4 named red-team scenarios)

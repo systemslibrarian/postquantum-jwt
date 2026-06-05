@@ -40,7 +40,7 @@ drop-in replacement for OAuth/OIDC/JWT middleware**.
 > [Compared to System.IdentityModel.Tokens.Jwt](#compared-to-systemidentitymodeltokensjwt)
 > for the side-by-side.
 
-> **Status — `1.0.0-preview.7`. Production-oriented preview for controlled
+> **Status — `1.0.0-preview.8`. Production-oriented preview for controlled
 > systems; not independently audited.** The public API and wire format are held
 > stable across the `1.0.0-preview.*` series — the `preview` suffix marks the
 > **pending independent audit**, not API churn; no breaking changes are expected
@@ -57,6 +57,7 @@ drop-in replacement for OAuth/OIDC/JWT middleware**.
 ## Table of contents
 
 - [Why](#why)
+- [What's new in 1.0.0-preview.8](#whats-new-in-100-preview8)
 - [What's new in 1.0.0-preview.7](#whats-new-in-100-preview7)
 - [What's new in 1.0.0-preview.6](#whats-new-in-100-preview6)
 - [Install](#install)
@@ -119,6 +120,40 @@ OAuth/OIDC/JWT middleware or a generic JWT/JWE library.
 | Systems behind an interop-translating gateway | Anywhere generic JWT/JWE interoperability is required |
 
 ---
+
+## What's new in 1.0.0-preview.8
+
+A focused **security** fix continuing the preview.6/preview.7 fail-closed
+hardening pass, plus a substantial assurance and transparency layer. No API
+change, no wire-format change; tokens minted by the builder are unaffected.
+
+- **Security: `exp + skew` / `nbf - skew` arithmetic is now overflow-safe.**
+  A token whose `exp` claim sat exactly at `UnixSecondsMax`
+  (`DateTimeOffset.MaxValue.ToUnixTimeSeconds()`) parsed successfully but
+  escaped `Validate` as a raw `ArgumentOutOfRangeException` from
+  `exp + skew` — a fail-closed totality violation. Symmetric underflow
+  existed for `nbf - skew` at `UnixSecondsMin`. Fix: clamp the comparison
+  (`exp` past `DateTimeOffset.MaxValue - skew` is effectively infinite, the
+  check passes by definition; `nbf` below `DateTimeOffset.MinValue + skew` is
+  symmetric). Surfaced by **the very first end-to-end Stryker.NET mutation
+  run** — writing the boundary test for the surviving equality mutant at the
+  parser bound surfaced the overflow one stack frame deeper.
+  Regression-locked by 11 new `BoundaryTests.cs` cases.
+- **Mutation testing (Stryker.NET 4.x) scoped to the parser/validator path.**
+  Latest: **66.31% raw**, **~87% on behaviorally-meaningful mutations** after
+  filtering exception-message `String`-mutator survivors (the
+  `PqJwtFailureReason` taxonomy intentionally doesn't assert on text — tests
+  pin the enum value). `stryker-config.json` + `docs/TESTING.md` methodology.
+- **Named red-team scenario suite** (`RedTeamScenarios.cs`) — structural
+  attacks named so reviewers can find them: header `jku`/`jwk`/`x5u`/`x5c`
+  ignored for key selection, tampered inner signature in encrypted envelope,
+  header-swap AEAD AAD binding, `kid` collision.
+- **New reviewer-facing docs:**
+  [`docs/TESTING.md`](docs/TESTING.md) (per-layer test pyramid + commands),
+  [`docs/SUPPLY-CHAIN.md`](docs/SUPPLY-CHAIN.md) (how to verify a release —
+  provenance, SBOM, `SHA256SUMS`, SourceLink, deterministic build), and
+  [`docs/ROADMAP-TO-1.0.md`](docs/ROADMAP-TO-1.0.md) (explicit answer to
+  "when does the `preview` suffix come off?").
 
 ## What's new in 1.0.0-preview.7
 
@@ -409,13 +444,13 @@ Full notes in [`CHANGELOG.md`](CHANGELOG.md).
 ## Install
 
 ```bash
-dotnet add package PostQuantum.Jwt --version 1.0.0-preview.7
+dotnet add package PostQuantum.Jwt --version 1.0.0-preview.8
 ```
 
 Or in a `.csproj`:
 
 ```xml
-<PackageReference Include="PostQuantum.Jwt" Version="1.0.0-preview.7" />
+<PackageReference Include="PostQuantum.Jwt" Version="1.0.0-preview.8" />
 ```
 
 **Runtime requirement:** the native ML-KEM / ML-DSA primitives need an OpenSSL
@@ -577,7 +612,7 @@ package and call `AddPqJwtBearer(...)` on the standard
 `ML-DSA-65`.
 
 ```bash
-dotnet add package PostQuantum.Jwt.AspNetCore --version 1.0.0-preview.7
+dotnet add package PostQuantum.Jwt.AspNetCore --version 1.0.0-preview.8
 ```
 
 ```csharp

@@ -8,6 +8,102 @@ the API between previews.
 
 ## [Unreleased]
 
+## [1.0.0-preview.8] — 2026-06-05
+
+Security continuation of the preview.6/preview.7 fail-closed hardening pass:
+one targeted overflow guard in the lifetime checks, **surfaced by the new
+Stryker.NET mutation-testing layer** the first time it ran end-to-end. No API
+change, no wire-format change; tokens minted by this library's builder are
+unaffected. Also: a substantial assurance and transparency layer (named
+red-team scenarios, boundary tests, mutation testing, supply-chain and testing
+docs, an explicit 1.0 roadmap).
+
+> **Release note (transparency):** like preview.5, preview.6, and preview.7,
+> this version is published manually via `dotnet nuget push` because the
+> tag-based release workflow's `NUGET_API_KEY` is still invalid. The `.nupkg`
+> files therefore do **not** carry the CI build-provenance attestation the
+> pipeline normally adds; nuget.org repository signing still applies.
+
+### Fixed
+
+- **`exp + skew` / `nbf - skew` arithmetic is now overflow-safe in
+  `PqJwtValidator`.** A token whose `exp` claim sat exactly at `UnixSecondsMax`
+  (`253402300799L == DateTimeOffset.MaxValue.ToUnixTimeSeconds()`) parsed
+  successfully but escaped `Validate` as a raw `ArgumentOutOfRangeException`
+  from `exp + skew` overflowing `DateTimeOffset.MaxValue` — one of the
+  exception classes the validator's fail-closed totality contract guarantees
+  can never escape. A symmetric underflow existed for `nbf - skew` at
+  `UnixSecondsMin`. Fix: clamp the comparison at each site (`exp` past
+  `DateTimeOffset.MaxValue - skew` is effectively infinite — the check passes
+  by definition; `nbf` below `DateTimeOffset.MinValue + skew` is symmetric).
+  Surfaced by writing the boundary test that exercises the surviving Stryker
+  equality mutant at the `UnixSecondsMax` parser bound, which immediately
+  surfaced the fail-closed totality bug one stack frame deeper.
+  Regression-locked by 11 new `BoundaryTests.cs` cases. This is the kind of
+  edge FsCheck-style adversarial fuzz and Tier 2 coverage-guided fuzz had no
+  signal to drive at directly; Stryker pointed at the precise line.
+
+### Added
+
+- **Stryker.NET mutation-testing scaffold** (`stryker-config.json`,
+  `StrykerOutput/` gitignored) scoped to the parser + validator path. Latest
+  run: **66.31% raw mutation score** over 183 testable mutants;
+  **~87% on behaviorally-meaningful mutations** after filtering the surviving
+  `String`-mutator results on exception-message text (which the
+  `PqJwtFailureReason` taxonomy intentionally doesn't assert on — tests pin
+  the enum value, not the message text). Run locally with `dotnet stryker`.
+  Methodology is documented in `docs/TESTING.md`.
+- **`BoundaryTests.cs`** — off-by-one and overflow boundary conditions
+  identified by Stryker as surviving mutants: `MaxTokenLength` cap,
+  `exp`/`nbf` skew edges, and `UnixSecondsMin`/`Max` parser bounds. 11 new
+  passing cases; the `exp == UnixSecondsMax` case is the regression test for
+  the overflow fix above.
+- **`RedTeamScenarios.cs`** — a named adversarial-scenario suite so reviewers
+  can find structural attacks by name rather than excavate them from the
+  invariants suite. Covers: header `jku`/`jwk`/`x5u`/`x5c` ignored for key
+  selection (PQJWT001's runtime counterpart); encrypted envelope with tampered
+  inner signature → `SignatureMismatch`; header swap after encryption breaks
+  the AEAD AAD binding → `DecryptionFailed`; `kid` collision (same string,
+  different actual key) → `SignatureMismatch`. Class docstring
+  cross-references attacks already covered elsewhere so the discoverability
+  layer is complete.
+- **`docs/TESTING.md`** — reviewer-facing test pyramid: every assurance layer
+  (KATs, failure-reason taxonomy, invariants, red-team, properties, Tier 1
+  random + Tier 2 coverage-guided fuzz, TLA+, metrics, ASP.NET integration,
+  analyzers, boundary tests, mutation testing) with the file path and the
+  command to run it. Companion to `KNOWN-GAPS.md`.
+- **`docs/SUPPLY-CHAIN.md`** — how to verify a release you just installed:
+  build-provenance attestation, embedded SBOM, `SHA256SUMS.txt`, SourceLink,
+  deterministic build, repository signature, the consumer-side analyzers.
+  Cross-linked from `README.md` and `KNOWN-GAPS.md`.
+- **`docs/ROADMAP-TO-1.0.md`** — explicit answer to "when does the `preview`
+  suffix come off?" Lists the gates (independent audit primarily; the
+  in-repo assurance layer is already considered sufficient otherwise).
+  Cross-linked from `README.md` and `KNOWN-GAPS.md`.
+
+### Changed
+
+- **`docs/perf` numbers in README replaced with measured BenchmarkDotNet
+  values** (replacing previous indicative latencies): ML-DSA-65 verify 86 µs,
+  ML-DSA-65 sign 550 µs, sign + encrypt 773 µs, decrypt + verify 214 µs, cold
+  start 21 ms; ES256 verify 115 µs on the same host. Source: the preview.6
+  BenchmarkDotNet suite; methodology in `docs/PQ-JWT-COST-AND-MIGRATION.md`.
+- **Playground SizeBar** (`samples/PqJwtPlayground/`) now reports the
+  measured classical baseline token sizes from the BenchmarkDotNet `--sizes`
+  run rather than indicative numbers.
+- **Release workflow now packs and pushes all four packages** (core,
+  AspNetCore, Analyzers, Templates) in the documented dependency order, not
+  just core + AspNetCore. (Still gated on the CI `NUGET_API_KEY` being valid;
+  this release continues to ship via the manual CLI path.)
+- **`KNOWN-GAPS.md` no-compression / "Compact Mode" rationale** is now
+  written down, not implied — `zip`/in-token compression and a wire-shrink
+  "Compact Mode" are deliberately out of scope for the `1.0` profile.
+
+### Fixed (build)
+
+- **`.gitattributes`** pins `.sh` / `.bash` files to LF endings so the
+  release scripts stay executable when cloned on Windows checkouts.
+
 ## [1.0.0-preview.7] — 2026-06-04
 
 Security continuation of the preview.6 fail-closed hardening pass: one targeted
