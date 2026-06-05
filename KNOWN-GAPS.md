@@ -9,7 +9,9 @@ Last reviewed for: `1.0.0-preview.7`. Companion views — what *is* tested in
 repo, by layer, with the commands to run each, lives in
 [`docs/TESTING.md`](docs/TESTING.md); how to verify a release you just
 installed (build-provenance, embedded SBOM, `SHA256SUMS`, SourceLink) lives in
-[`docs/SUPPLY-CHAIN.md`](docs/SUPPLY-CHAIN.md).
+[`docs/SUPPLY-CHAIN.md`](docs/SUPPLY-CHAIN.md); and the "when does the
+`preview` suffix come off?" answer lives in
+[`docs/ROADMAP-TO-1.0.md`](docs/ROADMAP-TO-1.0.md).
 
 ## Cryptography
 
