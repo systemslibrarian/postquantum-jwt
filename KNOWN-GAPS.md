@@ -5,7 +5,7 @@ unverified, and where the sharp edges are. Honesty over polish: if something is
 incomplete, it is listed here rather than glossed over. This file is part of the
 contract with anyone evaluating the library.
 
-Last reviewed for: `1.0.0-preview.5`.
+Last reviewed for: `1.0.0-preview.7`.
 
 ## Cryptography
 
@@ -79,7 +79,32 @@ Last reviewed for: `1.0.0-preview.5`.
   [`docs/adr/0001-algorithm-agility.md`](docs/adr/0001-algorithm-agility.md).
 - **Single recipient for encryption.** A token can be encrypted to exactly one
   X-Wing public key; multi-recipient JWE is not implemented.
-- **No compression, no detached payloads, no JSON (non-compact) serialization.**
+- **No token compression (`zip:DEF`), no "Compact Mode".** A signed token is
+  ~4.6 KB and an encrypted token is ~7.8 KB; ~95% of the signed token is the
+  ML-DSA-65 signature itself, which is essentially indistinguishable from
+  random by construction and **does not compress** (DEFLATE/Brotli/gzip on it
+  is 0%, sometimes slightly negative). What's left to compress — the JOSE
+  header (~40 B) and the claims payload (~100-300 B) — is a small fraction of
+  the total. Compressing a 200-byte payload to ~100 B saves ~133 B after
+  base64url, a ~3% reduction on a 4.6 KB token. The CPU side is asymmetric in
+  the wrong direction: DEFLATE on KB-scale input is ~100-200 µs, and verify
+  on this stack is ~86 µs on modern AVX2 (see
+  [`docs/PQ-JWT-COST-AND-MIGRATION.md`](docs/PQ-JWT-COST-AND-MIGRATION.md)) —
+  so adding decompression to the verify path roughly doubles its wall-clock
+  for a few percent of token size, and `zip:DEF` JWEs have a documented
+  decompression-bomb attack class. JWE's `"zip":"DEF"` (RFC 7516 §4.1.3)
+  could be wired into the encrypted path specifically if a concrete header
+  size limit forced it, but the savings are smaller still (the encrypted
+  payload is mostly the inner signed token, which is mostly the incompressible
+  signature). A CBOR-encoded "Compact Mode" header would save another ~20-30 B
+  by replacing JSON, at the cost of breaking JOSE compact-serialization
+  alignment — which is what makes the token recognisable to the playground
+  decoder, the VS Code inspector, and the SPEC. Token size is the cost you
+  design around (8 KB header limits are fine; cookies are not), not a cost
+  the library can engineer away meaningfully. Revisitable if a real consumer
+  reports a concrete >8 KB header limit problem.
+- **No detached payloads, no JSON (non-compact) serialization.** Compact
+  serialization only.
 
 ## API & lifecycle
 
