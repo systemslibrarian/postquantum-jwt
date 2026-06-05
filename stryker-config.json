@@ -7,6 +7,11 @@
     "solution": "PostQuantum.Jwt.slnx",
     "mutate": [
       "**/PqJwtValidator.cs",
+      "**/PqJwtBuilder.cs",
+      "**/Cryptography/XWing.cs",
+      "**/Cryptography/XWingPrivateKey.cs",
+      "**/Cryptography/XWingPublicKey.cs",
+      "**/InMemoryReplayCache.cs",
       "**/Internal/JoseHeader.cs",
       "**/Internal/Base64Url.cs"
     ],

@@ -31,16 +31,20 @@ repo and why.
 | **ASP.NET Core integration** | [`PqJwtAspNetCoreTests.cs`](../tests/PostQuantum.Jwt.Tests/PqJwtAspNetCoreTests.cs) | The bearer handler, the `HttpPqJwtKeyRing` JWKS-equivalent, and integration with the standard auth pipeline. |
 | **Roslyn analyzer tests** | [`tests/PostQuantum.Jwt.Analyzers.Tests/`](../tests/PostQuantum.Jwt.Analyzers.Tests/) | `HeaderIgnoranceAnalyzer` (PQJWT001) — flags consumer code that inspects token header fields; `ValidatorReuseAnalyzer` (PQJWT002) — flags per-call validator construction. Both are *semantic* (Roslyn semantic model), not text-pattern. |
 | **Boundary tests (Stryker-driven)** | [`BoundaryTests.cs`](../tests/PostQuantum.Jwt.Tests/BoundaryTests.cs) | Off-by-one and overflow boundary conditions specifically identified by Stryker.NET as surviving mutants on `PqJwtValidator`: `MaxTokenLength`, `exp`/`nbf` skew edges, and `UnixSecondsMin`/`Max` parser bounds. Writing the `exp == UnixSecondsMax` test surfaced a real fail-closed totality bug (raw `ArgumentOutOfRangeException` escape from `exp + skew` overflow); the fix and the regression-locking test ship together. |
-| **Mutation testing** | [`stryker-config.json`](../stryker-config.json) (Stryker.NET 4.x) | Scoped to the parser + validator path. Latest run: **66.31% raw mutation score** over 183 testable mutants. After filtering the ~40 surviving String-mutator results on exception-message text (which the failure-reason taxonomy intentionally doesn't assert on — tests pin the `PqJwtFailureReason` enum, not the message string), **~87% on behaviorally-meaningful mutations**. Run locally with `dotnet stryker`; HTML report in `StrykerOutput/`. The first operational run found the `exp+skew` overflow bug listed in the row above. |
+| **Mutation testing** | [`stryker-config.json`](../stryker-config.json) (Stryker.NET 4.x) | Scoped to the parser + validator + builder + X-Wing engine + replay cache path (`PqJwtValidator`, `PqJwtBuilder`, `Cryptography/XWing*`, `InMemoryReplayCache`, `Internal/JoseHeader`, `Internal/Base64Url`). Previous run on the parser + validator subset (preview.8 ship): **66.31% raw**, **~87% on behaviorally-meaningful mutations** after filtering the surviving String-mutator results on exception-message text (which the failure-reason taxonomy intentionally doesn't assert on — tests pin the `PqJwtFailureReason` enum, not the message string). The expanded scope needs a fresh baseline run; the first operational run on the original subset found the `exp+skew` overflow bug in the row above. Run locally with `dotnet stryker`; HTML report in `StrykerOutput/`. |
+| **Differential JOSE interop** | [`JoseInteropTests.cs`](../tests/PostQuantum.Jwt.Tests/JoseInteropTests.cs) | Tokens produced by `PqJwtBuilder` are re-parsed with `Microsoft.IdentityModel.JsonWebTokens.JsonWebTokenHandler` — an independent JOSE parser that can't verify ML-DSA but can structurally parse the wire format. Header (alg/typ/kid), issuer, subject, audience, jwt id, iat/exp, and Unicode/nested claims must all round-trip. Pins agreement on header field-set shape ({alg,typ} without kid; {alg,kid,typ} with kid) — any future header pollution would surface here. |
+| **Constant-time verify (opt-in)** | [`ConstantTimeVerifyTests.cs`](../tests/PostQuantum.Jwt.Tests/ConstantTimeVerifyTests.cs) | Welch's t-test on validate-latency distributions over 1500 interleaved samples each, comparing two tampers both inside the c̃ region (first 48 bytes of an ML-DSA-65 signature, where the verifier cannot short-circuit per FIPS 204 §8.2 alg 3). Default run: |t| ≈ 0.1 (means within ~1 µs) — no statistically detectable signature-byte-position leakage in the cryptographically meaningful region. Not a formal CT proof — managed runtime noise dictates a generous threshold (\|t\|<6). Opt-in via `dotnet test --filter Category=Timing` so noisy CI workers don't fail the main suite. |
 | **Benchmarks (not tests)** | [`benchmarks/PostQuantum.Jwt.Benchmarks/`](../benchmarks/PostQuantum.Jwt.Benchmarks/) | BenchmarkDotNet: sign / verify / sign+encrypt / decrypt+verify, cold-start "time-to-first-verified-token", and an exact token-size report. Not part of `dotnet test`; perf regression reference. |
 
 ## Current numbers
 
 As of `1.0.0-preview.8`:
 
-- **159 tests passing, 0 skipped** — 148 in `PostQuantum.Jwt.Tests` (133 from
-  preview.7 + 11 Stryker-driven boundary tests + 4 named red-team scenarios)
-  + 11 in `PostQuantum.Jwt.Analyzers.Tests`.
+- **164 tests passing in the default suite, 0 skipped** — 153 in
+  `PostQuantum.Jwt.Tests` (148 from the preview.8 ship + 5 new
+  `JoseInteropTests`) + 11 in `PostQuantum.Jwt.Analyzers.Tests`. One
+  additional opt-in timing-distribution test
+  (`ConstantTimeVerifyTests`) runs via `--filter Category=Timing`.
 - **Mutation kill rate** (Stryker.NET on parser + validator path): 66.31% raw,
   ~87% on behaviorally-meaningful mutations after filtering the exception-
   message-string survivors. The first Stryker run surfaced a fail-closed
@@ -75,7 +79,7 @@ These are not oversights — they are documented choices. See
 ## Running it yourself
 
 ```bash
-# 1. The full 144-test suite. ~5 seconds locally on a modern AVX2 box.
+# 1. The full 164-test default suite. ~6 seconds locally on a modern AVX2 box.
 dotnet test
 ```
 

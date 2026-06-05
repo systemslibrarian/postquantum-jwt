@@ -22,6 +22,12 @@
          deterministic fail-closed suite. -->
     <PackageReference Include="FsCheck.Xunit" Version="3.3.3" />
     <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="10.0.8" />
+    <!-- Differential / oracle parser. Used in JoseInteropTests to parse the
+         JOSE structure of tokens built by PqJwtBuilder with an *independent*
+         implementation. It cannot verify ML-DSA-65, but it can prove the
+         token's header + claim shape is wire-compatible with the canonical
+         .NET JOSE parser. -->
+    <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" Version="8.3.0" />
   </ItemGroup>
 
   <ItemGroup>
