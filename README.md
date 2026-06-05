@@ -960,8 +960,10 @@ We aim to be honest about exactly what this library does and does not give you.
   [Standards and interoperability status](#standards-and-interoperability-status).
 - **Preview.** The public API and wire format are held stable across the `1.0.0-preview.*` series; the `preview` suffix reflects the pending independent audit, not expected API churn. No breaking changes are planned before the final `1.0.0`, though a security review could still force one.
 
-Full detail lives in [`SECURITY.md`](SECURITY.md) and
-[`KNOWN-GAPS.md`](KNOWN-GAPS.md). To report a vulnerability, see `SECURITY.md`.
+Full detail lives in [`SECURITY.md`](SECURITY.md),
+[`KNOWN-GAPS.md`](KNOWN-GAPS.md), and — for the test pyramid (KATs, fuzz, TLA+
+model, invariant tests, how to run each layer) — [`docs/TESTING.md`](docs/TESTING.md).
+To report a vulnerability, see `SECURITY.md`.
 
 ---
 
