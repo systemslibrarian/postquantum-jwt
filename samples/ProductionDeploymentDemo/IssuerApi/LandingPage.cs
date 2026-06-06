@@ -389,11 +389,11 @@ internal static class LandingPage
 </head>
 <body>
   <div class="banner">
-    <b>DEMO ONLY.</b> Ephemeral keys reset on cold start, public ingress is rate-limited
-    (10/min issuer, 20/min orders, per IP), Redis sidecar has no persistence.
-    <b>Never trust tokens issued here.</b> This deployment exists so security reviewers can
-    poke at a real running <a href="https://github.com/systemslibrarian/postquantum-jwt">PostQuantum.Jwt</a>
-    instance, not for production use.
+    <b>DEMO ONLY.</b> Ephemeral keys reset on cold start; the Redis sidecar has no
+    persistence. <b>Never trust tokens issued here.</b> This deployment exists so security
+    reviewers can poke at a real running
+    <a href="https://github.com/systemslibrarian/postquantum-jwt">PostQuantum.Jwt</a> instance,
+    not for production use.
   </div>
 
   <header class="hero">
