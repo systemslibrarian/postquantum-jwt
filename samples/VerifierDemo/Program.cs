@@ -28,24 +28,38 @@ var builder = WebApplication.CreateBuilder(args);
 var keysUrl = builder.Configuration["ISSUER_KEYS_URL"]
     ?? "http://localhost:5080/.well-known/pqjwt-keys";
 
-// Build the HTTP-backed key ring ONCE and capture it in the auth closure below.
-// HttpPqJwtKeyRing caches fetched public keys and refreshes on its interval; an
-// unknown kid forces a single refresh before resolving to null (fail closed).
-// No signing key ever lives in this process - it only holds public verification
-// keys it fetched from the issuer.
-var http = new HttpClient();
-var keyRing = new HttpPqJwtKeyRing(
-    http,
-    new Uri(keysUrl),
-    refreshInterval: TimeSpan.FromSeconds(30));   // short, so rotation is visible in a demo
+// HttpPqJwtKeyRing is registered as BOTH a singleton AND a hosted service:
+//   - The singleton holds the in-memory cache + the long-lived HttpClient.
+//   - The hosted service runs StartAsync at app start — one preload, then a
+//     PeriodicTimer-driven background refresh on the configured interval so
+//     rotations are visible to /verify without a redeploy.
+// Resolve(kid) is then a pure in-memory lookup on the auth request path,
+// never blocking on HTTP. No signing key ever lives in this process — only
+// the public verification keys it fetched from the issuer.
+//
+// The HttpClient's SocketsHttpHandler uses a 2-minute PooledConnectionLifetime
+// so DNS TTLs are honored — important when the issuer container recycles to
+// a new IP behind the same hostname.
+builder.Services.AddSingleton(_ =>
+    new HttpPqJwtKeyRing(
+        new HttpClient(new SocketsHttpHandler { PooledConnectionLifetime = TimeSpan.FromMinutes(2) }),
+        new Uri(keysUrl),
+        refreshInterval: TimeSpan.FromSeconds(30)));   // short, so rotation is visible in a demo
+builder.Services.AddHostedService(sp => sp.GetRequiredService<HttpPqJwtKeyRing>());
 
 builder.Services
     .AddAuthentication(PqJwtBearerDefaults.AuthenticationScheme)
-    .AddPqJwtBearer(options =>
+    .AddPqJwtBearer(_ => { });
+
+builder.Services
+    .AddOptions<PqJwtBearerOptions>(PqJwtBearerDefaults.AuthenticationScheme)
+    .Configure<HttpPqJwtKeyRing>((options, keyRing) =>
     {
         options.ValidationParameters = new PqJwtValidationParameters
         {
-            // Every token's kid is resolved through the HTTP key ring.
+            // Every token's kid is resolved through the HTTP key ring's cache —
+            // a pure in-memory lookup. The cache is kept current by the hosted
+            // service's background refresh registered above.
             SignatureKeyResolver = kid => keyRing.Resolve(kid),
             ValidIssuer = Issuer,
             ValidAudience = Audience,

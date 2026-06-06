@@ -49,6 +49,36 @@ public sealed class PqJwtAspNetCoreTests
         Assert.Contains("admin", body, StringComparison.Ordinal);
     }
 
+    [PqcTheory]
+    [InlineData("bearer")]
+    [InlineData("BEARER")]
+    [InlineData("BeArEr")]
+    public async Task Authorization_scheme_matching_is_case_insensitive(string scheme)
+    {
+        // Regression: PqJwtBearerHandler used StringComparison.Ordinal on the
+        // "Bearer " prefix, which would reject standards-compliant case
+        // variants like "bearer" or "BEARER". RFC 9110 §11.1 defines
+        // auth-scheme as a case-insensitive token; the handler now uses
+        // OrdinalIgnoreCase to match.
+        using var signingKey = TestKeys.NewSigningKey();
+        var clock = new FixedTimeProvider(Now);
+
+        var token = new PqJwtBuilder(clock)
+            .WithIssuer("https://issuer.example")
+            .WithSubject("alice")
+            .WithAudience("https://api.example")
+            .WithLifetime(TimeSpan.FromMinutes(10))
+            .SignWith(signingKey)
+            .Build();
+
+        using var server = await CreateTestServer(signingKey, clock);
+        using var client = server.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(scheme, token);
+
+        var response = await client.GetAsync(new Uri("/me", UriKind.Relative));
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
     [PqcFact]
     public async Task A_missing_bearer_token_returns_401()
     {

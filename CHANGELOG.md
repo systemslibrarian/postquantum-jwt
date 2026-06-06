@@ -8,6 +8,28 @@ the API between previews.
 
 ## [Unreleased]
 
+### Fixed
+
+- **`PqJwtBearerHandler` accepted the `Authorization` scheme as case-sensitive
+  ("Bearer " only), in violation of RFC 9110 §11.1 ("auth-scheme tokens are
+  case-insensitive").** Requests presenting valid tokens with `Authorization:
+  bearer …` or `Authorization: BEARER …` were rejected as no-result and the
+  token never validated. Switched the prefix check from
+  `StringComparison.Ordinal` to `StringComparison.OrdinalIgnoreCase`. The
+  token slice length is unchanged (fixed at the prefix's wire length). New
+  theory test covers `bearer` / `BEARER` / `BeArEr` against the live handler.
+- **`samples/VerifierDemo/Program.cs` was broken by the preview.9
+  `HttpPqJwtKeyRing` `IHostedService` refactor.** The sample constructed the
+  key ring as a local variable and wired `Resolve(kid)` into
+  `SignatureKeyResolver`, but never called `PreloadAsync` or registered the
+  hosted service — so the cache stayed empty and `/verify` failed closed with
+  `UnknownKeyId` on every request. Refactored the sample to the canonical
+  preview.9 pattern: register `HttpPqJwtKeyRing` as both a singleton and a
+  hosted service, then resolve `IPqJwtKeyRing` from DI inside the bearer
+  options configuration. Also added `SocketsHttpHandler` with
+  `PooledConnectionLifetime = 2 minutes` for DNS-TTL honouring in container
+  environments.
+
 ## [1.0.0-preview.9] — 2026-06-05
 
 A concurrency / lifecycle hardening pass on `InMemoryReplayCache` and

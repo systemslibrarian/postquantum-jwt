@@ -57,10 +57,14 @@ public sealed class PqJwtBearerHandler : AuthenticationHandler<PqJwtBearerOption
     protected override Task<AuthenticateResult> HandleAuthenticateAsync()
     {
         // No header / wrong scheme → "no result" rather than "fail": lets other
-        // schemes get a shot at the request.
+        // schemes get a shot at the request. HTTP auth-scheme matching is
+        // case-insensitive per RFC 9110 §11.1 ("auth-scheme tokens are
+        // case-insensitive"), so we accept `Bearer`, `bearer`, `BEARER`, etc.
+        // The token slice length is fixed at PqJwtBearerDefaults.BearerPrefix.Length
+        // (7), which is the wire length regardless of the prefix's casing.
         var authorization = Request.Headers.Authorization.ToString();
         if (string.IsNullOrEmpty(authorization) ||
-            !authorization.StartsWith(PqJwtBearerDefaults.BearerPrefix, StringComparison.Ordinal))
+            !authorization.StartsWith(PqJwtBearerDefaults.BearerPrefix, StringComparison.OrdinalIgnoreCase))
         {
             return Task.FromResult(AuthenticateResult.NoResult());
         }
