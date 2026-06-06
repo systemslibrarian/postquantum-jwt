@@ -36,4 +36,10 @@ internal static partial class Logging
         Level = LogLevel.Warning,
         Message = "PqJwt key ring fetch from {Endpoint} failed.")]
     public static partial void KeyRingFetchFailed(this ILogger logger, Exception exception, Uri endpoint);
+
+    [LoggerMessage(
+        EventId = 6,
+        Level = LogLevel.Warning,
+        Message = "PqJwt key ring failed to dispose quarantined ML-DSA key for kid {Kid}; resource will be reclaimed by the GC finalizer.")]
+    public static partial void KeyRingQuarantineDisposeFailed(this ILogger logger, Exception exception, string kid);
 }

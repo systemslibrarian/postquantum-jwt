@@ -8,6 +8,79 @@ the API between previews.
 
 ## [Unreleased]
 
+A concurrency / lifecycle hardening pass on `InMemoryReplayCache` and
+`HttpPqJwtKeyRing`. **One behaviour change in `HttpPqJwtKeyRing`** —
+`Resolve` is now a pure in-memory lookup and the type implements
+`IHostedService`; consumers must register it as a hosted service to keep
+the cache refreshed. Calling `Resolve` no longer drives a synchronous HTTP
+fetch.
+
+### Fixed
+
+- **`InMemoryReplayCache.Prune` could evict a still-live entry under
+  concurrent registration, opening a single-process replay window.** The
+  prune sweep removed entries by key alone; a concurrent `TryRegister`
+  that replaced a just-expired entry with a fresh `expiresAt` between the
+  enumerator's read and the `TryRemove` would have its live entry
+  deleted, and the next presentation of the same `jti` could slip past
+  replay defense. Fixed by switching to the atomic compare-and-remove
+  facade `((ICollection<KeyValuePair<string, DateTimeOffset>>)_seen)
+  .Remove(entry)` — the entry is only pruned if BOTH the key AND the
+  value still match what the enumerator observed.
+- **`HttpPqJwtKeyRing` disposed an ML-DSA handle inline during cache
+  replacement, racing concurrent `Resolve` callers and crashing them
+  with `ObjectDisposedException` on the verify path.** The `AddOrUpdate`
+  factory ran under `ConcurrentDictionary`'s per-bucket lock but
+  `Resolve` could have already read the old reference outside that lock
+  and be mid-`VerifyData` on the native pointer. Replaced inline
+  `old.Dispose()` with a 30-second deferred-disposal quarantine queue
+  drained on every refresh — same pattern as the
+  `ProductionDeploymentDemo`'s `IssuerKeyRing`.
+- **`HttpPqJwtKeyRing` left evicted (rotated-out) keys un-disposed,
+  relying on the GC finalizer.** Now routed through the same quarantine
+  queue so disposal is deferred-but-deterministic, honouring CLAUDE.md's
+  "dispose anything holding key handles" rule without re-introducing the
+  inline-dispose race.
+
+### Changed
+
+- **`HttpPqJwtKeyRing.Resolve` is now a pure in-memory lookup; refresh
+  runs in the background via `IHostedService`.** The previous
+  sync-over-async pattern (`RefreshIfDue(...).GetAwaiter().GetResult()`
+  on the request path) risked thread-pool starvation under load — a
+  momentary slowdown on the key-directory endpoint could exhaust ASP.NET
+  Core worker threads and deadlock the entire host. The new shape:
+  - `Resolve(kid)` returns whatever is in the cache and never blocks on
+    HTTP; an unknown kid returns `null` so the bearer handler reports
+    `UnknownKeyId` cleanly instead of hanging on a synchronous fetch.
+  - `StartAsync` performs one preload then spawns a `PeriodicTimer`-driven
+    refresh loop on a `Task.Run` background thread.
+  - `StopAsync` cancels the loop.
+  - `PreloadAsync` still works for tests / manual warm-ups.
+
+  **Action required:** register the type as both a singleton and a hosted
+  service:
+  ```csharp
+  services.AddSingleton(sp => new HttpPqJwtKeyRing(...));
+  services.AddHostedService(sp => sp.GetRequiredService<HttpPqJwtKeyRing>());
+  ```
+  Consumers that only registered the singleton will see an empty cache
+  and `UnknownKeyId` for every kid until they add the hosted-service
+  registration or call `PreloadAsync` themselves. This is intentional —
+  the old "Resolve auto-fetches" semantics were the source of the
+  deadlock risk and there is no safe way to keep them in a synchronous
+  signature.
+
+### Added
+
+- **`HttpPqJwtKeyRing` skips the ML-DSA reimport when a kid's published
+  base64 hasn't changed.** A parallel `ConcurrentDictionary<string,
+  string>` records the last-imported base64 per kid; the refresh loop
+  short-circuits on match. Under steady state, native-handle churn drops
+  from ~12-per-minute-per-kid (under a 5-minute interval the old code
+  re-imported on every poll regardless of whether the JWKS changed) to
+  zero.
+
 ## [1.0.0-preview.8] — 2026-06-05
 
 Security continuation of the preview.6/preview.7 fail-closed hardening pass:

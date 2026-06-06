@@ -78,7 +78,17 @@ public sealed class InMemoryReplayCache : IPqJwtReplayCache
         {
             if (entry.Value <= now)
             {
-                _seen.TryRemove(entry.Key, out _);
+                // Atomic compare-and-remove: only delete the entry if BOTH the
+                // key AND the value still match what the enumerator observed.
+                // Without this, a concurrent TryRegister could have already
+                // replaced the stale expiry with a fresh one between the
+                // enumerator's read and the remove, and we would evict a
+                // perfectly valid LIVE entry. The resulting "phantom
+                // forgetfulness" would let the same jti slip through replay
+                // defense on its next presentation — a real replay-attack
+                // surface in single-process deployments. ConcurrentDictionary
+                // exposes this via its ICollection<KeyValuePair> facade.
+                ((ICollection<KeyValuePair<string, DateTimeOffset>>)_seen).Remove(entry);
             }
         }
     }
