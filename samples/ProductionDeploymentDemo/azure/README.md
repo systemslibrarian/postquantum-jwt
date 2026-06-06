@@ -99,10 +99,51 @@ internal warm-up (`IssuerKeyRing` fetching the issuer's JWKS).
 ## Custom domain (optional)
 
 After the initial deploy, you can bind a custom domain (e.g.
-`demo.pqjwt.systemslibrarian.dev`) to the Issuer Container App via the
-portal: **Container App → Custom domains → Add custom domain**. You'll need
-a `CNAME` and a `TXT` validation record in your DNS provider; Container
-Apps issues a managed TLS certificate for free.
+`demo.pqjwt.systemslibrarian.dev`) to the Issuer Container App. You'll need
+two DNS records and one CLI command pair; Container Apps issues a managed
+TLS certificate for free.
+
+**Step 1.** In your DNS provider, add:
+
+| Type | Name | Value |
+|---|---|---|
+| CNAME | `<sub>` (e.g. `demo.pqjwt`) — DNS only on Cloudflare (gray cloud) | `pqjwt-demo-issuer.<env-default-domain>` |
+| TXT | `asuid.<sub>` (e.g. `asuid.demo.pqjwt`) | from `az containerapp show -n pqjwt-demo-issuer -g pqjwt-demo-rg --query 'properties.customDomainVerificationId' -o tsv` |
+
+**Step 2.** Bind + request the free managed cert (~5–15 min to issue):
+
+```powershell
+az containerapp hostname add -n pqjwt-demo-issuer -g pqjwt-demo-rg --hostname demo.pqjwt.systemslibrarian.dev
+az containerapp hostname bind -n pqjwt-demo-issuer -g pqjwt-demo-rg --hostname demo.pqjwt.systemslibrarian.dev --environment pqjwt-demo-env --validation-method CNAME
+```
+
+**Step 3.** Re-deploy with `-ExtraCorsOrigins` so the Orders API's CORS
+policy accepts cross-origin XHR from the new hostname:
+
+```powershell
+.\deploy.ps1 -ExtraCorsOrigins "https://demo.pqjwt.systemslibrarian.dev"
+```
+
+### ⚠ Gotcha — every `deploy.ps1` after binding wipes the hostname
+
+The Bicep template's `configuration.ingress` block does NOT include
+custom-domain bindings. Each `az deployment group create` against
+`main.bicep` therefore overwrites the ingress config and drops every bound
+hostname. The managed certificate itself survives — only the binding
+disappears. After every redeploy, run:
+
+```powershell
+.\rebind-hostname.ps1
+# or with overrides:
+.\rebind-hostname.ps1 -Hostname demo.pqjwt.systemslibrarian.dev
+```
+```bash
+./rebind-hostname.sh
+HOSTNAME=demo.pqjwt.systemslibrarian.dev ./rebind-hostname.sh
+```
+
+The script looks up the existing managed cert by subject name and re-binds
+it idempotently — no second cert issuance, no DNS re-verification.
 
 ## Logs
 
