@@ -570,6 +570,19 @@ internal static class LandingPage
       intended for controlled issuer/verifier systems, not generic JWT interop. See
       <a href="https://github.com/systemslibrarian/postquantum-jwt#readme">README</a>.
     </p>
+    <p style="margin-top:18px; padding:12px 14px; background:rgba(255,184,107,0.06); border-left:3px solid var(--warn); border-radius:6px; color:var(--ink-mid);">
+      <b style="color:var(--warn)">Why this demo leaks <code>failureReason</code> on the wire — and a production verifier must not.</b><br>
+      The 401 response body here includes a <code>failureReason</code> field
+      (<code>ReplayDetected</code>, <code>DecryptionFailed</code>, <code>UnknownKeyId</code>, etc.)
+      because the demo's job is to be <i>legible</i>: visitors should see exactly which gate the
+      validator tripped. A production verifier returns generic <code>401 Unauthorized</code> for
+      every failure path because the typed reason is a precise oracle that helps an attacker
+      narrow down what to try next. The OrdersApi reads <code>EXPOSE_FAILURE_REASON=true</code>
+      from its environment, and the production-shape default is off. The same image deployed
+      without that env behaves like a real verifier. See
+      <a href="https://github.com/systemslibrarian/postquantum-jwt/blob/main/samples/ProductionDeploymentDemo/OrdersApi/Program.cs">OrdersApi/Program.cs</a>
+      for the env-gated code path.
+    </p>
     <p class="muted" style="margin-top:14px;">To God be the glory — 1 Corinthians 10:31.</p>
   </footer>
 
@@ -631,21 +644,18 @@ internal static class LandingPage
       setStepStatus(stepNum, 'bad');
       return false;
     }
-    // Poll the issuer's JWKS until a given kid disappears (or timeout).
-    // Used by the retirement step to wait for the verifier's background
-    // refresh to pick up the retired key before we test against it.
-    async function waitForKidToDisappear(targetKid, timeoutMs = 12000, pollMs = 800) {
-      const deadline = performance.now() + timeoutMs;
-      while (performance.now() < deadline) {
-        const call = await callIssuer('GET', '/.well-known/pqjwt-keys');
-        appendRaw('Poll JWKS waiting for ' + targetKid + ' to disappear', call);
-        if (call.json && call.json.keys && !call.json.keys.some(k => (k.kid || k.Kid) === targetKid)) {
-          updateKeyState(call.json);
-          return true;
-        }
-        await new Promise(r => setTimeout(r, pollMs));
-      }
-      return false;
+    // Force Orders to refresh its IssuerKeyRing cache from the issuer's JWKS.
+    // Returns the verifier-side cached kids after the refresh. This is the
+    // ground-truth signal for retirement: only after Orders has fetched the
+    // post-retirement JWKS can a token signed by the retired key reliably
+    // fail with UnknownKeyId. Without this, the demo would poll the
+    // issuer-side JWKS as a proxy and could race the Orders background
+    // refresh (every ~5s) — surfacing as a ReplayDetected/UnknownKeyId
+    // ambiguity in the narrative.
+    async function forceOrdersRefresh() {
+      const call = await callOrders('POST', '/admin/refresh-keys');
+      appendRaw('Force Orders to refresh its issuer-key cache', call);
+      return call;
     }
     function setExplain(html) { explain.innerHTML = html; }
     function setRaw(s) { raw.textContent = s; raw.classList.remove('dim'); }
@@ -1004,19 +1014,22 @@ internal static class LandingPage
         appendRaw('JWKS after retire (issuer-side, immediate)', jwks2);
         if (jwks2.json) updateKeyState(jwks2.json);
 
-        // Wait for Orders' background IssuerKeyRing refresh to fetch the new
-        // JWKS — otherwise the next call could land while the kid is still
-        // cached, surfacing as ReplayDetected (if we reused a token) or
-        // succeeding outright. We use a fresh issuer-side poll as a proxy
-        // for "the JWKS has shrunk"; in practice the verifier sees the same
-        // thing within one refresh interval.
-        setVerdict('warn', 'POLL', `Polling JWKS for ~12s waiting for the retired kid <code>${retireKid}</code> to disappear…`);
-        const disappeared = await waitForKidToDisappear(retireKid);
-        if (!disappeared) {
-          setVerdict('warn', 'TIMEOUT', `The retired kid is still in the published JWKS after 12s. Either the test environment is slow or the retirement did not take effect — we will not call this a retirement success.`);
-          setStepStatus(8, 'bad');
-          return;
+        // Force Orders to refresh its IssuerKeyRing cache from the issuer's
+        // JWKS. This is the verifier-side ground truth: only when Orders has
+        // fetched the post-retirement JWKS will a token signed by the retired
+        // kid reliably fail with UnknownKeyId on the wire. We previously
+        // polled the issuer-side JWKS as a proxy, but that races Orders'
+        // background refresh.
+        setVerdict('warn', 'POST', `Forcing Orders to refresh its verifier-side key cache so the retirement actually takes effect there…`);
+        const refresh = await forceOrdersRefresh();
+        if (!refresh.res.ok) {
+          setVerdict('warn', `HTTP ${refresh.res.status}`, `Could not force the Orders cache refresh. The admin endpoint is gated by EXPOSE_FAILURE_REASON on the verifier — in local docker-compose runs without that env, the step falls back to "wait long enough" semantics.`);
+          // Best-effort fallback: wait one orders-side refresh interval.
+          await new Promise(r => setTimeout(r, 8000));
         }
+        // Also refresh the right-rail JWKS pane to show the post-retire state.
+        const jwksFinal = await callIssuer('GET', '/.well-known/pqjwt-keys');
+        if (jwksFinal.json) updateKeyState(jwksFinal.json);
 
         // Now the actual retirement test. T_retire was never seen by Orders
         // before, so jti collision is impossible; the only remaining failure

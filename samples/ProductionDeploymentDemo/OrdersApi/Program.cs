@@ -269,10 +269,20 @@ app.UseAuthentication();
 // AuthenticateResult.Failure so UseStatusCodePages (registered earlier in the
 // pipeline) can surface it. AuthenticationMiddleware only writes
 // IAuthenticateResultFeature on auth SUCCESS, so for failures we read the
-// cached AuthenticateResult here (a pure lookup — the handler already ran)
-// and stash the exception in HttpContext.Items where the status-page handler
-// reads it. Gated by EXPOSE_FAILURE_REASON to keep production-shape clones
-// from leaking the reason as a side effect of the same image.
+// cached AuthenticateResult here and stash the exception in HttpContext.Items
+// where the status-page handler reads it.
+//
+// IMPORTANT: this is a pure cached lookup, NOT a re-validation. The base
+// AuthenticationHandler caches its HandleAuthenticateAsync result in a
+// _authenticateTask field, and AuthenticateAsync(scheme) returns the same
+// Task on every subsequent call within the same request. So the bearer
+// handler's PqJwtValidator.Validate runs exactly once per request even
+// though we touch AuthenticateAsync from two places (UseAuthentication +
+// here). Verified against AspNetCore source
+// (Microsoft.AspNetCore.Authentication.AuthenticationHandler<TOptions>).
+//
+// Gated by EXPOSE_FAILURE_REASON to keep production-shape clones from
+// leaking the reason as a side effect of the same image.
 if (exposeFailureReason)
 {
     app.Use(async (ctx, next) =>
@@ -316,6 +326,32 @@ app.MapGet("/.well-known/pqjwt-recipient-key", (XWingPrivateKey recipientKey) =>
     alg = PqJwtAlgorithms.XWing,
     key = Convert.ToBase64String(recipientKey.PublicKey.Export()),
 }));
+
+// DEMO-ONLY admin endpoint: forces an immediate IssuerKeyRing refresh and
+// returns the cached kids. Used by the browser-driven landing page's step 8
+// after a key-retirement so the demo can prove the verifier (NOT the issuer)
+// has observed the retirement before sending T_retire. Without this, the
+// landing page would poll the issuer-side JWKS as a proxy and might race the
+// Orders background refresh, surfacing as a ReplayDetected/UnknownKeyId
+// ambiguity in the demo narrative.
+//
+// Gated by EXPOSE_FAILURE_REASON so the same env that opens up the
+// failure-reason field also opens this admin path. Production deployments
+// must keep both off — an arbitrary caller forcing an unscheduled refresh
+// can be a DoS vector against the issuer.
+if (exposeFailureReason)
+{
+    app.MapPost("/admin/refresh-keys", async (IssuerKeyRing keyRing, CancellationToken ct) =>
+    {
+        await keyRing.RefreshNowAsync(ct);
+        return Results.Ok(new
+        {
+            issuerKeysCached = keyRing.PublishedKeyCount,
+            lastRefreshUtc = keyRing.LastRefreshUtc,
+            note = "demo-only admin endpoint; gated by EXPOSE_FAILURE_REASON env",
+        });
+    });
+}
 
 app.MapGet("/orders/123", (HttpContext ctx) => Results.Ok(new
 {

@@ -738,7 +738,7 @@ current source (CI builds the whole sample solution on every push).
 | [`PqJwtPlayground`](https://github.com/systemslibrarian/postquantum-jwt/tree/main/samples/PqJwtPlayground) | Interactive Blazor UI — the [live demo](https://pqjwt.systemslibrarian.dev) above |
 | [`RefreshTokenDemo`](https://github.com/systemslibrarian/postquantum-jwt/tree/main/samples/RefreshTokenDemo) | Access/refresh split, rotation, reuse detection |
 | [`DistributedReplayCache`](https://github.com/systemslibrarian/postquantum-jwt/tree/main/samples/DistributedReplayCache) | `IPqJwtReplayCache` over Redis / `IDistributedCache` |
-| [`ProductionDeploymentDemo`](https://github.com/systemslibrarian/postquantum-jwt/tree/main/samples/ProductionDeploymentDemo) | Full issuer/verifier deployment runbook — scripted encrypted-token, tamper, replay, audience, expiry, and key-rotation checks |
+| [`ProductionDeploymentDemo`](https://github.com/systemslibrarian/postquantum-jwt/tree/main/samples/ProductionDeploymentDemo) | Full issuer/verifier deployment runbook — scripted encrypted-token, tamper, replay, audience, expiry, and key-rotation checks. [**Live at https://demo.pqjwt.systemslibrarian.dev**](https://demo.pqjwt.systemslibrarian.dev/) — 8-step interactive browser tour with typed `PqJwtFailureReason` on the wire. |
 | [`SpecByExample`](https://github.com/systemslibrarian/postquantum-jwt/tree/main/samples/SpecByExample) | xUnit tests whose names are the lessons |
 | [`TestingSupport`](https://github.com/systemslibrarian/postquantum-jwt/tree/main/samples/TestingSupport) | A no-crypto test auth handler for your own `[Authorize]` endpoints |
 

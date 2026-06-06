@@ -29,6 +29,18 @@ services:
       ALLOW_INSECURE_KEY_DIRECTORY: "true"
       PQJWT_KEY_REFRESH_SECONDS: "1"
       REDIS_CONNECTION: "redis:6379"
+      # DEMO-ONLY: surface the typed PqJwtFailureReason in the 401 problem-details
+      # response so the IssuerApi-hosted browser landing page (http://localhost:5180)
+      # can show wire-truth. Also enables the /admin/refresh-keys endpoint that
+      # step 8 uses to force a verifier-side cache refresh after retirement.
+      # Production verifiers must NEVER set this — leaking the typed reason gives
+      # an attacker a precise oracle of which validation gate they tripped.
+      EXPOSE_FAILURE_REASON: "true"
+      # Tell IssuerApi's landing page where to find OrdersApi from the browser's
+      # perspective (the browser sees localhost ports, not the compose-network DNS).
+      # IssuerApi inherits ORDERS_PUBLIC_URL via its own env block below.
+      # CORS allowed origin: the IssuerApi published port.
+      CORS_ALLOWED_ORIGINS: "http://localhost:5180"
     depends_on:
       - redis
     ports:
@@ -47,6 +59,10 @@ services:
       PQJWT_ENCRYPTED_TOKENS: "true"
       ORDERS_RECIPIENT_KEY_URL: "http://orders-api:8080/.well-known/pqjwt-recipient-key"
       PQJWT_RECIPIENT_KEY_REFRESH_SECONDS: "30"
+      # Browser-facing URL of Orders. The landing-page JS calls Orders from the
+      # visitor's browser (not from inside the compose network), so this must be
+      # the host-exposed URL, not the compose-network DNS name.
+      ORDERS_PUBLIC_URL: "http://localhost:5190"
     depends_on:
       - orders-api
     ports:

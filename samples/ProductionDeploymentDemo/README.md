@@ -8,10 +8,16 @@
 
 A production-shaped, intentionally boring, service-to-service deployment demo for `PostQuantum.Jwt`.
 
-> **▶ Live (when deployed):** the [Issuer landing page](https://pqjwt-demo-issuer.azurecontainerapps.io/)
-> is an interactive HTML UI hosted by the IssuerApi process itself, with
-> live buttons for every demo step. See [`azure/`](azure/) for the
-> deploy-it-yourself Bicep + scripts (15 min, idle cost rounds to $0).
+> **▶ Live now:** <https://demo.pqjwt.systemslibrarian.dev> — an interactive
+> HTML UI hosted by the IssuerApi process itself, with live buttons that drive
+> the full 8-step demo (issue → validate → replay-reject → tamper-reject →
+> wrong-audience → expired → rotate → retire) end-to-end against the real
+> OrdersApi + Redis sidecar. Each rejection shows the typed `PqJwtFailureReason`
+> the verifier returned on the wire — see the "Wire-truth demo tradeoff"
+> section below for why visitors can see that and a production verifier
+> deliberately can't.
+> See [`azure/`](azure/) for the deploy-it-yourself Bicep + scripts
+> (~6 min, idle cost rounds to $0).
 
 This sample is different from the smaller samples in this repository. It does not merely show how to call the builder or validator. It shows the operational pattern around the token:
 
@@ -227,6 +233,42 @@ The Orders API:
 - uses Redis for atomic replay defense when configured
 - owns the X-Wing private key for encrypted tokens
 - returns generic 401/403 problem details without leaking validator internals
+
+## Wire-truth demo tradeoff (`EXPOSE_FAILURE_REASON`)
+
+The live OrdersApi reads an `EXPOSE_FAILURE_REASON=true` env var (set in
+[`azure/main.bicep`](azure/main.bicep) and in
+[`docker-compose.yml`](docker-compose.yml)). When set, the 401
+problem-details response body includes a `failureReason` field carrying
+the typed `PqJwtFailureReason` the validator surfaced:
+
+```json
+{
+  "type": "about:blank",
+  "title": "Unauthorized",
+  "status": 401,
+  "detail": "No valid PostQuantum.Jwt bearer token was accepted.",
+  "correlationId": "...",
+  "failureReason": "ReplayDetected"
+}
+```
+
+The browser-driven landing page reads `failureReason` directly from the
+wire instead of guessing the reason client-side. That's what makes the
+demo legible — visitors can prove the validator surfaced the right reason
+for the right step.
+
+**This is a deliberate demo-only tradeoff and a production verifier must
+never set it.** The typed reason is a precise oracle that helps an
+attacker narrow down which validation gate they tripped — exactly the
+information a generic-401 production posture is meant to deny. The
+default for the env var is `false`; the docker-compose and Bicep
+templates set it `true` explicitly with inline comments calling this out.
+
+When the env is on, the OrdersApi also exposes a `POST /admin/refresh-keys`
+endpoint that the landing-page step 8 uses to force an immediate
+verifier-side JWKS refresh after a key retirement (the alternative is to
+poll the issuer-side JWKS as a proxy and race Orders' background refresh).
 
 ## Deploy to Azure Container Apps (live demo)
 
