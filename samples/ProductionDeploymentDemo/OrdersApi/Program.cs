@@ -220,17 +220,19 @@ app.UseStatusCodePages(async statusCodeContext =>
         response.ContentType = "application/problem+json";
         var correlationId = response.Headers["X-Correlation-ID"].ToString();
 
-        // DEMO-ONLY wire-truth: when EXPOSE_FAILURE_REASON is on, re-read the
-        // cached AuthenticateResult to surface the typed PqJwtFailureReason that
-        // PqJwtBearerHandler caught. AuthenticateAsync is idempotent — it returns
-        // the result the handler already produced earlier in the pipeline, not a
-        // fresh validation. Production deployments leave this off and return the
-        // generic detail string only.
+        // DEMO-ONLY wire-truth: when EXPOSE_FAILURE_REASON is on, surface the
+        // typed PqJwtFailureReason that PqJwtBearerHandler caught. We read it
+        // from IAuthenticateResultFeature (set by the AuthenticationMiddleware
+        // earlier in the pipeline) rather than calling AuthenticateAsync —
+        // calling AuthenticateAsync from inside UseStatusCodePages can
+        // re-enter the challenge pipeline mid-response and silently drop the
+        // status-page body. Reading the feature is a pure lookup. Production
+        // deployments leave this off and return the generic detail string only.
         string? failureReason = null;
         if (exposeFailureReason && response.StatusCode == 401)
         {
-            var authResult = await ctx.AuthenticateAsync(PqJwtBearerDefaults.AuthenticationScheme);
-            failureReason = authResult.Failure switch
+            var authFailure = ctx.Features.Get<IAuthenticateResultFeature>()?.AuthenticateResult?.Failure;
+            failureReason = authFailure switch
             {
                 PqJwtValidationException pex => pex.Reason.ToString(),
                 PqJwtException => "Unspecified",

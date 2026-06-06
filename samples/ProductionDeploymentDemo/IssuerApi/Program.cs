@@ -61,14 +61,28 @@ if (rateLimitPermits > 0)
     {
         options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
         options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
-            RateLimitPartition.GetFixedWindowLimiter(
+        {
+            // Exempt public-by-design endpoints from rate limiting. JWKS is polled
+            // by verifier services on a fixed cadence — Orders polls every ~5s in
+            // this demo — and rate-limiting it makes the verifier's key-ring
+            // refresh fail intermittently, which would propagate into the
+            // visitor-facing demo as flaky validation. /health is the
+            // liveness/readiness probe and must always answer. Rate limiting
+            // still applies to /token, /keys/*, and the landing page itself.
+            var path = httpContext.Request.Path;
+            if (path.StartsWithSegments("/.well-known") || path.StartsWithSegments("/health"))
+            {
+                return RateLimitPartition.GetNoLimiter("nolimit");
+            }
+            return RateLimitPartition.GetFixedWindowLimiter(
                 partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
                 factory: _ => new FixedWindowRateLimiterOptions
                 {
                     PermitLimit = rateLimitPermits,
                     Window = TimeSpan.FromSeconds(rateLimitWindowSeconds),
                     QueueLimit = 0,
-                }));
+                });
+        });
     });
 }
 
