@@ -16,6 +16,12 @@ var audience = builder.Configuration["PQJWT_AUDIENCE"] ?? DefaultAudience;
 var encryptedByDefault = ParseBool(builder.Configuration["PQJWT_ENCRYPTED_TOKENS"], defaultValue: true);
 var recipientKeyUrl = builder.Configuration["ORDERS_RECIPIENT_KEY_URL"]
     ?? "http://localhost:5190/.well-known/pqjwt-recipient-key";
+
+// Public base URL of Orders, used by the browser-driven landing page to
+// fire cross-origin calls. Derived from the recipient-key URL by stripping
+// the well-known path if the explicit env var isn't set.
+var ordersPublicUrl = builder.Configuration["ORDERS_PUBLIC_URL"]
+    ?? DeriveOrdersBaseFromRecipientKeyUrl(recipientKeyUrl);
 var recipientKeyRefreshSeconds = int.TryParse(builder.Configuration["PQJWT_RECIPIENT_KEY_REFRESH_SECONDS"], out var parsedRecipientRefreshSeconds)
     ? Math.Clamp(parsedRecipientRefreshSeconds, 1, 3600)
     : 30;
@@ -111,7 +117,7 @@ app.MapGet("/health", () => Results.Ok(new
     audience,
 }));
 
-app.MapGet("/", () => Results.Content(LandingPage.Html, "text/html; charset=utf-8"));
+app.MapGet("/", () => Results.Content(LandingPage.Render(ordersPublicUrl), "text/html; charset=utf-8"));
 
 app.MapPost("/token", async (
     DemoTokenRequest? request,
@@ -280,6 +286,16 @@ async Task<object> IssueTokenAsync(
         subject,
         scope,
     };
+}
+
+static string DeriveOrdersBaseFromRecipientKeyUrl(string recipientKeyUrl)
+{
+    if (Uri.TryCreate(recipientKeyUrl, UriKind.Absolute, out var uri))
+    {
+        return $"{uri.Scheme}://{uri.Authority}";
+    }
+
+    return "http://localhost:5190";
 }
 
 static bool ParseBool(string? value, bool defaultValue)

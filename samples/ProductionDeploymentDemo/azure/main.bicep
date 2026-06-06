@@ -47,6 +47,9 @@ param ordersRateLimitPermits int = 20
 @maxValue(3600)
 param rateLimitWindowSeconds int = 60
 
+@description('Extra browser-facing origins (comma-separated) the OrdersApi CORS policy should allow on top of the issuer hostnames. Use this when binding a custom domain on the issuer; the issuer custom-domain hostname goes here.')
+param extraCorsOrigins string = ''
+
 // -------- Log Analytics --------
 resource logs 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
   name: '${namePrefix}-logs'
@@ -138,6 +141,11 @@ resource orders 'Microsoft.App/containerApps@2024-03-01' = {
             { name: 'ALLOW_INSECURE_KEY_DIRECTORY', value: 'false' }
             { name: 'RATE_LIMIT_PERMITS', value: string(ordersRateLimitPermits) }
             { name: 'RATE_LIMIT_WINDOW_SECONDS', value: string(rateLimitWindowSeconds) }
+            // CORS: allow the issuer's default Container Apps hostname plus any extra origins
+            // the caller passed in (typically the issuer's custom domain). The browser-driven
+            // landing page lives on the issuer, so Orders needs to accept its origin for the
+            // cross-origin XHR to succeed.
+            { name: 'CORS_ALLOWED_ORIGINS', value: empty(extraCorsOrigins) ? 'https://${namePrefix}-issuer.${env.properties.defaultDomain}' : 'https://${namePrefix}-issuer.${env.properties.defaultDomain},${extraCorsOrigins}' }
           ]
           probes: [
             {
@@ -190,6 +198,9 @@ resource issuer 'Microsoft.App/containerApps@2024-03-01' = {
             { name: 'PQJWT_RECIPIENT_KEY_REFRESH_SECONDS', value: '60' }
             { name: 'RATE_LIMIT_PERMITS', value: string(issuerRateLimitPermits) }
             { name: 'RATE_LIMIT_WINDOW_SECONDS', value: string(rateLimitWindowSeconds) }
+            // Public base URL of Orders, used by the browser-driven landing page to fire
+            // cross-origin calls. Same domain Orders runs at.
+            { name: 'ORDERS_PUBLIC_URL', value: 'https://${namePrefix}-orders.${env.properties.defaultDomain}' }
           ]
           probes: [
             {

@@ -22,7 +22,12 @@ param(
     [string]$RedisImage = 'redis:7-alpine',
     [int]$IssuerRateLimitPermits = 10,
     [int]$OrdersRateLimitPermits = 20,
-    [int]$RateLimitWindowSeconds = 60
+    [int]$RateLimitWindowSeconds = 60,
+    # Extra browser-facing origins (comma-separated) the OrdersApi should allow on top of
+    # the issuer's default Container Apps hostname. If you bind a custom domain to the
+    # issuer, pass it here so the cross-origin landing-page calls work.
+    #   .\deploy.ps1 -ExtraCorsOrigins "https://demo.example.com"
+    [string]$ExtraCorsOrigins = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -72,6 +77,7 @@ $result = az deployment group create `
         issuerRateLimitPermits=$IssuerRateLimitPermits `
         ordersRateLimitPermits=$OrdersRateLimitPermits `
         rateLimitWindowSeconds=$RateLimitWindowSeconds `
+        extraCorsOrigins=$ExtraCorsOrigins `
     --output json | ConvertFrom-Json
 
 if ($null -eq $result) {

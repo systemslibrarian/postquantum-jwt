@@ -70,6 +70,31 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
     options.KnownProxies.Clear();
 });
 
+// CORS for the browser-driven landing page (hosted on IssuerApi). Without
+// this, the Issuer's landing page can't call Orders cross-origin from a
+// browser. Allowed origins are env-configurable so the same image works
+// behind any hostname the issuer is exposed at.
+//
+//   CORS_ALLOWED_ORIGINS = "https://demo.example.com,https://issuer.example.com"
+//
+// When the env is unset (local docker-compose), CORS is not enabled and the
+// run-demo scripts (which run server-to-server, not browser-driven) keep
+// working unchanged.
+var corsOrigins = (builder.Configuration["CORS_ALLOWED_ORIGINS"] ?? "")
+    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+if (corsOrigins.Length > 0)
+{
+    builder.Services.AddCors(options =>
+    {
+        options.AddDefaultPolicy(policy => policy
+            .WithOrigins(corsOrigins)
+            .WithMethods("GET", "POST", "OPTIONS")
+            .WithHeaders("Authorization", "Content-Type", "X-Correlation-ID")
+            .WithExposedHeaders("X-Correlation-ID"));
+    });
+}
+
 // Demo rate limit. OrdersApi sees more traffic per demo run (every verified
 // request hits it), so the default is slightly higher than IssuerApi.
 // Tighten for the live deployment via env (Container App sets
@@ -143,6 +168,14 @@ app.Logger.LogInformation(
     rateLimitWindowSeconds);
 
 app.UseForwardedHeaders();
+
+// CORS must come before rate limiting and authentication so the browser's
+// preflight OPTIONS request is answered with the right Access-Control-*
+// headers even when the caller would otherwise be blocked.
+if (corsOrigins.Length > 0)
+{
+    app.UseCors();
+}
 
 if (rateLimitPermits > 0)
 {

@@ -24,6 +24,7 @@ REDIS_IMAGE="${REDIS_IMAGE:-redis:7-alpine}"
 ISSUER_RATE_LIMIT_PERMITS="${ISSUER_RATE_LIMIT_PERMITS:-10}"
 ORDERS_RATE_LIMIT_PERMITS="${ORDERS_RATE_LIMIT_PERMITS:-20}"
 RATE_LIMIT_WINDOW_SECONDS="${RATE_LIMIT_WINDOW_SECONDS:-60}"
+EXTRA_CORS_ORIGINS="${EXTRA_CORS_ORIGINS:-}"
 
 cyan()   { printf '\033[36m%s\033[0m\n' "$*"; }
 yellow() { printf '\033[33m%s\033[0m\n' "$*"; }
@@ -67,6 +68,7 @@ result=$(az deployment group create \
         issuerRateLimitPermits="$ISSUER_RATE_LIMIT_PERMITS" \
         ordersRateLimitPermits="$ORDERS_RATE_LIMIT_PERMITS" \
         rateLimitWindowSeconds="$RATE_LIMIT_WINDOW_SECONDS" \
+        extraCorsOrigins="$EXTRA_CORS_ORIGINS" \
     --output json)
 
 issuer_fqdn=$(echo "$result" | jq -r '.properties.outputs.issuerFqdn.value')
