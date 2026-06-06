@@ -27,6 +27,15 @@ public sealed class IssuerKeyRing : IHostedService, IDisposable
     private readonly ConcurrentDictionary<string, MLDsa> _cache = new(StringComparer.Ordinal);
     private readonly SemaphoreSlim _refreshLock = new(1, 1);
 
+    // Native MLDsa handles whose cache slot has been replaced or evicted. We
+    // do NOT dispose them inline because a concurrent Resolve() may still
+    // hold the reference returned from TryGetValue and be mid-VerifyData on
+    // its native pointer. Disposal happens here after a TTL that's >>
+    // the longest realistic verify time (which is ~100 µs). Drained on every
+    // RefreshNowAsync call.
+    private readonly ConcurrentQueue<(DateTimeOffset QuarantinedAt, MLDsa Key, string Kid)> _quarantine = new();
+    private static readonly TimeSpan QuarantineTtl = TimeSpan.FromSeconds(30);
+
     private CancellationTokenSource? _refreshCts;
     private Task? _refreshLoop;
     private DateTimeOffset _lastRefreshUtc = DateTimeOffset.MinValue;
@@ -136,11 +145,21 @@ public sealed class IssuerKeyRing : IHostedService, IDisposable
                     var bytes = Convert.FromBase64String(entry.Key);
                     var key = MLDsa.ImportMLDsaPublicKey(MLDsaAlgorithm.MLDsa65, bytes);
 
+                    // Capture any pre-existing key for deferred disposal — the
+                    // AddOrUpdate factory runs under ConcurrentDictionary's per-bucket
+                    // lock but Resolve() can have already read the OLD reference
+                    // outside that lock, so disposing inline would race a native
+                    // VerifyData call.
+                    MLDsa? evicted = null;
                     _cache.AddOrUpdate(entry.Kid, key, (_, old) =>
                     {
-                        old.Dispose();
+                        evicted = old;
                         return key;
                     });
+                    if (evicted is not null)
+                    {
+                        _quarantine.Enqueue((DateTimeOffset.UtcNow, evicted, entry.Kid));
+                    }
                 }
                 catch (Exception ex) when (ex is FormatException or CryptographicException)
                 {
@@ -152,10 +171,17 @@ public sealed class IssuerKeyRing : IHostedService, IDisposable
             {
                 if (!published.Contains(cachedKid))
                 {
-                    _cache.TryRemove(cachedKid, out _);
+                    if (_cache.TryRemove(cachedKid, out var evictedKey))
+                    {
+                        // Same race: a concurrent Resolve() may have already grabbed
+                        // this reference. Quarantine, don't dispose inline.
+                        _quarantine.Enqueue((DateTimeOffset.UtcNow, evictedKey, cachedKid));
+                    }
                     _logger.LogWarning("Evicted issuer key kid={Kid} because it is no longer published.", cachedKid);
                 }
             }
+
+            DrainExpiredQuarantine();
 
             _lastRefreshUtc = DateTimeOffset.UtcNow;
             _logger.LogInformation(
@@ -194,6 +220,19 @@ public sealed class IssuerKeyRing : IHostedService, IDisposable
         }
     }
 
+    private void DrainExpiredQuarantine()
+    {
+        var now = DateTimeOffset.UtcNow;
+        while (_quarantine.TryPeek(out var head) && (now - head.QuarantinedAt) >= QuarantineTtl)
+        {
+            if (_quarantine.TryDequeue(out var item))
+            {
+                try { item.Key.Dispose(); }
+                catch (Exception ex) { _logger.LogWarning(ex, "Failed to dispose quarantined issuer key kid={Kid}", item.Kid); }
+            }
+        }
+    }
+
     public void Dispose()
     {
         if (_disposed)
@@ -208,6 +247,13 @@ public sealed class IssuerKeyRing : IHostedService, IDisposable
         foreach (var key in _cache.Values)
         {
             key.Dispose();
+        }
+
+        // Drain everything quarantined — the host is shutting down, no more
+        // concurrent readers can appear.
+        while (_quarantine.TryDequeue(out var item))
+        {
+            try { item.Key.Dispose(); } catch { /* swallow on shutdown */ }
         }
 
         _refreshLock.Dispose();

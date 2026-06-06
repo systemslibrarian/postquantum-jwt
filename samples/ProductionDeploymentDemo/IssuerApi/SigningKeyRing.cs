@@ -19,6 +19,15 @@ public sealed class SigningKeyRing : IDisposable
     private int _generation = 1;
     private bool _disposed;
 
+    // SigningKeyRecords that have been rotated out or retired. We do NOT
+    // dispose them inline because a token-issue request that already read
+    // `Active` (under lock, then released the lock) may be mid-SignData on the
+    // native MLDsa pointer. Disposal happens here after a TTL that's >> the
+    // longest realistic sign time (which is ~600 µs for ML-DSA-65). Drained
+    // on every state-changing operation under the same lock.
+    private readonly Queue<(DateTimeOffset QuarantinedAt, SigningKeyRecord Record)> _quarantine = new();
+    private static readonly TimeSpan QuarantineTtl = TimeSpan.FromSeconds(30);
+
     public SigningKeySnapshot Snapshot()
     {
         lock (_gate)
@@ -65,8 +74,15 @@ public sealed class SigningKeyRing : IDisposable
         lock (_gate)
         {
             ThrowIfDisposed();
+            DrainExpiredQuarantine();
 
-            _previous?.Dispose();
+            // The previous-previous becomes safe to dispose only after a
+            // quarantine TTL — see the field comment. Quarantine here; the
+            // drain above will reap it on a later operation.
+            if (_previous is not null)
+            {
+                _quarantine.Enqueue((DateTimeOffset.UtcNow, _previous));
+            }
             _previous = _active;
 
             _generation++;
@@ -84,15 +100,29 @@ public sealed class SigningKeyRing : IDisposable
         lock (_gate)
         {
             ThrowIfDisposed();
+            DrainExpiredQuarantine();
 
             var retiredKid = _previous?.Kid;
-            _previous?.Dispose();
+            if (_previous is not null)
+            {
+                _quarantine.Enqueue((DateTimeOffset.UtcNow, _previous));
+            }
             _previous = null;
 
             return new SigningKeyRetirementResult(
                 RetiredKid: retiredKid,
                 ActiveKid: _active.Kid,
                 PublishedKeyCount: GetPublishedKeysUnderLock().Count);
+        }
+    }
+
+    private void DrainExpiredQuarantine()
+    {
+        var now = DateTimeOffset.UtcNow;
+        while (_quarantine.Count > 0 && (now - _quarantine.Peek().QuarantinedAt) >= QuarantineTtl)
+        {
+            var item = _quarantine.Dequeue();
+            try { item.Record.Dispose(); } catch { /* don't break the caller on a quarantine-disposal hiccup */ }
         }
     }
 
@@ -118,6 +148,11 @@ public sealed class SigningKeyRing : IDisposable
 
             _active.Dispose();
             _previous?.Dispose();
+            while (_quarantine.Count > 0)
+            {
+                var item = _quarantine.Dequeue();
+                try { item.Record.Dispose(); } catch { /* swallow on shutdown */ }
+            }
             _disposed = true;
         }
     }
