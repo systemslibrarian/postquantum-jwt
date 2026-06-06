@@ -146,6 +146,12 @@ resource orders 'Microsoft.App/containerApps@2024-03-01' = {
             // landing page lives on the issuer, so Orders needs to accept its origin for the
             // cross-origin XHR to succeed.
             { name: 'CORS_ALLOWED_ORIGINS', value: empty(extraCorsOrigins) ? 'https://${namePrefix}-issuer.${env.properties.defaultDomain}' : 'https://${namePrefix}-issuer.${env.properties.defaultDomain},${extraCorsOrigins}' }
+            // DEMO-ONLY: surface the typed PqJwtFailureReason in the 401 problem-details
+            // response so the browser-driven landing page can show wire-truth. Production
+            // deployments must NEVER set this — leaking the typed reason gives an attacker
+            // a precise oracle of which validation gate they tripped. Documented in
+            // samples/ProductionDeploymentDemo/OrdersApi/Program.cs next to the parsing site.
+            { name: 'EXPOSE_FAILURE_REASON', value: 'true' }
           ]
           probes: [
             {

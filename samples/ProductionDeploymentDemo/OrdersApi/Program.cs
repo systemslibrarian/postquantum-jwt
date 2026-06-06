@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using PostQuantum.Jwt;
@@ -22,6 +23,16 @@ var allowInsecureKeyDirectory = ParseBool(builder.Configuration["ALLOW_INSECURE_
 var refreshSeconds = int.TryParse(builder.Configuration["PQJWT_KEY_REFRESH_SECONDS"], out var parsedRefreshSeconds)
     ? Math.Clamp(parsedRefreshSeconds, 1, 300)
     : 5;
+
+// DEMO-ONLY: when set, include the typed PqJwtFailureReason in the 401 problem-
+// details response so the browser-driven landing page can show wire-truth instead
+// of inferring reasons client-side. Production deployments must keep this OFF —
+// leaking the typed reason gives an attacker a precise oracle of which validation
+// gate they tripped (signature vs claims vs replay vs decryption), which is the
+// whole point of returning generic 401s in production. The Container Apps
+// deployment sets this to true; the docker-compose / local-dev path leaves it
+// unset and behaves like production.
+var exposeFailureReason = ParseBool(builder.Configuration["EXPOSE_FAILURE_REASON"], defaultValue: false);
 
 // Demo recipient key. A real deployment should load this from a vault/HSM/sealed secret.
 // Registered by factory so the DI container owns disposal.
@@ -201,12 +212,31 @@ app.UseAuthorization();
 
 app.UseStatusCodePages(async statusCodeContext =>
 {
-    var response = statusCodeContext.HttpContext.Response;
+    var ctx = statusCodeContext.HttpContext;
+    var response = ctx.Response;
 
     if (response.StatusCode is 401 or 403)
     {
         response.ContentType = "application/problem+json";
         var correlationId = response.Headers["X-Correlation-ID"].ToString();
+
+        // DEMO-ONLY wire-truth: when EXPOSE_FAILURE_REASON is on, re-read the
+        // cached AuthenticateResult to surface the typed PqJwtFailureReason that
+        // PqJwtBearerHandler caught. AuthenticateAsync is idempotent — it returns
+        // the result the handler already produced earlier in the pipeline, not a
+        // fresh validation. Production deployments leave this off and return the
+        // generic detail string only.
+        string? failureReason = null;
+        if (exposeFailureReason && response.StatusCode == 401)
+        {
+            var authResult = await ctx.AuthenticateAsync(PqJwtBearerDefaults.AuthenticationScheme);
+            failureReason = authResult.Failure switch
+            {
+                PqJwtValidationException pex => pex.Reason.ToString(),
+                PqJwtException => "Unspecified",
+                _ => null,
+            };
+        }
 
         await response.WriteAsJsonAsync(new
         {
@@ -217,6 +247,7 @@ app.UseStatusCodePages(async statusCodeContext =>
                 ? "No valid PostQuantum.Jwt bearer token was accepted."
                 : "The token was valid but lacked the required authorization claim.",
             correlationId,
+            failureReason, // null in production-shape; populated only when EXPOSE_FAILURE_REASON=true
         });
     }
 });

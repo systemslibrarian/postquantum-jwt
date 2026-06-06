@@ -595,6 +595,58 @@ internal static class LandingPage
       verdictPill.textContent = label;
       verdictText.innerHTML = text;
     }
+    // Wire-truth helper. Reads the typed PqJwtFailureReason from the Orders
+    // 401 response body (the demo deployment sets EXPOSE_FAILURE_REASON=true;
+    // production-shape clones leave it off and this returns null). We never
+    // infer the reason client-side — if the wire doesn't carry it we say so.
+    function wireReason(call) {
+      return (call && call.json && call.json.failureReason) || null;
+    }
+    // Convert a failure reason name to a human label without inventing semantics.
+    function labelForReason(reason) {
+      if (!reason) return 'REJECTED';
+      // Pascal-case → UPPER WITH SPACES, capped for the pill.
+      return reason.replace(/([a-z])([A-Z])/g, '$1 $2').toUpperCase();
+    }
+    // Shared rejection handler: reads the typed reason from the wire,
+    // labels the pill accordingly, and only marks the step "good" when the
+    // wire's reason matches what the step claims to be proving. Any other
+    // outcome lands as 'warn' so the narrative never lies about evidence.
+    function handleRejection(call, stepNum, expectations) {
+      const wire = wireReason(call);
+      const label = `${call.res.status} — ${labelForReason(wire)}`;
+      bumpReason(wire || (call.res.status === 401 ? 'Unspecified' : 'Status' + call.res.status));
+      if (call.res.status !== 401) {
+        setVerdict('warn', 'HTTP ' + call.res.status, `Unexpected status; this step expected a 401 with reason <code>${expectations.reason}</code>. Inspect the raw response below.`);
+        setStepStatus(stepNum, 'bad');
+        return false;
+      }
+      if (wire === expectations.reason) {
+        setVerdict('bad', label, expectations.narrativeOnMatch);
+        setStepStatus(stepNum, 'good');
+        return true;
+      }
+      const mismatchText = `Wire returned <code>${wire || '(reason not exposed)'}</code> instead of the expected <code>${expectations.reason}</code>. This step claims a specific gate, so a different reason — even another fail-closed one — is recorded as a mismatch, not a success.`;
+      setVerdict('warn', label, mismatchText);
+      setStepStatus(stepNum, 'bad');
+      return false;
+    }
+    // Poll the issuer's JWKS until a given kid disappears (or timeout).
+    // Used by the retirement step to wait for the verifier's background
+    // refresh to pick up the retired key before we test against it.
+    async function waitForKidToDisappear(targetKid, timeoutMs = 12000, pollMs = 800) {
+      const deadline = performance.now() + timeoutMs;
+      while (performance.now() < deadline) {
+        const call = await callIssuer('GET', '/.well-known/pqjwt-keys');
+        appendRaw('Poll JWKS waiting for ' + targetKid + ' to disappear', call);
+        if (call.json && call.json.keys && !call.json.keys.some(k => (k.kid || k.Kid) === targetKid)) {
+          updateKeyState(call.json);
+          return true;
+        }
+        await new Promise(r => setTimeout(r, pollMs));
+      }
+      return false;
+    }
     function setExplain(html) { explain.innerHTML = html; }
     function setRaw(s) { raw.textContent = s; raw.classList.remove('dim'); }
     function setStepStatus(n, status) {
@@ -824,15 +876,11 @@ internal static class LandingPage
         setVerdict('warn', 'GET', 'Sending the SAME token to Orders a second time. Redis should reject it…');
         const call = await callOrders('GET', '/orders/123', { bearer: lastIssuedToken });
         appendRaw('Replay attempt', call);
-        if (call.res.status === 401) {
-          setVerdict('bad', '401 — REPLAY DETECTED', `Orders ran the same validation pipeline, but Redis' <code>SET NX</code> for this <code>jti</code> failed because the previous validation already registered it. The validator fails closed — same token, different request, rejected.`);
-          setExplain(`<b>Property proved:</b> replay defense survives a stolen token. Even with a perfectly valid signature and current <code>exp</code>, the second presentation of the same <code>jti</code> is rejected with <b>ReplayDetected</b>. The replay store is a real Redis sidecar in this deployment (not in-memory) — multi-node deployments share the same TTL'd seen-jti set.`);
-          bumpReason('ReplayDetected');
-          setStepStatus(4, 'good');
-        } else {
-          setVerdict('bad', `HTTP ${call.res.status}`, `Unexpected status — replay should have produced a 401 ReplayDetected. Check the raw response.`);
-          setStepStatus(4, 'bad');
-        }
+        handleRejection(call, 4, {
+          reason: 'ReplayDetected',
+          narrativeOnMatch: `Orders ran the same validation pipeline, but Redis' <code>SET NX</code> for this <code>jti</code> failed because the previous validation already registered it. The wire returned the typed reason <b>ReplayDetected</b>.`,
+        });
+        setExplain(`<b>Property proved:</b> replay defense survives a stolen token. Even with a valid signature and current <code>exp</code>, the second presentation of the same <code>jti</code> is rejected with <b>ReplayDetected</b>. The replay store is a real Redis sidecar in this deployment (not in-memory) — multi-node deployments share the same TTL'd seen-jti set. The reason name in the verdict pill is the one Orders sent on the wire, not a label inferred client-side.`);
       },
 
       5: async () => {
@@ -842,15 +890,24 @@ internal static class LandingPage
         const tampered = tamperFirstSigChar(lastIssuedToken);
         const call = await callOrders('GET', '/orders/123', { bearer: tampered });
         appendRaw('Tampered token', call);
-        if (call.res.status === 401) {
-          setVerdict('bad', '401 — TAMPER REJECTED', `One flipped character is enough. For a 5-part envelope, this corrupts the AES-GCM tag and decryption fails closed (<b>DecryptionFailed</b>). For a 3-part token it surfaces as <b>SignatureMismatch</b>.`);
-          setExplain(`<b>Property proved:</b> ciphertext + tag malleability is non-existent. AEAD construction binds the protected header into the AAD, and the 16-byte tag is pinned by the profile (no truncation accepted). For signed-only tokens the equivalent guarantee is ML-DSA-65 itself — any byte changed on the wire breaks verification.`);
-          bumpReason(call.json && call.json.title ? call.json.title : 'Rejected');
+        // For a 5-part envelope, flipping the first sig-segment char actually
+        // corrupts the KEM ciphertext segment, surfacing as DecryptionFailed.
+        // For a 3-part signed-only token the equivalent flip surfaces as
+        // SignatureMismatch. Either is a valid fail-closed outcome — we accept
+        // both reasons as success.
+        const wire = wireReason(call);
+        const acceptable = new Set(['DecryptionFailed', 'SignatureMismatch']);
+        if (call.res.status === 401 && acceptable.has(wire)) {
+          setVerdict('bad', `401 — ${labelForReason(wire)}`, `One flipped character is enough. Orders surfaced the typed reason <b>${wire}</b> on the wire.`);
+          bumpReason(wire);
           setStepStatus(5, 'good');
         } else {
-          setVerdict('bad', `HTTP ${call.res.status}`, `Unexpected — tampered tokens should always be rejected.`);
-          setStepStatus(5, 'bad');
+          handleRejection(call, 5, {
+            reason: 'DecryptionFailed',  // narratively the headline reason for the encrypted profile
+            narrativeOnMatch: 'unreachable — accepted above',
+          });
         }
+        setExplain(`<b>Property proved:</b> ciphertext + tag malleability is non-existent. The AEAD construction binds the protected header into the AAD and the 16-byte tag is pinned by the profile (no truncation accepted). For a 5-part envelope, corrupting a KEM-ciphertext byte makes X-Wing decapsulation produce a different shared secret, which means the AES-GCM tag check fails — wire returns <b>DecryptionFailed</b>. For a 3-part signed-only token the equivalent guarantee is ML-DSA-65 itself, surfacing as <b>SignatureMismatch</b>.`);
       },
 
       6: async () => {
@@ -868,15 +925,11 @@ internal static class LandingPage
         setVerdict('warn', 'GET', 'Sending it to Orders — should fail with AudienceMismatch…');
         const call = await callOrders('GET', '/orders/123', { bearer: tok });
         appendRaw('Validate wrong-aud at Orders', call);
-        if (call.res.status === 401) {
-          setVerdict('bad', '401 — AUDIENCE MISMATCH', `The signature verifies (same issuer, same kid), but the <code>aud</code> doesn't match what Orders is configured to accept. Fail-closed.`);
-          setExplain(`<b>Property proved:</b> claim validation is bound to the verifier's configuration, not the token. The token is honestly signed by the legitimate issuer — it just isn't <i>for Orders</i>. A misrouted (or maliciously redirected) token cannot impersonate a valid one across services.`);
-          bumpReason(call.json && call.json.title ? call.json.title : 'AudienceMismatch');
-          setStepStatus(6, 'good');
-        } else {
-          setVerdict('bad', `HTTP ${call.res.status}`, 'Unexpected status.');
-          setStepStatus(6, 'bad');
-        }
+        handleRejection(call, 6, {
+          reason: 'AudienceMismatch',
+          narrativeOnMatch: `Signature verifies (same issuer, same kid), but the <code>aud</code> doesn't match what Orders is configured to accept. Wire returned the typed reason <b>AudienceMismatch</b>.`,
+        });
+        setExplain(`<b>Property proved:</b> claim validation is bound to the verifier's configuration, not the token. The token is honestly signed by the legitimate issuer — it just isn't <i>for Orders</i>. A misrouted (or maliciously redirected) token cannot impersonate a valid one across services.`);
       },
 
       7: async () => {
@@ -894,53 +947,88 @@ internal static class LandingPage
         setVerdict('warn', 'GET', 'Sending to Orders — should fail with Expired after the signature verifies…');
         const call = await callOrders('GET', '/orders/123', { bearer: tok });
         appendRaw('Validate expired at Orders', call);
-        if (call.res.status === 401) {
-          setVerdict('bad', '401 — EXPIRED', `The signature verifies; the <code>exp</code> claim is in the past. Fail-closed with the <b>Expired</b> reason.`);
-          setExplain(`<b>Property proved:</b> lifetime checks live after signature verification — which is the right order for fail-closed totality. An unauthenticated payload claim is never trusted; only after the signature confirms the issuer minted exactly these bytes does the validator look at <code>exp</code>/<code>nbf</code>. See <code>docs/SPEC.md</code> steps 6→7.`);
-          bumpReason('Expired');
-          setStepStatus(7, 'good');
-        } else {
-          setVerdict('bad', `HTTP ${call.res.status}`, 'Unexpected status.');
-          setStepStatus(7, 'bad');
-        }
+        handleRejection(call, 7, {
+          reason: 'Expired',
+          narrativeOnMatch: `Signature verifies; the <code>exp</code> claim is in the past. Wire returned the typed reason <b>Expired</b>.`,
+        });
+        setExplain(`<b>Property proved:</b> lifetime checks live after signature verification — which is the right order for fail-closed totality. An unauthenticated payload claim is never trusted; only after the signature confirms the issuer minted exactly these bytes does the validator look at <code>exp</code>/<code>nbf</code>. See <code>docs/SPEC.md</code> steps 6→7.`);
       },
 
       8: async () => {
         activateStep(8, 'Rotate & retire keys');
-        setVerdict('warn', 'POST', 'Rotating the active signing key (previous stays valid for overlap)…');
+        // Two-token isolation pattern. Reusing lastIssuedToken would conflate
+        // UnknownKid with ReplayDetected (its jti is already in Redis from
+        // steps 3-4), so we mint two fresh tokens under the soon-to-be-retired
+        // active kid: one for the overlap-window proof, one for the retirement
+        // proof. T_retire is never sent to Orders before retirement, so its
+        // jti is guaranteed unseen — any 401 it gets must come from kid state.
+
+        setVerdict('warn', 'POST', 'Minting two fresh tokens under the current active kid…');
+        const tokOverlap = await callIssuer('POST', '/token', {});
+        appendRaw('Mint T_overlap', tokOverlap);
+        const tokRetire = await callIssuer('POST', '/token', {});
+        appendRaw('Mint T_retire', tokRetire);
+        if (!tokOverlap.res.ok || !tokRetire.res.ok) {
+          setVerdict('bad', `HTTP ${tokOverlap.res.status}/${tokRetire.res.status}`, 'Could not mint the two pre-rotation tokens.');
+          setStepStatus(8, 'bad');
+          return;
+        }
+        const overlapKid = (tokOverlap.json && tokOverlap.json.kid) || 'unknown';
+        const retireKid = (tokRetire.json && tokRetire.json.kid) || 'unknown';
+
+        setVerdict('warn', 'POST', 'Rotating: the kid both tokens were signed under becomes <i>previous</i>; a new <i>active</i> kid takes its place…');
         const rot = await callIssuer('POST', '/keys/rotate', {});
         appendRaw('Rotate', rot);
-
         const jwks1 = await callIssuer('GET', '/.well-known/pqjwt-keys');
         appendRaw('JWKS after rotate', jwks1);
         if (jwks1.json) updateKeyState(jwks1.json);
 
-        setVerdict('warn', 'POST', 'Minting a token under the new active kid…');
-        const newTok = await callIssuer('POST', '/token', {});
-        appendRaw('Issue under new kid', newTok);
+        // Overlap proof: T_overlap was signed under the now-previous kid, but
+        // the previous kid is still published, so Orders must still accept it.
+        setVerdict('warn', 'GET', 'Validating T_overlap — previous kid is still published, so the token must still verify…');
+        const overlap = await callOrders('GET', '/orders/123', { bearer: tokOverlap.json.access_token });
+        appendRaw('Validate T_overlap (rotated, not retired)', overlap);
+        if (!overlap.res.ok) {
+          handleRejection(overlap, 8, {
+            reason: '(expected acceptance — overlap window)',
+            narrativeOnMatch: 'unreachable',
+          });
+          return;
+        }
+        bumpReason('Accepted');
 
-        setVerdict('warn', 'POST', 'Retiring the previous kid. Any token still signed by it must now be rejected…');
+        setVerdict('warn', 'POST', 'Retiring the previous kid. The verifier polls JWKS on a background timer — we will wait for it to notice…');
         const retire = await callIssuer('POST', '/keys/retire-previous', {});
         appendRaw('Retire previous', retire);
-
         const jwks2 = await callIssuer('GET', '/.well-known/pqjwt-keys');
-        appendRaw('JWKS after retire', jwks2);
+        appendRaw('JWKS after retire (issuer-side, immediate)', jwks2);
         if (jwks2.json) updateKeyState(jwks2.json);
 
-        // Try the OLD lastIssuedToken — its kid is now retired.
-        if (lastIssuedToken) {
-          const call = await callOrders('GET', '/orders/123', { bearer: lastIssuedToken });
-          appendRaw('Validate retired-kid token at Orders', call);
-          if (call.res.status === 401) {
-            setVerdict('bad', '401 — UNKNOWN KID', `After retirement the previous kid is no longer in the JWKS. A token still signed by it cannot be verified — fail-closed with <b>UnknownKid</b> (the validator never tries the wrong key).`);
-            setExplain(`<b>Property proved:</b> structural key rotation. A signed-only key change works the same way as a TLS certificate rollover — overlap window so live tokens keep working, then a hard cutoff. Crucially, no <code>kid</code> means no verification attempt; the validator does not silently fall back to another published key.`);
-            bumpReason('UnknownKid');
-            setStepStatus(8, 'good');
-          } else {
-            setVerdict('warn', `HTTP ${call.res.status}`, 'Unexpected — retired kid should have produced 401 UnknownKid.');
-            setStepStatus(8, 'bad');
-          }
+        // Wait for Orders' background IssuerKeyRing refresh to fetch the new
+        // JWKS — otherwise the next call could land while the kid is still
+        // cached, surfacing as ReplayDetected (if we reused a token) or
+        // succeeding outright. We use a fresh issuer-side poll as a proxy
+        // for "the JWKS has shrunk"; in practice the verifier sees the same
+        // thing within one refresh interval.
+        setVerdict('warn', 'POLL', `Polling JWKS for ~12s waiting for the retired kid <code>${retireKid}</code> to disappear…`);
+        const disappeared = await waitForKidToDisappear(retireKid);
+        if (!disappeared) {
+          setVerdict('warn', 'TIMEOUT', `The retired kid is still in the published JWKS after 12s. Either the test environment is slow or the retirement did not take effect — we will not call this a retirement success.`);
+          setStepStatus(8, 'bad');
+          return;
         }
+
+        // Now the actual retirement test. T_retire was never seen by Orders
+        // before, so jti collision is impossible; the only remaining failure
+        // path is the validator's kid resolution returning null.
+        setVerdict('warn', 'GET', 'Validating T_retire — its kid is now retired and unseen-jti, so the only acceptable failure is UnknownKid…');
+        const call = await callOrders('GET', '/orders/123', { bearer: tokRetire.json.access_token });
+        appendRaw('Validate T_retire (retired kid)', call);
+        handleRejection(call, 8, {
+          reason: 'UnknownKid',
+          narrativeOnMatch: `T_retire was never sent to Orders before — its <code>jti</code> isn't in Redis. The only way it could fail now is if its kid is no longer resolvable. Wire returned the typed reason <b>UnknownKid</b>.`,
+        });
+        setExplain(`<b>Property proved:</b> structural key rotation with hard retirement. The overlap window (T_overlap accepted after rotate) and the retirement cutoff (T_retire rejected with <b>UnknownKid</b> after the verifier's JWKS catches up) are independent steps — the two-token pattern isolates the kid-state test from any replay-cache interference. The step is only marked successful when both the JWKS poll observes the retirement <i>and</i> Orders returns the typed reason <code>UnknownKid</code>; anything else is a mismatch, not a success.`);
       },
     };
 
