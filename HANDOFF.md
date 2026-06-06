@@ -4,17 +4,25 @@ This note captures the current state of the project for someone (or some
 agent) picking it up cold. **Read `CLAUDE.md` first** (project guardrails),
 then this file.
 
-## Project state (as of 2026-06-05)
+## Project state (as of 2026-06-06)
 
-- **Latest release: `1.0.0-preview.8` on nuget.org** — all four packages
+- **Latest release: `1.0.0-preview.10` on nuget.org** — all four packages
   live and indexed: `PostQuantum.Jwt`, `PostQuantum.Jwt.AspNetCore`,
   `PostQuantum.Jwt.Analyzers`, `PostQuantum.Jwt.Templates`. Tag
-  `v1.0.0-preview.8`, GitHub Release published.
+  `v1.0.0-preview.10`, GitHub Release published. preview.9 hardened
+  `InMemoryReplayCache` and `HttpPqJwtKeyRing` for concurrency / lifecycle
+  (the latter now an `IHostedService` — consumers must register it as a
+  hosted service). preview.10 then fixed two regressions on top: a
+  case-sensitive `Authorization: Bearer` check in `PqJwtBearerHandler`
+  (RFC 9110 §11.1) and the `VerifierDemo` sample missing the hosted-service
+  registration from the preview.9 refactor.
 - **All work is on `main`** (the maintainer does **not** use feature
   branches — commit and push directly to `main`).
-- **176 tests passing in the default suite, 0 skipped**: 165 in
-  `PostQuantum.Jwt.Tests` + 11 in `PostQuantum.Jwt.Analyzers.Tests`.
-  One opt-in timing-distribution test runs via
+- **Default test suite is green** across `PostQuantum.Jwt.Tests` (the
+  fail-closed/library suite) and `PostQuantum.Jwt.Analyzers.Tests` (the
+  PQJWT001/002 diagnostics suite); see the README for the live figure as
+  new fail-closed tests land across previews. One opt-in
+  timing-distribution test still runs via
   `dotnet test --filter Category=Timing`.
 - **Live demo:** <https://demo.pqjwt.systemslibrarian.dev> —
   `samples/ProductionDeploymentDemo` running on Azure Container Apps
@@ -29,10 +37,14 @@ then this file.
   test and benchmark runs with `LD_LIBRARY_PATH=/opt/conda/lib`. Without
   it, PQ tests skip (and the `linux-pq-required` CI lane fails on any skip).
 - **NuGet publish:** the CI `NUGET_API_KEY` (on the `nuget-publish` GitHub
-  environment) remains **invalid** — `preview.5` through `preview.8` were
+  environment) remains **invalid** — `preview.5` through `preview.10` were
   pushed **manually** with the key saved in `./nuget.key` (gitignored), so
   they lack the CI build-provenance attestation. Each affected
-  `CHANGELOG.md` entry carries a transparency-note paragraph. The
+  `CHANGELOG.md` entry carries a transparency-note paragraph. Tags and
+  GitHub Releases are still cut for each preview — the `release.yml` pack
+  job runs on tag push (the build-provenance attestation is generated
+  there), but the `publish` job stays gated by the `nuget-publish`
+  environment and is cancelled until a working key is provisioned. The
   playground deploy secret (`AZURE_CREDENTIALS`) is healthy; the live demo
   deploy uses `az login` + `samples/ProductionDeploymentDemo/azure/deploy.ps1`
   manually.
