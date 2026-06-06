@@ -486,7 +486,7 @@ internal static class LandingPage
           <span class="step-num">8</span>
           <div>
             <div class="step-title"><span class="verb">POST</span>Rotate &amp; retire keys</div>
-            <div class="step-sub">Mint a new active <code>kid</code>, then retire the previous one. Old tokens under the retired <code>kid</code> → <b>UnknownKid</b>.</div>
+            <div class="step-sub">Mint a new active <code>kid</code>, then retire the previous one. Old tokens under the retired <code>kid</code> → <b>UnknownKeyId</b>.</div>
           </div>
         </button>
         <div class="explain" style="margin: 10px 6px;">
@@ -957,7 +957,7 @@ internal static class LandingPage
       8: async () => {
         activateStep(8, 'Rotate & retire keys');
         // Two-token isolation pattern. Reusing lastIssuedToken would conflate
-        // UnknownKid with ReplayDetected (its jti is already in Redis from
+        // UnknownKeyId with ReplayDetected (its jti is already in Redis from
         // steps 3-4), so we mint two fresh tokens under the soon-to-be-retired
         // active kid: one for the overlap-window proof, one for the retirement
         // proof. T_retire is never sent to Orders before retirement, so its
@@ -1021,14 +1021,14 @@ internal static class LandingPage
         // Now the actual retirement test. T_retire was never seen by Orders
         // before, so jti collision is impossible; the only remaining failure
         // path is the validator's kid resolution returning null.
-        setVerdict('warn', 'GET', 'Validating T_retire — its kid is now retired and unseen-jti, so the only acceptable failure is UnknownKid…');
+        setVerdict('warn', 'GET', 'Validating T_retire — its kid is now retired and unseen-jti, so the only acceptable failure is UnknownKeyId…');
         const call = await callOrders('GET', '/orders/123', { bearer: tokRetire.json.access_token });
         appendRaw('Validate T_retire (retired kid)', call);
         handleRejection(call, 8, {
-          reason: 'UnknownKid',
-          narrativeOnMatch: `T_retire was never sent to Orders before — its <code>jti</code> isn't in Redis. The only way it could fail now is if its kid is no longer resolvable. Wire returned the typed reason <b>UnknownKid</b>.`,
+          reason: 'UnknownKeyId',
+          narrativeOnMatch: `T_retire was never sent to Orders before — its <code>jti</code> isn't in Redis. The only way it could fail now is if its kid is no longer resolvable. Wire returned the typed reason <b>UnknownKeyId</b>.`,
         });
-        setExplain(`<b>Property proved:</b> structural key rotation with hard retirement. The overlap window (T_overlap accepted after rotate) and the retirement cutoff (T_retire rejected with <b>UnknownKid</b> after the verifier's JWKS catches up) are independent steps — the two-token pattern isolates the kid-state test from any replay-cache interference. The step is only marked successful when both the JWKS poll observes the retirement <i>and</i> Orders returns the typed reason <code>UnknownKid</code>; anything else is a mismatch, not a success.`);
+        setExplain(`<b>Property proved:</b> structural key rotation with hard retirement. The overlap window (T_overlap accepted after rotate) and the retirement cutoff (T_retire rejected with <b>UnknownKeyId</b> after the verifier's JWKS catches up) are independent steps — the two-token pattern isolates the kid-state test from any replay-cache interference. The step is only marked successful when both the JWKS poll observes the retirement <i>and</i> Orders returns the typed reason <code>UnknownKeyId</code>; anything else is a mismatch, not a success.`);
       },
     };
 
