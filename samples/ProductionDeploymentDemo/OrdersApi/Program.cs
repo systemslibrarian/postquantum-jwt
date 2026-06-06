@@ -41,8 +41,21 @@ builder.Services.AddSingleton(_ => XWingPrivateKey.Generate());
 builder.Services.AddSingleton(sp =>
 {
     var logger = sp.GetRequiredService<ILogger<IssuerKeyRing>>();
+    // PooledConnectionLifetime forces the underlying socket pool to recycle
+    // connections every 2 minutes, which is what makes a long-lived
+    // HttpClient honor DNS TTLs in container environments (Azure Container
+    // Apps, k8s, docker-compose). Without it, if the issuer container
+    // recycles to a new IP, this Orders pod's existing connection points
+    // at a dead endpoint forever and JWKS refresh silently fails. The
+    // IssuerKeyRing owns this HttpClient (its Dispose cleans it up on
+    // shutdown), so we don't need IHttpClientFactory's lifetime machinery
+    // — we just need the handler's pool to rotate.
+    var http = new HttpClient(new SocketsHttpHandler
+    {
+        PooledConnectionLifetime = TimeSpan.FromMinutes(2),
+    });
     return new IssuerKeyRing(
-        new HttpClient(),
+        http,
         new Uri(issuerKeysUrl),
         allowInsecureKeyDirectory,
         TimeSpan.FromSeconds(refreshSeconds),

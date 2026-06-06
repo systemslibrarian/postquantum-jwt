@@ -54,13 +54,48 @@ public sealed class RecipientKeyClient
                 return _cached;
             }
 
-            var document = await _http.GetFromJsonAsync(
-                _endpoint,
-                RecipientKeyJsonContext.Default.RecipientKeyDocument,
-                cancellationToken).ConfigureAwait(false);
+            // Stale-while-revalidate: if the upstream recipient-key directory
+            // has a network blip while we already hold a valid cached key, we
+            // serve the cached value rather than cascading the failure into
+            // every concurrent /token request. We do NOT update _lastFetched
+            // on the fallback path, so the next request retries the refresh
+            // instead of waiting another full _refreshInterval. The first call
+            // (no cache yet) still propagates the failure — there is nothing
+            // to fall back to.
+            RecipientKeyDocument? document;
+            try
+            {
+                document = await _http.GetFromJsonAsync(
+                    _endpoint,
+                    RecipientKeyJsonContext.Default.RecipientKeyDocument,
+                    cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (
+                ex is HttpRequestException ||
+                ex is TaskCanceledException && !cancellationToken.IsCancellationRequested)
+            {
+                if (_cached is not null)
+                {
+                    _logger.LogWarning(
+                        ex,
+                        "Failed to refresh Orders X-Wing recipient key from {Endpoint}; serving cached kid={Kid} (stale-while-revalidate).",
+                        _endpoint,
+                        _cachedKid);
+                    return _cached;
+                }
+                throw;
+            }
 
             if (document is null)
             {
+                if (_cached is not null)
+                {
+                    _logger.LogWarning(
+                        "Orders recipient-key endpoint {Endpoint} returned an empty document; serving cached kid={Kid}.",
+                        _endpoint,
+                        _cachedKid);
+                    return _cached;
+                }
                 throw new InvalidOperationException("Recipient key endpoint returned an empty document.");
             }
 

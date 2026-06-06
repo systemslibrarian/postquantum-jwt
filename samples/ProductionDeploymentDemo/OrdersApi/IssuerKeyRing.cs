@@ -25,6 +25,14 @@ public sealed class IssuerKeyRing : IHostedService, IDisposable
     private readonly TimeSpan _refreshInterval;
     private readonly ILogger<IssuerKeyRing> _logger;
     private readonly ConcurrentDictionary<string, MLDsa> _cache = new(StringComparer.Ordinal);
+    // Parallel record of the base64 each kid was last imported from. The
+    // background refresh runs every ~5s; the JWKS payload almost never changes
+    // between polls. Without this short-circuit we would re-import a fresh
+    // native MLDsa handle on every refresh (6 churned-and-quarantined handles
+    // per kid per minute under steady state), pushing all of them through the
+    // 30s deferred-disposal queue. Comparing the published base64 to what we
+    // imported it from lets us skip the reimport when the key is unchanged.
+    private readonly ConcurrentDictionary<string, string> _cachedKeyBase64 = new(StringComparer.Ordinal);
     private readonly SemaphoreSlim _refreshLock = new(1, 1);
 
     // Native MLDsa handles whose cache slot has been replaced or evicted. We
@@ -140,6 +148,16 @@ public sealed class IssuerKeyRing : IHostedService, IDisposable
                     continue;
                 }
 
+                // Skip reimport when the published base64 matches what we
+                // already imported for this kid. Avoids churning a fresh
+                // native MLDsa handle through the quarantine on every ~5s
+                // poll just because the background loop ran.
+                if (_cachedKeyBase64.TryGetValue(entry.Kid, out var previousBase64) &&
+                    string.Equals(previousBase64, entry.Key, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
                 try
                 {
                     var bytes = Convert.FromBase64String(entry.Key);
@@ -160,6 +178,7 @@ public sealed class IssuerKeyRing : IHostedService, IDisposable
                     {
                         _quarantine.Enqueue((DateTimeOffset.UtcNow, evicted, entry.Kid));
                     }
+                    _cachedKeyBase64[entry.Kid] = entry.Key;
                 }
                 catch (Exception ex) when (ex is FormatException or CryptographicException)
                 {
@@ -177,6 +196,7 @@ public sealed class IssuerKeyRing : IHostedService, IDisposable
                         // this reference. Quarantine, don't dispose inline.
                         _quarantine.Enqueue((DateTimeOffset.UtcNow, evictedKey, cachedKid));
                     }
+                    _cachedKeyBase64.TryRemove(cachedKid, out _);
                     _logger.LogWarning("Evicted issuer key kid={Kid} because it is no longer published.", cachedKid);
                 }
             }
