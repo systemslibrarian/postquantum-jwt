@@ -155,8 +155,7 @@ Update this table as letters go out and responses come in.
 
 | Sent | Recipient | Variant | Response | Outcome |
 |---|---|---|---|---|
-| _pending_ | Bas Westerbaan (Cloudflare) | Academic | | |
-| _pending_ | Deirdre Connolly | Academic | | |
+| 2026-06-05 | Bas Westerbaan + Deirdre Connolly + Peter Schwabe (X-Wing draft authors) | Targeted implementer question + PR offer | **Replied same day.** Bas: "Unfortunately, without a way to set the coins, you can't test the encapsulation perfectly. Not much we can do about that. Wouldn't say that that means it's not a good X-Wing implementation." → explicit endorsement of conformance under the platform-randomized-only constraint. Follow-up sent confirming the decaps-on-encaps-vectors approach + proposing a §5.4.1 PR with platform-neutral wording + asking to be listed in the Implementations appendix. PR pending. | Asked whether the Appendix C encaps KATs intend implementers on randomized-only platform KEMs (e.g. .NET BCL `MLKem.Encapsulate`) to verify against a second derand-capable ML-KEM for that one path, while keygen + decaps + combiner are vector-checked directly. Proposed a one-sentence note in §5.4.1 calling this out as it'll become a more common gap as ML-KEM lands in platform crypto libraries. See `KNOWN-GAPS.md` "ML-KEM encapsulation is not KAT-validated" for the in-repo framing this email asks about. **Outcome so far:** draft co-author has implicitly endorsed the round-trip + decaps-on-encaps-vectors approach as conforming; PR to formalise that guidance in §5.4.1 is in flight; Implementations-appendix listing requested. This is the most validating signal we can get short of a paid audit, and it came from one well-crafted email — see "Notes on tone" above for what worked. |
 | _pending_ | CFRG mailing list | Public note | | |
 | _pending_ | NCC Group Cryptography Services | Commercial | | |
 | _pending_ | Trail of Bits | Commercial | | |

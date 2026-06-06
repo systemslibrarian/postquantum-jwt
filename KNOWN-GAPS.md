@@ -17,22 +17,30 @@ installed (build-provenance, embedded SBOM, `SHA256SUMS`, SourceLink) lives in
 
 - **No external audit.** No third party has reviewed the design or
   implementation. Do not use in production.
-- **ML-KEM encapsulation specifically is not KAT-validated (BCL limitation).**
-  Seed-based key generation and the decapsulation + SHA3-256 combiner path are
-  checked against the official `draft-connolly-cfrg-xwing-kem` known-answer
-  vectors (`spec/test-vectors.json`) — all three vectors pass. The X-Wing
-  **combiner direction** and the **X25519 ephemeral half** of encapsulation
-  are also exercised deterministically through an internal test seam
-  (`IXWingDeterministicCoins`, reachable only via
+- **ML-KEM encapsulation is not vector-KAT'd in the encaps direction (platform
+  constraint — not an implementation oversight).** What *is* vector-checked:
+  seed-based keygen reproduces every vector's public key; **every vector's
+  `ct` is decapsulated against the corresponding `sk` and the recovered `ss`
+  is asserted equal to the vector** (`XWingKatTests.Decapsulating_the_vector_
+  ciphertext_yields_the_vector_shared_secret`) — this exercises `Decapsulate`
+  and the SHA3-256 combiner against the same values as the encaps vectors,
+  and it is the assurance pattern the X-Wing draft co-author **Bas Westerbaan
+  confirmed (2026-06-05) is sufficient for a conforming implementation** on
+  platforms that ship only a randomized ML-KEM (see `docs/AUDIT-OUTREACH.md`).
+  The X-Wing **combiner direction** and the **X25519 ephemeral half** of
+  encapsulation are additionally exercised deterministically through an
+  internal test seam (`IXWingDeterministicCoins`, reachable only via
   `InternalsVisibleTo("PostQuantum.Jwt.Tests")` — production always uses the
   OS CSPRNG via `RandomNumberGenerator` and the BCL `MLKem`, never an
-  injected coin source). The only remaining un-KAT'd path is the BCL
+  injected coin source). The remaining un-vector-KAT'd path is the BCL
   `MLKem.Encapsulate` itself: it draws its own randomness and exposes no
-  derandomized ("Encaps_derand") entry point, so the vectors' `eseed` cannot
-  be injected. That path is covered by a 64-iteration round-trip property
-  test with a statistical sanity check (all 64 ciphertexts distinct, all 64
-  shared secrets distinct, every round-trip recovers the secret). If a
-  derandomized ML-KEM API becomes available, add the encaps KAT.
+  derandomized entry point, so the vectors' `eseed` cannot be injected. We
+  cover it by a 64-iteration round-trip property test with a statistical
+  sanity check (all 64 ciphertexts distinct, all 64 shared secrets distinct,
+  every round-trip recovers the secret). A PR to formalise this pattern in
+  X-Wing draft §5.4.1 is in flight; see `docs/AUDIT-OUTREACH.md` for status.
+  If a derandomized BCL ML-KEM API becomes available, add the direct encaps
+  KAT as well — but it would be additive, not corrective.
 - **No independent ML-KEM / ML-DSA KATs in this repo.** We rely on the .NET BCL
   (FIPS-validated) for these primitives and do not re-test them here. If your
   threat model needs in-repo KATs, they are not present yet.
