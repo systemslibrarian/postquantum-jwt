@@ -1,11 +1,16 @@
 // RejectionExplainer
 //
 // Turns a PqJwtValidationException into a plain-language explanation of WHY the
-// token was rejected. The mapping keys off the real messages the validator
-// throws (see PqJwtValidator.cs) — when none match, we fall back to the raw
-// message rather than inventing a reason. It lives in the shared samples
-// project (Pq.Samples.Shared) because it is coupled to the validator's exact
-// exception messages and must not drift between samples.
+// token was rejected. Branches on the strongly-typed PqJwtFailureReason enum on
+// the exception — the same enum that backs the validator's typed-reason
+// taxonomy and the bounded-cardinality metric tag. The exception message is
+// only used as the unspecified-case fallback. This is the right pattern for
+// consumers: it's stable across library versions, immune to message-text
+// changes and to satellite-assembly localisation, and an enum-switch
+// exhaustiveness analyser will flag any new failure reason the library adds.
+//
+// It lives in the shared samples project (Pq.Samples.Shared) so multiple
+// samples can share one copy without it drifting between them.
 //
 // To God be the glory — 1 Corinthians 10:31.
 
@@ -17,81 +22,99 @@ public static class RejectionExplainer
 {
     /// <summary>
     /// A short headline ("what happened") and a one-line "why it matters",
-    /// derived from the exception the fail-closed validator threw.
+    /// derived from the typed PqJwtFailureReason on the fail-closed
+    /// validator's exception.
     /// </summary>
-    public static (string What, string Why) Explain(PqJwtValidationException ex)
+    public static (string What, string Why) Explain(PqJwtValidationException ex) => ex.Reason switch
     {
-        string m = ex.Message;
+        PqJwtFailureReason.SignatureMismatch => (
+            "Signature did not verify",
+            "The token was altered after signing, or signed by a different key. ML-DSA-65 over the header+payload no longer matches."),
 
-        // Order matters: check the most specific signals first.
-        if (Has(m, "signature verification failed"))
-            return ("Signature did not verify",
-                "The token was altered after signing, or signed by a different key. ML-DSA-65 over the header+payload no longer matches.");
+        PqJwtFailureReason.SignatureMalformed => (
+            "Signature segment is corrupt",
+            "The signature bytes aren't valid base64url — the token was truncated or mangled in transit."),
 
-        if (Has(m, "not valid base64url"))
-            return ("Signature segment is corrupt",
-                "The signature bytes aren't valid base64url — the token was truncated or mangled in transit.");
+        PqJwtFailureReason.MalformedEncoding => (
+            "Segment is not valid base64url",
+            "One of the token's segments isn't canonical base64url. Non-canonical encodings are rejected to prevent token-string malleability."),
 
-        if (Has(m, "expired at"))
-            return ("Token expired",
-                "The 'exp' instant is in the past (beyond the allowed clock skew). Expiry is enforced by default; there is no opt-out.");
+        PqJwtFailureReason.Expired => (
+            "Token expired",
+            "The 'exp' instant is in the past (beyond the allowed clock skew). Expiry is enforced by default; there is no opt-out."),
 
-        if (Has(m, "not valid before"))
-            return ("Token not yet valid",
-                "The 'nbf' instant is in the future. The token is being presented before its activation time.");
+        PqJwtFailureReason.NotYetValid => (
+            "Token not yet valid",
+            "The 'nbf' instant is in the future. The token is being presented before its activation time."),
 
-        if (Has(m, "missing the required 'exp'"))
-            return ("No expiry claim",
-                "Every token must carry 'exp'. A token with no expiry is rejected rather than treated as eternal.");
+        PqJwtFailureReason.MissingExpiration => (
+            "No expiry claim",
+            "Every token must carry 'exp'. A token with no expiry is rejected rather than treated as eternal."),
 
-        if (Has(m, "replay detected"))
-            return ("Replay detected",
-                "This 'jti' was already seen by the replay cache. The same token cannot be used twice when replay protection is on.");
+        PqJwtFailureReason.ReplayDetected => (
+            "Replay detected",
+            "This 'jti' was already seen by the replay cache. The same token cannot be used twice when replay protection is on."),
 
-        if (Has(m, "no 'jti'"))
-            return ("Replay protection without a jti",
-                "Replay protection is enabled but the token carries no 'jti' to track. It is refused rather than silently allowed.");
+        PqJwtFailureReason.MissingJwtId => (
+            "Replay protection without a jti",
+            "Replay protection is enabled but the token carries no 'jti' to track. It is refused rather than silently allowed."),
 
-        if (Has(m, "issuer"))
-            return ("Issuer mismatch",
-                "The 'iss' claim does not equal the configured ValidIssuer. The token was minted for a different issuer.");
+        PqJwtFailureReason.IssuerMismatch => (
+            "Issuer mismatch",
+            "The 'iss' claim does not equal the configured ValidIssuer. The token was minted for a different issuer."),
 
-        if (Has(m, "audience"))
-            return ("Audience mismatch",
-                "The 'aud' claim does not include the configured ValidAudience. The token was minted for a different recipient.");
+        PqJwtFailureReason.AudienceMismatch => (
+            "Audience mismatch",
+            "The 'aud' claim does not include the configured ValidAudience. The token was minted for a different recipient."),
 
-        if (Has(m, "Unsupported or disallowed signature algorithm") || Has(m, "Unsupported key-agreement") || Has(m, "Unsupported content-encryption"))
-            return ("Algorithm not accepted",
-                "The validator accepts exactly one suite (ML-DSA-65 / X-Wing / A256GCM). It never trusts the token's own 'alg' to pick a path — that's how 'alg: none' and downgrade attacks are foreclosed.");
+        PqJwtFailureReason.AlgorithmNotAccepted => (
+            "Algorithm not accepted",
+            "The validator accepts exactly one suite (ML-DSA-65 / X-Wing / A256GCM). It never trusts the token's own 'alg' to pick a path — that's how 'alg: none' and downgrade attacks are foreclosed."),
 
-        if (Has(m, "No verification key was resolved for kid"))
-            return ("Unknown key id",
-                "The 'kid' resolved to no key in the ring. An unknown signing key fails closed instead of being trusted.");
+        PqJwtFailureReason.UnknownKeyId => (
+            "Unknown key id",
+            "The 'kid' resolved to no key in the ring. An unknown signing key fails closed instead of being trusted."),
 
-        if (Has(m, "decryption failed") || Has(m, "authentication tag mismatch"))
-            return ("Decryption / tag check failed",
-                "The AES-256-GCM tag didn't authenticate, or the wrong X-Wing private key was used. Ciphertext integrity is enforced.");
+        PqJwtFailureReason.DecryptionFailed => (
+            "Decryption / tag check failed",
+            "The AES-256-GCM tag didn't authenticate, or the wrong X-Wing private key was used. Ciphertext integrity is enforced."),
 
-        if (Has(m, "key-agreement material is malformed"))
-            return ("Malformed key-agreement material",
-                "The X-Wing encapsulation in the token is structurally invalid.");
+        PqJwtFailureReason.KeyAgreementMalformed => (
+            "Malformed key-agreement material",
+            "The X-Wing encapsulation in the token is structurally invalid."),
 
-        if (Has(m, "Decrypted content is not a signed JWT"))
-            return ("Inner token isn't a signed JWT",
-                "After decryption, the contents weren't a valid signed token — the sign-then-encrypt invariant was violated.");
+        PqJwtFailureReason.InnerNotSigned => (
+            "Inner token isn't a signed JWT",
+            "After decryption, the contents weren't a valid signed token — the sign-then-encrypt invariant was violated."),
 
-        if (Has(m, "payload is not valid JSON") || Has(m, "payload is not a JSON object"))
-            return ("Payload isn't a JSON object",
-                "The decoded payload didn't parse as a JSON object. The token is structurally invalid.");
+        PqJwtFailureReason.MalformedJson => (
+            "Header or payload isn't valid JSON",
+            "The decoded segment didn't parse as JSON. The token is structurally invalid."),
 
-        if (Has(m, "Malformed token: expected") || Has(m, "malformed structure"))
-            return ("Wrong segment count",
-                "A signed token has 3 segments and an encrypted one has 5. This token had neither — it isn't a PostQuantum.Jwt token.");
+        PqJwtFailureReason.MalformedPayload => (
+            "Payload isn't a JSON object",
+            "The decoded payload was valid JSON but not a JSON object. The token is structurally invalid."),
 
-        // Fall back to the real message rather than fabricate a reason.
-        return ("Rejected", m);
-    }
+        PqJwtFailureReason.MalformedToken => (
+            "Wrong segment count",
+            "A signed token has 3 segments and an encrypted one has 5. This token had neither — it isn't a PostQuantum.Jwt token."),
 
-    private static bool Has(string haystack, string needle) =>
-        haystack.Contains(needle, StringComparison.OrdinalIgnoreCase);
+        PqJwtFailureReason.InvalidHeader => (
+            "Invalid header field",
+            "A required JOSE header field was missing or carried an unexpected value (for example a missing 'cty' on an encrypted token)."),
+
+        PqJwtFailureReason.MalformedTimeClaim => (
+            "Malformed time claim",
+            "An 'exp' or 'nbf' claim was present but not an integer Unix-time value."),
+
+        PqJwtFailureReason.CryptographicMaterial => (
+            "Cryptographic material failed a primitive check",
+            "A primitive key/length/format check on cryptographic bytes inside the token failed during parsing."),
+
+        // Fall back to the real message rather than fabricate a reason. Only
+        // reached when the library reports an Unspecified reason (legacy
+        // constructor) or when a future library version adds a reason this
+        // sample doesn't know about yet.
+        _ => ("Rejected", ex.Message),
+    };
 }

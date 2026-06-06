@@ -383,7 +383,18 @@ public sealed class PqJwtDemoService : IDisposable
     private static byte[] Base64UrlDecodeBytes(string s)
     {
         s = s.Replace('-', '+').Replace('_', '/');
-        switch (s.Length % 4) { case 2: s += "=="; break; case 3: s += "="; break; }
+        // length % 4 == 1 is a structurally-invalid base64 length: there is no
+        // padding to reach a multiple of four, and FromBase64String would throw
+        // FormatException with an opaque "Invalid length" message. Throw our
+        // own FormatException up front so the call sites' try/catch wrappers
+        // (DecodeShare returns null; DecodeForDisplay swallows) get a clear
+        // intent and copy-pasters of this helper aren't surprised.
+        switch (s.Length % 4)
+        {
+            case 1: throw new FormatException("Invalid base64url length (mod 4 == 1).");
+            case 2: s += "=="; break;
+            case 3: s += "="; break;
+        }
         return Convert.FromBase64String(s);
     }
 
@@ -432,7 +443,16 @@ public sealed class PqJwtDemoService : IDisposable
     private static string DecodeSegment(string seg)
     {
         string s = seg.Replace('-', '+').Replace('_', '/');
-        switch (s.Length % 4) { case 2: s += "=="; break; case 3: s += "="; break; }
+        // length % 4 == 1 is structurally invalid; throw early with a clear
+        // message instead of letting FromBase64String throw an opaque one. The
+        // caller (DecodeForDisplay) catches and swallows, so this is purely
+        // a "fail honestly" hardening of the helper itself.
+        switch (s.Length % 4)
+        {
+            case 1: throw new FormatException("Invalid base64url length (mod 4 == 1).");
+            case 2: s += "=="; break;
+            case 3: s += "="; break;
+        }
         return System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(s));
     }
 

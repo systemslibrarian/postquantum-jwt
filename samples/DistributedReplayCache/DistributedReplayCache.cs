@@ -105,14 +105,35 @@ public sealed class DistributedCacheReplayCache : IPqJwtReplayCache
     }
 
     /// <inheritdoc />
+    /// <remarks>
+    /// <para>
+    /// <b>SCALE WARNING.</b> IPqJwtReplayCache.TryRegister is synchronous, but
+    /// IDistributedCache is fundamentally async — every <c>_cache.Get</c> and
+    /// <c>_cache.Set</c> call below dispatches via .GetAwaiter().GetResult() on
+    /// a thread-pool thread. Under heavy load that blocks on network I/O can
+    /// starve the ASP.NET Core thread pool and degrade the entire host (the
+    /// same anti-pattern that motivated <c>HttpPqJwtKeyRing</c>'s background-
+    /// refresh refactor). This sample is fine for low-traffic services and
+    /// for showing the IDistributedCache plug-shape, but it is NOT a
+    /// horizontal-scale production primitive.
+    /// </para>
+    /// <para>
+    /// <b>Use <see cref="RedisReplayCache"/> for production.</b> It calls
+    /// StackExchange.Redis directly (synchronous client API, no
+    /// sync-over-async), and uses <c>SET key value NX PX &lt;ttl&gt;</c> for
+    /// atomic set-if-absent — closing both the thread-pool risk AND the
+    /// get-then-set race at the same time. If you have a non-Redis provider,
+    /// implement <c>IPqJwtReplayCache</c> directly against its native
+    /// synchronous-friendly API rather than going through IDistributedCache.
+    /// </para>
+    /// </remarks>
     public bool TryRegister(string jwtId, DateTimeOffset expiresAt)
     {
         ArgumentException.ThrowIfNullOrEmpty(jwtId);
         var key = _prefix + jwtId;
 
-        // The interface is synchronous; IDistributedCache is async. We block here
-        // deliberately and document it. (RedisReplayCache avoids this by using the
-        // synchronous StackExchange.Redis API directly.)
+        // The interface is synchronous; IDistributedCache is async under the
+        // hood. See the SCALE WARNING above — for production, RedisReplayCache.
         if (_cache.Get(key) is not null)
         {
             return false;   // already seen -> replay
