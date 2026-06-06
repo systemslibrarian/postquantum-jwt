@@ -18,9 +18,6 @@ namespace PostQuantum.Jwt.AspNetCore;
 /// </summary>
 public sealed class PqJwtBearerHandler : AuthenticationHandler<PqJwtBearerOptions>
 {
-    private PqJwtValidator? _validator;
-    private PqJwtValidationParameters? _validatorParameters;
-
     /// <summary>Creates the handler.</summary>
     /// <param name="options">The options monitor (DI-supplied).</param>
     /// <param name="logger">A logger factory (DI-supplied).</param>
@@ -31,27 +28,17 @@ public sealed class PqJwtBearerHandler : AuthenticationHandler<PqJwtBearerOption
         UrlEncoder encoder)
         : base(options, logger, encoder)
     {
-        // Defer validator construction to first use — base.Options is not
-        // populated until InitializeAsync runs the named-options lookup.
     }
 
-    private PqJwtValidator Validator
-    {
-        get
-        {
-            // Cheap reference-equality short-circuit: as long as the options
-            // instance hasn't changed (IOptionsMonitor reload), keep the
-            // existing validator.
-            var current = Options.ValidationParameters;
-            if (_validator is null || !ReferenceEquals(_validatorParameters, current))
-            {
-                _validator = new PqJwtValidator(current, Options.TimeProvider);
-                _validatorParameters = current;
-            }
-
-            return _validator;
-        }
-    }
+    // Authentication handlers are registered transient by AddScheme&lt;TOptions,
+    // THandler&gt;, so this handler instance is fresh per request — there is
+    // nothing to "cache" across calls within a single handler instance.
+    // PqJwtValidator construction is argument validation + reference assignment
+    // (no crypto), which is negligible next to the Validate call that follows.
+    // If per-request construction shows up in a profile, register the validator
+    // as a singleton via DI and resolve it here.
+    private PqJwtValidator Validator =>
+        new(Options.ValidationParameters, Options.TimeProvider);
 
     /// <inheritdoc />
     protected override Task<AuthenticateResult> HandleAuthenticateAsync()

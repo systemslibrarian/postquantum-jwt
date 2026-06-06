@@ -39,7 +39,7 @@ repo and why.
 
 ## Current numbers
 
-As of `1.0.0-preview.9`:
+As of `1.0.0-preview.10`:
 
 - **176 tests passing in the default suite, 0 skipped** — 165 in
   `PostQuantum.Jwt.Tests` (148 from the preview.8 ship + 5 new

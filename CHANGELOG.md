@@ -8,6 +8,18 @@ the API between previews.
 
 ## [Unreleased]
 
+## [1.0.0-preview.10] — 2026-06-06
+
+Two targeted fixes on top of preview.9's concurrency hardening: one
+interop bug in the ASP.NET Core bearer handler, and one regression in the
+`VerifierDemo` sample I shipped in preview.9.
+
+> **Release note (transparency):** like preview.5/.6/.7/.8/.9, this version
+> is published manually via `dotnet nuget push` because the tag-based
+> release workflow's `NUGET_API_KEY` is still invalid. The `.nupkg` files
+> therefore do **not** carry the CI build-provenance attestation the
+> pipeline normally adds; nuget.org repository signing still applies.
+
 ### Fixed
 
 - **`PqJwtBearerHandler` accepted the `Authorization` scheme as case-sensitive
@@ -19,8 +31,8 @@ the API between previews.
   token slice length is unchanged (fixed at the prefix's wire length). New
   theory test covers `bearer` / `BEARER` / `BeArEr` against the live handler.
 - **`samples/VerifierDemo/Program.cs` was broken by the preview.9
-  `HttpPqJwtKeyRing` `IHostedService` refactor.** The sample constructed the
-  key ring as a local variable and wired `Resolve(kid)` into
+  `HttpPqJwtKeyRing` `IHostedService` refactor (regression).** The sample
+  constructed the key ring as a local variable and wired `Resolve(kid)` into
   `SignatureKeyResolver`, but never called `PreloadAsync` or registered the
   hosted service — so the cache stayed empty and `/verify` failed closed with
   `UnknownKeyId` on every request. Refactored the sample to the canonical
@@ -29,6 +41,25 @@ the API between previews.
   options configuration. Also added `SocketsHttpHandler` with
   `PooledConnectionLifetime = 2 minutes` for DNS-TTL honouring in container
   environments.
+- **`samples/PqJwtPlayground` constructed a new `PqJwtValidator` on every
+  `Validate()` call** — exactly the anti-pattern the bundled `PQJWT002`
+  analyzer flags as wasteful, and it contradicted the snippet the same
+  service emits to users in `BuildSnippet()` (which correctly advises
+  validator reuse). Cached the validator as a field; recreated only when
+  `RegenerateKeys()` swaps the underlying keys.
+
+### Changed
+
+- **`PqJwtBearerHandler.Validator` dead-cache simplified.** The previous
+  property used a reference-equality short-circuit on `_validator` to skip
+  reconstruction, but ASP.NET Core registers authentication handlers as
+  transient via `AddScheme<TOptions, THandler>`, so a fresh handler instance
+  is created per request — `_validator` starts null every time and the
+  short-circuit never fired. Removed the dead fields; the property is now a
+  one-liner. The IOptionsMonitor-reload semantics still hold because each
+  request resolves a new handler with the current options. Documented the
+  transient-handler reality in a comment so a future reader doesn't
+  re-introduce the dead cache.
 
 ## [1.0.0-preview.9] — 2026-06-05
 

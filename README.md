@@ -23,6 +23,14 @@ drop-in replacement for OAuth/OIDC/JWT middleware**.
 > walks through building, validating, and tampering. Hosted scale-to-zero to
 > keep costs near nothing — the first request after idle can take up to a
 > minute to wake; reload if needed.
+>
+> **▶ Live production-shape demo — <https://demo.pqjwt.systemslibrarian.dev>** —
+> a real two-service deployment (issuer + Orders API + Redis sidecar) running
+> on Azure Container Apps. Eight-step guided tour drives the full chain
+> end-to-end: issue → validate → replay-reject → tamper-reject → rotate →
+> retire, with the typed `PqJwtFailureReason` returned on the wire so each
+> step's outcome is evidence, not narrative. See the source at
+> [`samples/ProductionDeploymentDemo`](https://github.com/systemslibrarian/postquantum-jwt/tree/main/samples/ProductionDeploymentDemo).
 
 > ### Read this first — these tokens target controlled systems, not generic JWT interop
 >
@@ -48,7 +56,7 @@ drop-in replacement for OAuth/OIDC/JWT middleware**.
 > [Compared to System.IdentityModel.Tokens.Jwt](#compared-to-systemidentitymodeltokensjwt)
 > for the side-by-side.
 
-> **Status — `1.0.0-preview.9`. Production-oriented preview for controlled
+> **Status — `1.0.0-preview.10`. Production-oriented preview for controlled
 > systems; not independently audited.** The public API and wire format are held
 > stable across the `1.0.0-preview.*` series — the `preview` suffix marks the
 > **pending independent audit**, not API churn; no breaking changes are expected
@@ -65,6 +73,7 @@ drop-in replacement for OAuth/OIDC/JWT middleware**.
 ## Table of contents
 
 - [Why](#why)
+- [What's new in 1.0.0-preview.10](#whats-new-in-100-preview10)
 - [What's new in 1.0.0-preview.9](#whats-new-in-100-preview9)
 - [What's new in 1.0.0-preview.8](#whats-new-in-100-preview8)
 - [What's new in 1.0.0-preview.7](#whats-new-in-100-preview7)
@@ -129,6 +138,38 @@ OAuth/OIDC/JWT middleware or a generic JWT/JWE library.
 | Systems behind an interop-translating gateway | Anywhere generic JWT/JWE interoperability is required |
 
 ---
+
+## What's new in 1.0.0-preview.10
+
+Two targeted fixes on top of preview.9's concurrency hardening — one interop
+bug in the ASP.NET Core bearer handler, and one regression in the
+`VerifierDemo` sample that shipped in preview.9.
+
+- **`PqJwtBearerHandler` now accepts case-insensitive `Authorization`
+  scheme.** `bearer …` and `BEARER …` work alongside `Bearer …`. The
+  previous case-sensitive prefix check violated RFC 9110 §11.1
+  ("auth-scheme tokens are case-insensitive") and rejected
+  standards-compliant requests with non-canonical casing. New theory test
+  covers `bearer` / `BEARER` / `BeArEr` against the live handler.
+- **`samples/VerifierDemo` regression fixed.** The preview.9
+  `HttpPqJwtKeyRing` `IHostedService` refactor changed `Resolve` to a pure
+  in-memory lookup, but the `VerifierDemo` sample still constructed the
+  ring as a local variable and wired `Resolve(kid)` into the bearer options
+  without registering the hosted service. The cache stayed empty and
+  `/verify` failed closed with `UnknownKeyId` on every request. The sample
+  now uses the canonical pattern: `AddSingleton(...)` +
+  `AddHostedService(...)`, then `IPqJwtKeyRing` resolved from DI inside the
+  bearer options `Configure` callback. Also adds `SocketsHttpHandler` with
+  `PooledConnectionLifetime = 2 minutes` so DNS TTLs are honoured in
+  container environments.
+- **`samples/PqJwtPlayground` now caches its validator** — was building a
+  new `PqJwtValidator` on every "Validate" click, exactly the pattern the
+  `PQJWT002` analyzer flags as wasteful. The validator is now a field
+  rebuilt only when `RegenerateKeys()` swaps the underlying keys.
+- **`PqJwtBearerHandler` dead validator cache simplified** — the previous
+  per-instance reference-equality short-circuit never fired because ASP.NET
+  Core registers auth handlers as transient (one fresh handler instance per
+  request). Removed the dead fields; the property is now a one-liner.
 
 ## What's new in 1.0.0-preview.9
 
@@ -492,19 +533,42 @@ Full notes in [`CHANGELOG.md`](CHANGELOG.md).
 ## Install
 
 ```bash
-dotnet add package PostQuantum.Jwt --version 1.0.0-preview.9
+dotnet add package PostQuantum.Jwt --version 1.0.0-preview.10
 ```
 
 Or in a `.csproj`:
 
 ```xml
-<PackageReference Include="PostQuantum.Jwt" Version="1.0.0-preview.9" />
+<PackageReference Include="PostQuantum.Jwt" Version="1.0.0-preview.10" />
 ```
 
-**Runtime requirement:** the native ML-KEM / ML-DSA primitives need an OpenSSL
-build that exposes them — **OpenSSL 3.5 or later** on Linux, or a recent
-Windows. PostQuantum.Jwt fails closed with a clear error where they are
-unavailable rather than silently falling back to weaker crypto.
+**Runtime requirement.** Native ML-KEM / ML-DSA primitives come from the OS
+crypto stack. PostQuantum.Jwt fails closed with a clear error when they are
+unavailable — a misconfigured host throws on the first token operation,
+never silently downgrades.
+
+| Host | Status |
+|---|---|
+| Recent Windows (CNG with PQC support) | Works |
+| Recent macOS | Works |
+| Linux + OpenSSL ≥ 3.5 | Works |
+| Linux + OpenSSL 3.0–3.4 (every LTS today) | **Will not run** |
+
+**Linux deployment is non-trivial today.** No current LTS distro ships
+OpenSSL 3.5+ in its default packages — Ubuntu 22.04 / 24.04, RHEL 9,
+Debian 12, Fedora 40, and Alpine 3.20 are all on 3.0.x–3.3.x. Workable
+production paths:
+
+- **Container with a newer OpenSSL** — see the Dockerfiles under
+  [`samples/ProductionDeploymentDemo/`](samples/ProductionDeploymentDemo/),
+  which install OpenSSL 3.5 during build.
+- **Conda-forge overlay** — `LD_LIBRARY_PATH=/opt/conda/lib` over
+  conda-forge's OpenSSL 3.5+. This is what the project's own CI runs.
+- **Self-built OpenSSL** — workable, but you now own the patch cadence
+  for a security-critical dependency.
+
+This is the single most common deployment surprise. Plan a path before
+you commit.
 
 ---
 
@@ -660,7 +724,7 @@ package and call `AddPqJwtBearer(...)` on the standard
 `ML-DSA-65`.
 
 ```bash
-dotnet add package PostQuantum.Jwt.AspNetCore --version 1.0.0-preview.9
+dotnet add package PostQuantum.Jwt.AspNetCore --version 1.0.0-preview.10
 ```
 
 ```csharp

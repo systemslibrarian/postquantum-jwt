@@ -83,6 +83,11 @@ public sealed class PqJwtDemoService : IDisposable
     private MLDsa _signingKey;
     private MLDsa _verificationKey;
     private XWingPrivateKey _recipientKey;
+    // Cached validator — the snippet this service emits to users (BuildSnippet)
+    // advises reusing one validator across calls, and the PQJWT002 analyzer
+    // flags per-call construction as wasteful. Recreated only when
+    // RegenerateKeys() swaps the underlying keys.
+    private PqJwtValidator _validator;
 
     public string SigningKid { get; private set; } = "playground-key-1";
 
@@ -92,7 +97,15 @@ public sealed class PqJwtDemoService : IDisposable
         _verificationKey = MLDsa.ImportMLDsaPublicKey(
             MLDsaAlgorithm.MLDsa65, _signingKey.ExportMLDsaPublicKey());
         _recipientKey = XWingPrivateKey.Generate();
+        _validator = BuildValidator();
     }
+
+    private PqJwtValidator BuildValidator() => new(new PqJwtValidationParameters
+    {
+        SignatureVerificationKey = _verificationKey,
+        DecryptionKey = _recipientKey,
+        RequireReplayProtection = false,
+    });
 
     /// <summary>Base64 of the current ML-DSA-65 public verification key.</summary>
     public string VerificationPublicKeyBase64
@@ -120,6 +133,7 @@ public sealed class PqJwtDemoService : IDisposable
                 MLDsaAlgorithm.MLDsa65, _signingKey.ExportMLDsaPublicKey());
             _recipientKey = XWingPrivateKey.Generate();
             SigningKid = "playground-key-" + Random.Shared.Next(1000, 9999);
+            _validator = BuildValidator();
         }
     }
 
@@ -232,17 +246,13 @@ public sealed class PqJwtDemoService : IDisposable
     {
         lock (_gate)
         {
-            var validator = new PqJwtValidator(new PqJwtValidationParameters
-            {
-                SignatureVerificationKey = _verificationKey,
-                DecryptionKey = _recipientKey,
-                RequireReplayProtection = false,
-            });
-
+            // Reuse the cached validator (PQJWT002 / ValidatorReuseAnalyzer pattern):
+            // building a validator per call is wasteful and contradicts the snippet
+            // this service emits to users in BuildSnippet().
             var sw = Stopwatch.StartNew();
             try
             {
-                var r = validator.Validate(token);
+                var r = _validator.Validate(token);
                 sw.Stop();
                 var claimsJson = JsonSerializer.Serialize(
                     r.Claims.ToDictionary(kv => kv.Key, kv => kv.Value),

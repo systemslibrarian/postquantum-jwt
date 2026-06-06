@@ -5,7 +5,7 @@ unverified, and where the sharp edges are. Honesty over polish: if something is
 incomplete, it is listed here rather than glossed over. This file is part of the
 contract with anyone evaluating the library.
 
-Last reviewed for: `1.0.0-preview.9`. Companion views — what *is* tested in
+Last reviewed for: `1.0.0-preview.10`. Companion views — what *is* tested in
 repo, by layer, with the commands to run each, lives in
 [`docs/TESTING.md`](docs/TESTING.md); how to verify a release you just
 installed (build-provenance, embedded SBOM, `SHA256SUMS`, SourceLink) lives in
