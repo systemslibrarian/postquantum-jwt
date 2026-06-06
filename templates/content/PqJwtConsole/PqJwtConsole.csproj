@@ -9,7 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="PostQuantum.Jwt" Version="1.0.0-preview.8" />
+    <PackageReference Include="PostQuantum.Jwt" Version="1.0.0-preview.9" />
   </ItemGroup>
 
 </Project>

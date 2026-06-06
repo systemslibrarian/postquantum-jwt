@@ -108,7 +108,7 @@ public sealed class PqJwtAspNetCoreTests
     }
 
     [PqcFact]
-    public void Http_key_ring_resolves_known_kid_and_rejects_unknown_kid()
+    public async Task Http_key_ring_resolves_known_kid_and_rejects_unknown_kid()
     {
         using var signingKey = TestKeys.NewSigningKey();
         var publicKey = signingKey.ExportMLDsaPublicKey();
@@ -121,6 +121,11 @@ public sealed class PqJwtAspNetCoreTests
         using var fakeHandler = new StubHandler(directoryJson);
         using var httpClient = new HttpClient(fakeHandler);
         using var keyRing = new HttpPqJwtKeyRing(httpClient, new Uri("https://keys.example/.well-known/pq-keys"));
+
+        // Resolve is now a pure in-memory lookup; preload the cache explicitly
+        // (production hosts register the type as IHostedService and StartAsync
+        // does the same preload + spawns the background refresh loop).
+        await keyRing.PreloadAsync(CancellationToken.None);
 
         var resolved = keyRing.Resolve(keyId);
         Assert.NotNull(resolved);
@@ -190,10 +195,12 @@ public sealed class PqJwtAspNetCoreTests
     }
 
     [PqcFact]
-    public void Http_key_ring_evicts_a_kid_removed_from_the_directory()
+    public async Task Http_key_ring_evicts_a_kid_removed_from_the_directory()
     {
         // Regression: a revoked / rotated-out kid must stop resolving, not stay
-        // trusted until process restart.
+        // trusted until process restart. In preview.9+, Resolve is a pure
+        // in-memory lookup driven by an IHostedService background loop — we
+        // simulate the refresh tick here by calling PreloadAsync explicitly.
         using var signingKey = TestKeys.NewSigningKey();
         var pub = Convert.ToBase64String(signingKey.ExportMLDsaPublicKey());
         const string kid = "rotating-kid";
@@ -205,13 +212,16 @@ public sealed class PqJwtAspNetCoreTests
         using var ring = new HttpPqJwtKeyRing(
             http, new Uri("https://keys.example/.well-known/pq-keys"), TimeSpan.FromMinutes(1), clock);
 
-        Assert.NotNull(ring.Resolve(kid)); // first resolve fetches + caches
+        await ring.PreloadAsync(CancellationToken.None);
+        Assert.NotNull(ring.Resolve(kid)); // first preload caches the published key
 
-        // Issuer drops the key from the directory; advance past the refresh interval.
+        // Issuer drops the key from the directory; the background loop's next
+        // tick would refresh — we simulate it by calling PreloadAsync again.
         stub.Response = """{ "keys": [] }""";
         clock.Now = Now.AddMinutes(2);
+        await ring.PreloadAsync(CancellationToken.None);
 
-        Assert.Null(ring.Resolve(kid)); // due refresh evicts the removed kid
+        Assert.Null(ring.Resolve(kid)); // refresh evicted the removed kid
     }
 
     [PqcFact]

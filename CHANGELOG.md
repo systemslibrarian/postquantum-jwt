@@ -8,12 +8,20 @@ the API between previews.
 
 ## [Unreleased]
 
+## [1.0.0-preview.9] — 2026-06-05
+
 A concurrency / lifecycle hardening pass on `InMemoryReplayCache` and
 `HttpPqJwtKeyRing`. **One behaviour change in `HttpPqJwtKeyRing`** —
 `Resolve` is now a pure in-memory lookup and the type implements
 `IHostedService`; consumers must register it as a hosted service to keep
 the cache refreshed. Calling `Resolve` no longer drives a synchronous HTTP
 fetch.
+
+> **Release note (transparency):** like preview.5/.6/.7/.8, this version is
+> published manually via `dotnet nuget push` because the tag-based release
+> workflow's `NUGET_API_KEY` is still invalid. The `.nupkg` files therefore
+> do **not** carry the CI build-provenance attestation the pipeline normally
+> adds; nuget.org repository signing still applies.
 
 ### Fixed
 

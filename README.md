@@ -48,7 +48,7 @@ drop-in replacement for OAuth/OIDC/JWT middleware**.
 > [Compared to System.IdentityModel.Tokens.Jwt](#compared-to-systemidentitymodeltokensjwt)
 > for the side-by-side.
 
-> **Status — `1.0.0-preview.8`. Production-oriented preview for controlled
+> **Status — `1.0.0-preview.9`. Production-oriented preview for controlled
 > systems; not independently audited.** The public API and wire format are held
 > stable across the `1.0.0-preview.*` series — the `preview` suffix marks the
 > **pending independent audit**, not API churn; no breaking changes are expected
@@ -65,6 +65,7 @@ drop-in replacement for OAuth/OIDC/JWT middleware**.
 ## Table of contents
 
 - [Why](#why)
+- [What's new in 1.0.0-preview.9](#whats-new-in-100-preview9)
 - [What's new in 1.0.0-preview.8](#whats-new-in-100-preview8)
 - [What's new in 1.0.0-preview.7](#whats-new-in-100-preview7)
 - [What's new in 1.0.0-preview.6](#whats-new-in-100-preview6)
@@ -128,6 +129,45 @@ OAuth/OIDC/JWT middleware or a generic JWT/JWE library.
 | Systems behind an interop-translating gateway | Anywhere generic JWT/JWE interoperability is required |
 
 ---
+
+## What's new in 1.0.0-preview.9
+
+A concurrency / lifecycle hardening pass on `InMemoryReplayCache` and
+`HttpPqJwtKeyRing`. **One behaviour change in `HttpPqJwtKeyRing`** — `Resolve`
+is now a pure in-memory lookup and the type implements `IHostedService`;
+consumers must register it as a hosted service to keep the cache refreshed.
+Calling `Resolve` no longer drives a synchronous HTTP fetch.
+
+- **Replay-cache `Prune` race fixed** — `InMemoryReplayCache.Prune` previously
+  removed entries by key alone; a concurrent `TryRegister` that replaced a
+  just-expired entry with a fresh `expiresAt` between the enumerator's read
+  and the `TryRemove` would have its **live entry deleted**, and the next
+  presentation of the same `jti` could slip past replay defense. Now uses the
+  atomic compare-and-remove facade — the entry is only pruned if both the key
+  AND the value still match.
+- **`HttpPqJwtKeyRing` is now a background-refresh `IHostedService`.** The
+  sync-over-async fetch on the auth request path is gone: `Resolve` returns
+  whatever is in the cache and never blocks on HTTP. The cache is refreshed
+  by a `PeriodicTimer`-driven background loop started by `StartAsync`. **Action
+  required for consumers:**
+  ```csharp
+  services.AddSingleton(sp => new HttpPqJwtKeyRing(...));
+  services.AddHostedService(sp => sp.GetRequiredService<HttpPqJwtKeyRing>());
+  ```
+  Consumers that only registered the singleton will see an empty cache and
+  `UnknownKeyId` for every kid until they add the hosted-service registration
+  or call `PreloadAsync` themselves. This is intentional — the old "Resolve
+  auto-fetches" semantics were the source of the thread-pool-starvation risk.
+- **Native handle race + leak in `HttpPqJwtKeyRing` fixed.** Old `MLDsa`
+  handles were disposed inline during cache replacement (racing concurrent
+  `Resolve` callers mid-`VerifyData`) and rotated-out keys were left
+  un-disposed (relying on GC finalizer). Both paths now route through a 30-
+  second deferred-disposal quarantine queue — deferred-but-deterministic
+  disposal that honours the "dispose anything holding key handles" rule
+  without re-introducing the inline-dispose race.
+- **`HttpPqJwtKeyRing` skips the ML-DSA reimport when a kid's published
+  base64 hasn't changed** — steady-state native-handle churn drops from
+  one-per-poll to zero when the JWKS is unchanged.
 
 ## What's new in 1.0.0-preview.8
 
@@ -452,13 +492,13 @@ Full notes in [`CHANGELOG.md`](CHANGELOG.md).
 ## Install
 
 ```bash
-dotnet add package PostQuantum.Jwt --version 1.0.0-preview.8
+dotnet add package PostQuantum.Jwt --version 1.0.0-preview.9
 ```
 
 Or in a `.csproj`:
 
 ```xml
-<PackageReference Include="PostQuantum.Jwt" Version="1.0.0-preview.8" />
+<PackageReference Include="PostQuantum.Jwt" Version="1.0.0-preview.9" />
 ```
 
 **Runtime requirement:** the native ML-KEM / ML-DSA primitives need an OpenSSL
@@ -620,7 +660,7 @@ package and call `AddPqJwtBearer(...)` on the standard
 `ML-DSA-65`.
 
 ```bash
-dotnet add package PostQuantum.Jwt.AspNetCore --version 1.0.0-preview.8
+dotnet add package PostQuantum.Jwt.AspNetCore --version 1.0.0-preview.9
 ```
 
 ```csharp
