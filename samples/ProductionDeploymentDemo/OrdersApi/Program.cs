@@ -180,6 +180,57 @@ app.Logger.LogInformation(
 
 app.UseForwardedHeaders();
 
+// UseStatusCodePages must be EARLY in the pipeline — before UseAuthentication —
+// so it can intercept the 401 the auth challenge later sets. ASP.NET Core's
+// status-code-pages middleware runs on the way back up the pipeline; if it's
+// registered after auth, the 401 escapes past it and the response goes out
+// with an empty body. (This is documented in
+// https://learn.microsoft.com/aspnet/core/fundamentals/error-handling but easy
+// to get wrong — symptom is content-length: 0 on every auth failure.)
+app.UseStatusCodePages(async statusCodeContext =>
+{
+    var ctx = statusCodeContext.HttpContext;
+    var response = ctx.Response;
+
+    if (response.StatusCode is 401 or 403)
+    {
+        response.ContentType = "application/problem+json";
+        var correlationId = response.Headers["X-Correlation-ID"].ToString();
+
+        // DEMO-ONLY wire-truth: when EXPOSE_FAILURE_REASON is on, surface the
+        // typed PqJwtFailureReason that PqJwtBearerHandler caught. We read it
+        // from IAuthenticateResultFeature (set by the AuthenticationMiddleware
+        // earlier in the pipeline) rather than calling AuthenticateAsync —
+        // calling AuthenticateAsync from inside UseStatusCodePages can re-enter
+        // the challenge pipeline mid-response. Reading the feature is a pure
+        // lookup. Production deployments leave this off and return the generic
+        // detail string only.
+        string? failureReason = null;
+        if (exposeFailureReason && response.StatusCode == 401)
+        {
+            var authFailure = ctx.Features.Get<IAuthenticateResultFeature>()?.AuthenticateResult?.Failure;
+            failureReason = authFailure switch
+            {
+                PqJwtValidationException pex => pex.Reason.ToString(),
+                PqJwtException => "Unspecified",
+                _ => null,
+            };
+        }
+
+        await response.WriteAsJsonAsync(new
+        {
+            type = "about:blank",
+            title = response.StatusCode == 401 ? "Unauthorized" : "Forbidden",
+            status = response.StatusCode,
+            detail = response.StatusCode == 401
+                ? "No valid PostQuantum.Jwt bearer token was accepted."
+                : "The token was valid but lacked the required authorization claim.",
+            correlationId,
+            failureReason, // null in production-shape; populated only when EXPOSE_FAILURE_REASON=true
+        });
+    }
+});
+
 // CORS must come before rate limiting and authentication so the browser's
 // preflight OPTIONS request is answered with the right Access-Control-*
 // headers even when the caller would otherwise be blocked.
@@ -209,50 +260,6 @@ app.Use(async (ctx, next) =>
 
 app.UseAuthentication();
 app.UseAuthorization();
-
-app.UseStatusCodePages(async statusCodeContext =>
-{
-    var ctx = statusCodeContext.HttpContext;
-    var response = ctx.Response;
-
-    if (response.StatusCode is 401 or 403)
-    {
-        response.ContentType = "application/problem+json";
-        var correlationId = response.Headers["X-Correlation-ID"].ToString();
-
-        // DEMO-ONLY wire-truth: when EXPOSE_FAILURE_REASON is on, surface the
-        // typed PqJwtFailureReason that PqJwtBearerHandler caught. We read it
-        // from IAuthenticateResultFeature (set by the AuthenticationMiddleware
-        // earlier in the pipeline) rather than calling AuthenticateAsync —
-        // calling AuthenticateAsync from inside UseStatusCodePages can
-        // re-enter the challenge pipeline mid-response and silently drop the
-        // status-page body. Reading the feature is a pure lookup. Production
-        // deployments leave this off and return the generic detail string only.
-        string? failureReason = null;
-        if (exposeFailureReason && response.StatusCode == 401)
-        {
-            var authFailure = ctx.Features.Get<IAuthenticateResultFeature>()?.AuthenticateResult?.Failure;
-            failureReason = authFailure switch
-            {
-                PqJwtValidationException pex => pex.Reason.ToString(),
-                PqJwtException => "Unspecified",
-                _ => null,
-            };
-        }
-
-        await response.WriteAsJsonAsync(new
-        {
-            type = "about:blank",
-            title = response.StatusCode == 401 ? "Unauthorized" : "Forbidden",
-            status = response.StatusCode,
-            detail = response.StatusCode == 401
-                ? "No valid PostQuantum.Jwt bearer token was accepted."
-                : "The token was valid but lacked the required authorization claim.",
-            correlationId,
-            failureReason, // null in production-shape; populated only when EXPOSE_FAILURE_REASON=true
-        });
-    }
-});
 
 app.MapGet("/health", (IssuerKeyRing keyRing) =>
 {
