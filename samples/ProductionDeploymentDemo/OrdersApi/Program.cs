@@ -208,7 +208,12 @@ app.UseStatusCodePages(async statusCodeContext =>
         string? failureReason = null;
         if (exposeFailureReason && response.StatusCode == 401)
         {
-            var authFailure = ctx.Features.Get<IAuthenticateResultFeature>()?.AuthenticateResult?.Failure;
+            // AspNetCore's AuthenticationMiddleware sets IAuthenticateResultFeature
+            // only when authentication SUCCEEDS — on failure it never lands there.
+            // The middleware below (registered between UseAuthentication and
+            // UseAuthorization) captures the failure exception into HttpContext.Items
+            // so we can surface the typed reason here.
+            var authFailure = ctx.Items["PqJwtFailure"] as Exception;
             failureReason = authFailure switch
             {
                 PqJwtValidationException pex => pex.Reason.ToString(),
@@ -259,6 +264,28 @@ app.Use(async (ctx, next) =>
 });
 
 app.UseAuthentication();
+
+// DEMO-ONLY: capture the typed PqJwtFailureReason from the bearer handler's
+// AuthenticateResult.Failure so UseStatusCodePages (registered earlier in the
+// pipeline) can surface it. AuthenticationMiddleware only writes
+// IAuthenticateResultFeature on auth SUCCESS, so for failures we read the
+// cached AuthenticateResult here (a pure lookup — the handler already ran)
+// and stash the exception in HttpContext.Items where the status-page handler
+// reads it. Gated by EXPOSE_FAILURE_REASON to keep production-shape clones
+// from leaking the reason as a side effect of the same image.
+if (exposeFailureReason)
+{
+    app.Use(async (ctx, next) =>
+    {
+        var result = await ctx.AuthenticateAsync(PqJwtBearerDefaults.AuthenticationScheme);
+        if (result?.Failure is { } ex)
+        {
+            ctx.Items["PqJwtFailure"] = ex;
+        }
+        await next();
+    });
+}
+
 app.UseAuthorization();
 
 app.MapGet("/health", (IssuerKeyRing keyRing) =>
