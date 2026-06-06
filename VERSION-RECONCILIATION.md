@@ -1,5 +1,14 @@
 # Version Reconciliation — 2026-06-01
 
+> **Historical snapshot.** This file documents the `0.3.0-preview.1 →
+> 1.0.0-preview.1 → 1.0.0-preview.2` maturity-tier bumps that landed in
+> early June 2026. The project has since shipped through `1.0.0-preview.8`;
+> see `CHANGELOG.md` for the canonical version history. Kept in repo as a
+> record of the suite-level versioning decision (why no
+> `PostQuantum.Cryptography` pin was added, how the `ProjectReference` →
+> `PackageReference` rewrite at pack time enforces inter-package lockstep).
+
+
 ## New suite version: 1.0.0-preview.1
 
 Both packages in this repository have been raised from `0.3.0-preview.1` to

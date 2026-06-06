@@ -22,8 +22,11 @@ docs/formal/states/
 *.tla2tools.jar
 tla2tools.jar
 
-# SharpFuzz output (fuzz/): published target, instrumented assemblies, crashes
+# SharpFuzz output (fuzz/): published target, instrumented assemblies, crashes,
+# and the libFuzzer-discovered input corpus (hundreds of files that accumulate
+# across runs; not meant to be tracked).
 fuzz/bin/
+fuzz/corpus/
 crash-*
 fuzz/crash-*
 libfuzzer-dotnet
@@ -50,3 +53,4 @@ nuget.key.txt
 *.snk
 
 StrykerOutput/
+stryker-run.log
