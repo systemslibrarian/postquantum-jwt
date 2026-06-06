@@ -66,23 +66,47 @@ builder.Services.AddSingleton(sp =>
 // the authentication request path; it never blocks on HTTP.
 builder.Services.AddHostedService(sp => sp.GetRequiredService<IssuerKeyRing>());
 
+// DEMO-ONLY: subscribe to the PostQuantum.Jwt meter so the landing page can
+// poll a live snapshot of the bounded-cardinality reason taxonomy. Same
+// EXPOSE_FAILURE_REASON gate as the typed-reason field and the X-Replay-Op
+// header — production-shape clones do not register this collector and the
+// /admin/metrics-snapshot endpoint is therefore absent.
+if (exposeFailureReason)
+{
+    builder.Services.AddSingleton<MetricsSnapshotCollector>();
+}
+
 builder.Services.AddSingleton<IPqJwtReplayCache>(sp =>
 {
     var logger = sp.GetRequiredService<ILoggerFactory>().CreateLogger("ReplayCache");
     var redisConnection = builder.Configuration["REDIS_CONNECTION"];
 
+    IPqJwtReplayCache cache;
+    string backendLabel;
+
     if (!string.IsNullOrWhiteSpace(redisConnection))
     {
         logger.LogInformation("Using Redis replay cache at {RedisConnection}", redisConnection);
         var mux = ConnectionMultiplexer.Connect(redisConnection);
-        return new RedisReplayCache(mux, ownsConnection: true);
+        cache = new RedisReplayCache(mux, ownsConnection: true);
+        backendLabel = "redis";
+    }
+    else
+    {
+        logger.LogWarning(
+            "REDIS_CONNECTION is not set. Falling back to InMemoryReplayCache. " +
+            "This is single-process only and not sufficient for horizontally scaled deployments.");
+        cache = new InMemoryReplayCache();
+        backendLabel = "memory";
     }
 
-    logger.LogWarning(
-        "REDIS_CONNECTION is not set. Falling back to InMemoryReplayCache. " +
-        "This is single-process only and not sufficient for horizontally scaled deployments.");
-
-    return new InMemoryReplayCache();
+    // DEMO-ONLY: wrap the cache so the browser-driven landing page can render
+    // the wire-level replay op alongside the verdict. Gated by the same env
+    // that opens up the typed failure reason — production deployments leak
+    // neither. See DemoReplayCacheTracer for the threat-model note.
+    return exposeFailureReason
+        ? new DemoReplayCacheTracer(cache, backendLabel)
+        : cache;
 });
 
 // Trust X-Forwarded-* from the Container Apps ingress so per-IP rate limiting
@@ -115,7 +139,7 @@ if (corsOrigins.Length > 0)
             .WithOrigins(corsOrigins)
             .WithMethods("GET", "POST", "OPTIONS")
             .WithHeaders("Authorization", "Content-Type", "X-Correlation-ID")
-            .WithExposedHeaders("X-Correlation-ID"));
+            .WithExposedHeaders("X-Correlation-ID", "X-Replay-Op"));
     });
 }
 
@@ -307,6 +331,36 @@ if (exposeFailureReason)
         }
         await next();
     });
+
+    // DEMO-ONLY: surface the last replay-cache op (recorded by
+    // DemoReplayCacheTracer during validator execution above) as the
+    // X-Replay-Op response header so the landing page can render the
+    // actual Redis-or-in-memory operation alongside the verdict. Clear
+    // the AsyncLocal afterwards so a recycled thread cannot leak the
+    // op into a later request that never ran TryRegister (e.g., one
+    // rejected at signature verify, where the validator short-circuits
+    // before the replay check).
+    app.Use(async (ctx, next) =>
+    {
+        try
+        {
+            var op = DemoReplayCacheTracer.CurrentLastOp;
+            if (!string.IsNullOrEmpty(op))
+            {
+                ctx.Response.OnStarting(state =>
+                {
+                    var (response, value) = ((HttpResponse, string))state;
+                    response.Headers["X-Replay-Op"] = value;
+                    return Task.CompletedTask;
+                }, (ctx.Response, op));
+            }
+            await next();
+        }
+        finally
+        {
+            DemoReplayCacheTracer.Clear();
+        }
+    });
 }
 
 app.UseAuthorization();
@@ -362,6 +416,41 @@ if (exposeFailureReason)
             issuerKeysCached = keyRing.PublishedKeyCount,
             lastRefreshUtc = keyRing.LastRefreshUtc,
             note = "demo-only admin endpoint; gated by EXPOSE_FAILURE_REASON env",
+        });
+    });
+
+    // Live aggregate of the bounded-cardinality pqjwt.validations counter.
+    // The landing page polls this every few seconds to render the
+    // observability contract — proving the counter is real, the reason tags
+    // come from a closed vocabulary, and no token/claim/key material ever
+    // appears in a tag value. Eagerly resolve the collector at startup so
+    // the first measurement is captured (MeterListener only sees
+    // measurements after Start()).
+    app.Services.GetRequiredService<MetricsSnapshotCollector>();
+    app.MapGet("/admin/metrics-snapshot", (MetricsSnapshotCollector collector) =>
+    {
+        var snapshot = collector.Snapshot();
+        long success = 0;
+        long failure = 0;
+        var reasons = new Dictionary<string, long>();
+        foreach (var (key, value) in snapshot)
+        {
+            if (key == "success") { success = value; continue; }
+            if (key == "failure") { failure += value; continue; }
+            if (key.StartsWith("failure.", StringComparison.Ordinal))
+            {
+                failure += value;
+                reasons[key["failure.".Length..]] = value;
+            }
+        }
+        return Results.Ok(new
+        {
+            total = success + failure,
+            success,
+            failure,
+            reasons,
+            note = "demo-only snapshot; gated by EXPOSE_FAILURE_REASON env. " +
+                   "Reason vocabulary is the library's closed PqJwtFailureReason taxonomy.",
         });
     });
 }

@@ -136,6 +136,71 @@ internal static class LandingPage
     .chip.alive .dot { background: var(--good); box-shadow: 0 0 0 3px rgba(93,211,158,0.18); }
     .chip.warn .dot { background: var(--warn); }
     .chip.bad .dot  { background: var(--bad);  }
+    .chip.warming .dot {
+      background: var(--warn);
+      animation: chip-pulse 1.1s ease-in-out infinite;
+    }
+    @keyframes chip-pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(255,184,107,0.35); }
+      50%      { box-shadow: 0 0 0 6px rgba(255,184,107,0); }
+    }
+
+    /* Cold-start awareness bar. Container Apps with scale-to-zero takes
+       30-60s to wake. Without an explicit countdown, the spinner reads as
+       "frozen page" — losing reviewers who would have waited if they knew
+       the wait was finite and expected. Auto-hides when both API health
+       endpoints report ok. */
+    .warming-bar {
+      display: none;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 32px;
+      background: rgba(255,184,107,0.10);
+      border-bottom: 1px solid rgba(255,184,107,0.25);
+      color: var(--warn);
+      font-size: 12.5px;
+    }
+    .warming-bar.show { display: flex; }
+    .warming-bar b { color: var(--ink); }
+    .warming-bar .spinner { margin: 0; }
+
+    /* Live aggregate of the pqjwt.validations counter — proves the
+       bounded-cardinality observability contract is real, the reason
+       vocabulary stays closed, and no token/claim/key material lands in
+       any tag value. Polled from /admin/metrics-snapshot every few
+       seconds. Demo-gated server-side. */
+    .metrics-strip {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+      padding: 8px 32px;
+      background: var(--panel-2);
+      border-bottom: 1px solid var(--line-soft);
+      font-size: 11.5px;
+      color: var(--ink-mid);
+    }
+    .metrics-strip .label { letter-spacing: 0.7px; text-transform: uppercase; font-size: 10px; color: var(--ink-dim); }
+    .metric-pill {
+      display: inline-flex;
+      gap: 6px;
+      padding: 3px 10px;
+      border-radius: 999px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+    }
+    .metric-pill.ok b  { color: var(--good); }
+    .metric-pill.bad b { color: var(--bad); }
+    .metric-pill b { color: var(--ink); font-weight: 700; }
+    .metric-reasons {
+      display: inline-flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 10.5px;
+    }
+    .metric-reasons .reason { color: var(--ink-mid); }
+    .metric-reasons .reason b { color: var(--ink); font-weight: 700; }
 
     /* --------- main grid --------- */
     main {
@@ -243,6 +308,33 @@ internal static class LandingPage
     .pill.warn { background: var(--warn-bg); color: var(--warn); border-color: rgba(255,184,107,0.4); }
     .verdict-text { color: var(--ink-mid); font-size: 13.5px; line-height: 1.45; }
     .verdict-text b { color: var(--ink); }
+
+    /* Wire-truth display of the actual replay-cache op the verifier just ran
+       against Redis (or the in-memory fallback). Demo-only — gated server-
+       side by EXPOSE_FAILURE_REASON. */
+    .replay-op {
+      display: none;
+      padding: 8px 18px 14px;
+      border-bottom: 1px solid var(--line-soft);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 11.5px;
+      color: var(--ink-mid);
+      letter-spacing: 0.2px;
+    }
+    .replay-op.show { display: block; }
+    .replay-op .tag {
+      display: inline-block;
+      margin-right: 8px;
+      padding: 2px 7px;
+      border-radius: 4px;
+      background: var(--panel-2);
+      color: var(--ink);
+      text-transform: uppercase;
+      font-size: 10px;
+      letter-spacing: 0.7px;
+      font-weight: 700;
+    }
+    .replay-op .op { color: var(--ink); }
 
     .section { border-bottom: 1px solid var(--line-soft); }
     .section:last-child { border-bottom: none; }
@@ -407,6 +499,8 @@ internal static class LandingPage
           JWKS-equivalent it polls, a Redis-backed replay cache it owns, and a typed failure-reason
           taxonomy that never silently downgrades. Click a numbered step on the left and watch the
           full chain run — issue, decode, validate, replay-reject, tamper-reject, key-rotate.
+          Want to craft your own token and watch the validator's typed reason instead?
+          <a href="https://pqjwt.systemslibrarian.dev">Open the single-process playground →</a>
         </p>
         <div class="crumbs">
           <a href="https://github.com/systemslibrarian/postquantum-jwt/blob/main/docs/SPEC.md">SPEC.md</a>
@@ -421,12 +515,27 @@ internal static class LandingPage
         </div>
       </div>
       <div class="status-tray">
-        <span class="chip" id="chip-issuer"><span class="dot"></span><span>issuer</span></span>
-        <span class="chip" id="chip-orders"><span class="dot"></span><span>orders</span></span>
-        <span class="chip" id="chip-redis"><span class="dot"></span><span>redis</span></span>
+        <span class="chip" id="chip-issuer"><span class="dot"></span><span id="chip-issuer-label">issuer</span></span>
+        <span class="chip" id="chip-orders"><span class="dot"></span><span id="chip-orders-label">orders</span></span>
+        <span class="chip" id="chip-redis"><span class="dot"></span><span id="chip-redis-label">redis</span></span>
       </div>
     </div>
   </header>
+
+  <div class="warming-bar" id="warming-bar">
+    <span class="spinner"></span>
+    <span>Services starting — <b id="warming-elapsed">0s</b> elapsed. Cold-start on
+      scale-to-zero Container Apps typically takes 30–60 seconds. Tour steps will run
+      once both <code>issuer</code> and <code>orders</code> report ready.</span>
+  </div>
+
+  <div class="metrics-strip" id="metrics-strip" style="display:none">
+    <span class="label">live counter</span>
+    <span class="metric-pill"><b id="metric-total">0</b> validations</span>
+    <span class="metric-pill ok"><b id="metric-success">0</b> accepted</span>
+    <span class="metric-pill bad"><b id="metric-failure">0</b> rejected</span>
+    <span class="metric-reasons" id="metric-reasons"><span class="muted">no rejections yet</span></span>
+  </div>
 
   <main>
     <!-- ============= LEFT: STEP RAIL ============= -->
@@ -501,6 +610,15 @@ internal static class LandingPage
       <div class="verdict">
         <span class="pill" id="verdict-pill">idle</span>
         <span class="verdict-text" id="verdict-text">Click <b>step 1</b> to start the tour, or jump in anywhere.</span>
+      </div>
+
+      <!-- Wire-truth replay-cache trace. Populated from the X-Replay-Op
+           response header on the Orders verification reply when the demo
+           gate (EXPOSE_FAILURE_REASON) is on. Without this, the Redis hop
+           is invisible and the demo's distributed-replay-protection
+           selling point reads as a claim instead of a demonstration. -->
+      <div class="replay-op" id="replay-op">
+        <span class="tag">replay cache</span><span class="op" id="replay-op-text"></span>
       </div>
 
       <div class="section">
@@ -671,6 +789,11 @@ internal static class LandingPage
     function activateStep(n, title) {
       document.querySelectorAll('.step').forEach(b => b.classList.toggle('active', b.dataset.step === String(n)));
       outTitle.textContent = `Step ${n} — ${title}`;
+      // Defensive reset: clear any replay-op trace from a prior step so the
+      // user briefly sees the panel empty between click and result, and
+      // steps that bail early (cold-start failure, missing prerequisite)
+      // do not leave a stale trace below the verdict.
+      setReplayOp(null);
     }
     function bumpReason(reason) {
       reasonCounts[reason] = (reasonCounts[reason] || 0) + 1;
@@ -803,12 +926,38 @@ internal static class LandingPage
       });
       const elapsed = Math.round(performance.now() - t0);
       const { json, text } = await safeJson(res);
-      return { res, json, text, elapsed, method, path: ORDERS_BASE + path };
+      // Pull the wire-level replay-cache op the verifier just ran (Redis
+      // SET NX or the in-memory fallback). Present only on responses where
+      // the validator reached the replay-registration step — early
+      // rejections (signature mismatch, decryption failure) short-circuit
+      // before that, and the absence of the header is itself meaningful:
+      // it proves the cheap-check-first DoS guard ran. The header is
+      // demo-gated server-side by EXPOSE_FAILURE_REASON.
+      const replayOp = res.headers.get('X-Replay-Op');
+      return { res, json, text, elapsed, method, path: ORDERS_BASE + path, replayOp };
+    }
+    function setReplayOp(op) {
+      const wrap = $('replay-op');
+      const txt = $('replay-op-text');
+      if (op) {
+        txt.textContent = op;
+        wrap.classList.add('show');
+      } else {
+        txt.textContent = '';
+        wrap.classList.remove('show');
+      }
     }
     function appendRaw(label, call) {
       const line = `// ${label}\n${call.method} ${call.path}\n${call.res.status} ${call.res.statusText} - ${call.elapsed}ms\n\n${tryPretty(call.text)}\n`;
       raw.textContent = (raw.textContent && !raw.classList.contains('dim') ? raw.textContent + '\n' : '') + line;
       raw.classList.remove('dim');
+      // Surface the replay-cache op alongside the raw response. Issuer
+      // calls leave replayOp undefined; chained step handlers that go
+      // Issuer-then-Orders therefore clear-then-set the trace in order,
+      // and Issuer-only steps (1, 2) clear any op left over from a prior
+      // step. Empty header (e.g., a token rejected before the replay
+      // check ran) also clears — the absence is itself informative.
+      setReplayOp(call && call.replayOp ? call.replayOp : null);
     }
     function tryPretty(s) { try { return JSON.stringify(JSON.parse(s), null, 2); } catch { return s; } }
 
@@ -1056,29 +1205,131 @@ internal static class LandingPage
       });
     });
 
-    // ---- status chips ----
-    async function pingChip(id, baseUrl, path) {
+    // ---- status chips + cold-start warming bar ----
+    // Cold-start on Azure Container Apps with scale-to-zero is the single
+    // biggest demo-time pain point — the page loads, fetches fail for
+    // 30-60 seconds, and a reviewer who doesn't know that's expected
+    // closes the tab. The fix is not "keep services warm" (which defeats
+    // scale-to-zero) but "tell the user the wait is finite and expected,
+    // and show progress in real time." Polling continues forever; once
+    // both API chips report alive, the warming bar hides itself.
+    const chipState = { issuer: 'warming', orders: 'warming', redis: 'warming' };
+    const warmingStart = Date.now();
+    let warmingTimer = null;
+    let warmingShownAt = 0;
+
+    function setChipState(id, label, labelId, state) {
       const chip = $(id);
+      const lbl  = labelId ? $(labelId) : null;
+      chip.classList.remove('alive', 'warn', 'bad', 'warming');
+      chip.classList.add(state);
+      if (lbl) lbl.textContent = label;
+    }
+
+    function updateWarmingBar() {
+      const allReady = chipState.issuer === 'alive' && chipState.orders === 'alive';
+      const bar = $('warming-bar');
+      if (allReady) {
+        bar.classList.remove('show');
+        if (warmingTimer) { clearInterval(warmingTimer); warmingTimer = null; }
+        return;
+      }
+      // Grace period: only reveal the bar after 800ms so a fast warm load
+      // doesn't flash a "starting" message at the user.
+      if (!bar.classList.contains('show') && Date.now() - warmingStart > 800) {
+        bar.classList.add('show');
+        warmingShownAt = Date.now();
+      }
+      if (bar.classList.contains('show')) {
+        const sec = Math.round((Date.now() - warmingStart) / 1000);
+        $('warming-elapsed').textContent = sec + 's';
+      }
+    }
+
+    async function pingOnce(id, baseUrl, path, label, labelId) {
       try {
         const res = await fetch(baseUrl + path, { method: 'GET' });
         if (res.ok) {
-          chip.classList.add('alive');
           const body = await res.json().catch(() => null);
+          chipState[id.replace('chip-', '')] = 'alive';
+          setChipState(id, label, labelId, 'alive');
+          // Orders /health surfaces its replay-cache backend; mirror to
+          // the redis chip so a reviewer sees the actual backend in use.
           if (body && body.replay) {
-            const r = $('chip-redis');
-            r.classList.remove('warn', 'bad');
-            r.classList.add(body.replay === 'redis' ? 'alive' : 'warn');
-            r.querySelector('span:last-child').textContent = 'redis (' + body.replay + ')';
+            chipState.redis = body.replay === 'redis' ? 'alive' : 'warn';
+            setChipState('chip-redis', 'redis (' + body.replay + ')', 'chip-redis-label',
+                         body.replay === 'redis' ? 'alive' : 'warn');
           }
-        } else {
-          chip.classList.add('warn');
+          return true;
         }
+        // 503 from /health = "warming-up" per Orders contract — keep polling.
+        chipState[id.replace('chip-', '')] = 'warming';
+        setChipState(id, label + ' (warming…)', labelId, 'warming');
+        return false;
       } catch {
-        chip.classList.add('bad');
+        chipState[id.replace('chip-', '')] = 'warming';
+        setChipState(id, label + ' (warming…)', labelId, 'warming');
+        return false;
       }
     }
-    pingChip('chip-issuer', ISSUER_BASE, '/health');
-    pingChip('chip-orders', ORDERS_BASE, '/health');
+
+    async function pollUntilAlive(id, baseUrl, path, label, labelId) {
+      // Initial fire so the chip moves out of its neutral idle state.
+      const ok = await pingOnce(id, baseUrl, path, label, labelId);
+      if (ok) { updateWarmingBar(); return; }
+      // Poll every 2.5s. No exponential backoff — we want fast detection
+      // when the container finally responds. 2.5s × ~24 attempts covers
+      // a 60-second cold start without hammering the endpoint.
+      const interval = setInterval(async () => {
+        const ready = await pingOnce(id, baseUrl, path, label, labelId);
+        updateWarmingBar();
+        if (ready) clearInterval(interval);
+      }, 2500);
+    }
+
+    // Mark chips as warming up front so the visual state is honest from
+    // the first paint instead of waiting for the first failed fetch.
+    setChipState('chip-issuer', 'issuer (warming…)', 'chip-issuer-label', 'warming');
+    setChipState('chip-orders', 'orders (warming…)', 'chip-orders-label', 'warming');
+    setChipState('chip-redis',  'redis (waiting…)',  'chip-redis-label',  'warming');
+    warmingTimer = setInterval(updateWarmingBar, 500);
+
+    pollUntilAlive('chip-issuer', ISSUER_BASE, '/health', 'issuer', 'chip-issuer-label');
+    pollUntilAlive('chip-orders', ORDERS_BASE, '/health', 'orders', 'chip-orders-label');
+
+    // ---- live metrics strip ----
+    // Polls /admin/metrics-snapshot (gated server-side by EXPOSE_FAILURE_REASON)
+    // to render the pqjwt.validations counter live. The strip stays hidden
+    // until the first successful response so the panel never flashes "0
+    // validations" before the verifier is actually up, and so a production-
+    // shape clone (no snapshot endpoint, returns 404) never shows a panel
+    // at all. Failure tag values come from the library's closed reason
+    // taxonomy; rendering them is also implicit proof that no token bytes
+    // landed in a tag.
+    async function pollMetrics() {
+      try {
+        const res = await fetch(ORDERS_BASE + '/admin/metrics-snapshot');
+        if (!res.ok) return;
+        const body = await res.json();
+        $('metrics-strip').style.display = 'flex';
+        $('metric-total').textContent = body.total ?? 0;
+        $('metric-success').textContent = body.success ?? 0;
+        $('metric-failure').textContent = body.failure ?? 0;
+        const reasons = Object.entries(body.reasons || {})
+          .sort((a, b) => b[1] - a[1]);
+        if (reasons.length === 0) {
+          $('metric-reasons').innerHTML = '<span class="muted">no rejections yet</span>';
+        } else {
+          $('metric-reasons').innerHTML = reasons
+            .map(([name, count]) => `<span class="reason">${escapeHtml(name)} <b>${count}</b></span>`)
+            .join(' · ');
+        }
+      } catch {
+        /* cold-start or production-shape clone — silent */
+      }
+    }
+    setInterval(pollMetrics, 3000);
+    pollMetrics();
   </script>
 </body>
 </html>
