@@ -16,7 +16,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="BenchmarkDotNet" Version="0.15.2" />
+    <PackageReference Include="BenchmarkDotNet" Version="0.15.8" />
     <!-- Classical JWT baseline for an honest "what does post-quantum cost you?"
          comparison. JsonWebTokenHandler is Microsoft's MODERN, recommended
          handler — deliberately NOT the legacy System.IdentityModel.Tokens.Jwt
