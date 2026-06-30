@@ -1,32 +1,38 @@
 # Security Policy
 
-PostQuantum.Jwt is a **production-oriented preview** (`1.0.0-preview.N`) for
+PostQuantum.Jwt is a **production-quality library** (`1.0.0`, stable) for
 **controlled issuer/verifier systems** — environments where the same team owns
-both token issuing and token validation. "Production-oriented" describes the
+both token issuing and token validation. "Production-quality" describes the
 hardened defaults (strict validation, fail-closed behavior, replay and
 key-rotation support), **not** an audit sign-off: the construction has **not**
 been independently audited, and this is **not** a drop-in replacement for
-OAuth/OIDC/JWT middleware. The leading `1.0` denotes the maturity of the design
-and a stable public API/wire format across the `preview.*` series; the
-`preview.N` suffix marks the **pending independent audit**, not expected API
-churn (a security review could still force a change before the final `1.0.0`).
-This document states the security model honestly so you can make an informed
-decision before relying on it.
+OAuth/OIDC/JWT middleware. The public API and v1 wire format are stable under
+SemVer from `1.0.0` onward.
+
+**The lack of an independent cryptographic audit is a permanent, documented
+limitation, not a temporary gate.** Through the preview series an external audit
+was framed as the blocker to `1.0`; at `1.0.0` that gate was removed
+deliberately — an unfunded project is unlikely to secure a formal review, and
+perpetual `preview` served no one. No third party has reviewed the design or
+implementation, and none is scheduled. Adopt this only where you control both
+issuer and verifier and accept that risk with eyes open. This document states
+the security model honestly so you can make an informed decision before relying
+on it.
 
 ## Supported versions
 
 | Version             | Supported           |
 |---------------------|---------------------|
-| `1.0.0-preview.8`   | ✅ (latest preview)  |
-| `1.0.0-preview.5`–`preview.7` | ❌ (superseded; security fixes ship in the latest preview only) |
-| `1.0.0-preview.4`   | ❌ (tagged, not published) |
-| `1.0.0-preview.3`   | ❌ (superseded)      |
+| `1.0.x`             | ✅ (current stable line) |
+| `1.0.0-preview.*`   | ❌ (superseded by `1.0.0`) |
 | `0.3.0-preview.*`   | ❌ (superseded)      |
 | `0.2.0-preview.*`   | ❌ (superseded)      |
 | `0.1.0-preview.*`   | ❌ (superseded)      |
 | anything older      | ❌                  |
 
-During the `1.0.0-preview.*` series only the most recent preview receives fixes.
+Security fixes ship in the latest `1.0.x` patch; upgrade to it to stay
+supported. The `1.0.0-preview.*` builds are superseded by `1.0.0` (no code
+change between `preview.10` and `1.0.0`).
 
 ## Reporting a vulnerability
 
@@ -58,7 +64,7 @@ We'll keep you informed if anything slips.
 | ✅ In scope | ❌ Out of scope |
 |---|---|
 | Signature-bypass, signature-forgery, `alg`-confusion, or any way to make `Validate` return success on a token the legitimate signer did not produce | Issues that the library already documents as caller-controlled (key storage, distributed replay cache, TLS, application authorization) |
-| Decryption of an encrypted token without the recipient private key, or any AEAD bypass on the encrypted profile | The lack of an independent audit (transparently documented; this is the gating concern, not a vulnerability per se) |
+| Decryption of an encrypted token without the recipient private key, or any AEAD bypass on the encrypted profile | The lack of an independent audit (a permanent, documented limitation — not a vulnerability per se) |
 | A token that escapes `Validate` with an exception type **other than** `PqJwtException` / `PqJwtValidationException` (a fail-closed totality violation) | The lack of formal constant-time guarantees beyond what the BCL + BouncyCastle provide (transparently documented in `KNOWN-GAPS.md`) |
 | Information leak of the token, claim values, key material, or replay-cache contents via the optional metrics surface | The single-process `InMemoryReplayCache` being inappropriate for multi-node deployments (documented; `IPqJwtReplayCache` is a contract for the caller) |
 | Memory-zeroization gaps for key material | Generic JOSE-library bugs in `Microsoft.IdentityModel.Tokens` or `BouncyCastle.Cryptography` (please report upstream) |
@@ -246,18 +252,20 @@ own request logs (see `samples/SECURE-USAGE.md` §8).
 
 ## Honesty statement
 
-This is preview cryptographic software written in the open. It has **not** been
-audited. The X-Wing key-generation and decapsulation/combiner paths **are**
-validated against the official known-answer vectors; the encapsulation path is
-not (the native ML-KEM API is randomized — see [`KNOWN-GAPS.md`](KNOWN-GAPS.md)).
-Known limitations are tracked transparently there. Until a stable `1.0.0` and an
-external review, treat the lack of an independent audit as the gating concern:
-this library is appropriate for controlled issuer/verifier systems whose owners
-accept that risk with eyes open — not for high-risk deployments, public-facing
-auth, or anywhere generic JWT/JWE interoperability is required.
+This is cryptographic software written in the open. It has **not** been
+audited, and no external review is scheduled — at `1.0.0` that is a permanent,
+documented limitation rather than a pending gate. The X-Wing key-generation and
+decapsulation/combiner paths **are** validated against the official known-answer
+vectors; the encapsulation path is not (the native ML-KEM API is randomized —
+see [`KNOWN-GAPS.md`](KNOWN-GAPS.md)). Known limitations are tracked
+transparently there. Treat the absence of an independent audit as the
+load-bearing caveat: this library is appropriate for controlled issuer/verifier
+systems whose owners accept that risk with eyes open — not for high-risk
+deployments, public-facing auth, or anywhere generic JWT/JWE interoperability is
+required.
 
 The fail-closed contract is locked in by the library test suite
-(**176 tests in the default `dotnet test` run**, plus an opt-in
+(**180 tests in the default `dotnet test` run**, plus an opt-in
 constant-time timing-distribution probe via `--filter Category=Timing`),
 including
 explicit checks for `alg: none` substitution, missing `alg`, header JSON

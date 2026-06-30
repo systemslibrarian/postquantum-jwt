@@ -104,21 +104,24 @@ public sealed class PqJwtValidator
     {
         ArgumentException.ThrowIfNullOrEmpty(token);
 
-        // Reject absurdly large tokens up front — before any split, Base64Url decode,
-        // JSON parse, or (expensive) ML-DSA verification touches the input. A signed
-        // token is ~4.5 KB and an encrypted one ~6.5 KB; the cap is generously above
-        // any legitimate token, so this only stops a memory/CPU-exhaustion attempt
-        // (a multi-megabyte "token") from amplifying work the signature check would
-        // reject anyway.
-        if (token.Length > MaxTokenLength)
-        {
-            throw new PqJwtValidationException(
-                PqJwtFailureReason.MalformedToken,
-                $"Token exceeds the maximum accepted length of {MaxTokenLength} characters.");
-        }
-
         try
         {
+            // Reject absurdly large tokens up front — before any split, Base64Url
+            // decode, JSON parse, or (expensive) ML-DSA verification touches the
+            // input. A signed token is ~4.5 KB and an encrypted one ~6.5 KB; the
+            // cap is generously above any legitimate token, so this only stops a
+            // memory/CPU-exhaustion attempt (a multi-megabyte "token") from
+            // amplifying work the signature check would reject anyway. Kept inside
+            // the try so this rejection is recorded on the failure metric like
+            // every other fail-closed reject — an oversized-token flood is itself
+            // a DoS signal worth surfacing in telemetry.
+            if (token.Length > MaxTokenLength)
+            {
+                throw new PqJwtValidationException(
+                    PqJwtFailureReason.MalformedToken,
+                    $"Token exceeds the maximum accepted length of {MaxTokenLength} characters.");
+            }
+
             var parts = token.Split('.');
             var result = parts.Length switch
             {

@@ -8,8 +8,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="PostQuantum.Jwt" Version="1.0.0-preview.10" />
-    <PackageReference Include="PostQuantum.Jwt.AspNetCore" Version="1.0.0-preview.10" />
+    <PackageReference Include="PostQuantum.Jwt" Version="1.0.0" />
+    <PackageReference Include="PostQuantum.Jwt.AspNetCore" Version="1.0.0" />
   </ItemGroup>
 
 </Project>

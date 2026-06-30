@@ -22,10 +22,10 @@
   <!-- Package metadata -->
   <PropertyGroup>
     <PackageId>PostQuantum.Jwt.Analyzers</PackageId>
-    <Version>1.0.0-preview.10</Version>
+    <Version>1.0.0</Version>
     <Title>PostQuantum.Jwt analyzers — compile-time architecture enforcement</Title>
     <Authors>Paul Clark</Authors>
-    <Description>Roslyn analyzers for PostQuantum.Jwt: PQJWT001 forbids inspecting JOSE header fields (alg/jwk/jku/x5u/x5c) — the verification key comes from a trusted key ring, never the token — and PQJWT002 flags per-call PqJwtValidator construction. Add with PrivateAssets="all". Production-oriented preview companion package for controlled issuer/verifier systems; not independently audited and not a drop-in OAuth/OIDC replacement.</Description>
+    <Description>Roslyn analyzers for PostQuantum.Jwt: PQJWT001 forbids inspecting JOSE header fields (alg/jwk/jku/x5u/x5c) — the verification key comes from a trusted key ring, never the token — and PQJWT002 flags per-call PqJwtValidator construction. Add with PrivateAssets="all". Production-quality companion package for controlled issuer/verifier systems; NOT independently audited (a permanent, documented limitation — see KNOWN-GAPS.md) and not a drop-in OAuth/OIDC replacement.</Description>
     <PackageProjectUrl>https://github.com/systemslibrarian/postquantum-jwt</PackageProjectUrl>
     <RepositoryUrl>https://github.com/systemslibrarian/postquantum-jwt</RepositoryUrl>
     <RepositoryType>git</RepositoryType>

@@ -90,6 +90,24 @@ public sealed class PqJwtMetricsTests
     }
 
     [Fact]
+    public void Oversized_token_rejection_increments_outcome_failure_with_malformed_token()
+    {
+        // Regression: the up-front oversized-length reject used to throw *before*
+        // the try/catch that records the failure metric, so an oversized-token
+        // flood (a DoS signal) emitted no telemetry. The reject now happens inside
+        // the recorded path. No crypto needed — the reject precedes all parsing,
+        // so a resolver-backed validator (no PQC key) suffices.
+        var validator = new PqJwtValidator(
+            new PqJwtValidationParameters { SignatureKeyResolver = _ => null });
+        var huge = new string('a', 200_000);
+
+        var measurements = CaptureWhile(() =>
+            Assert.Throws<PqJwtValidationException>(() => validator.Validate(huge)));
+
+        Assert.Contains(measurements, m => m is { Outcome: "failure", Reason: "malformed_token" });
+    }
+
+    [Fact]
     public void Every_defined_reason_maps_to_a_distinct_non_default_tag()
     {
         var tags = new Dictionary<string, PqJwtFailureReason>(StringComparer.Ordinal);

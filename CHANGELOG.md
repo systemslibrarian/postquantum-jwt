@@ -8,6 +8,80 @@ the API between previews.
 
 ## [Unreleased]
 
+## [1.0.0] — 2026-06-30
+
+**First stable release.** SemVer applies from here: PATCH for fixes, MINOR for
+additive surface, MAJOR for any break to the public API or the v1 wire format.
+
+The public API surface and the v1 token wire format are unchanged from
+`1.0.0-preview.10` — builder-minted tokens round-trip identically. A pre-release
+review surfaced two small hardening items (below) that ship in this release;
+they do not change the wire format or any public signature.
+
+### Security / hardening
+
+- **`PqJwtBuilder` now zeroes the encryption plaintext on every path, including
+  exceptions.** In `EncryptToken`, the inner-JWS plaintext (which carries the
+  claims) was zeroed only on the success path; an exception out of
+  `AesGcm.Encrypt` would skip the zeroing and leave it in managed memory. The
+  plaintext is now materialised before the `try` and zeroed in the `finally`
+  alongside the X-Wing shared secret, matching the "zero sensitive material
+  after use" discipline in `CLAUDE.md`. (In practice `AesGcm.Encrypt` does not
+  throw with correctly-sized buffers, so this is defense-in-depth on a
+  practically-unreachable path; the fix makes the intent exception-safe.)
+- **Oversized-token rejections now emit the failure metric.** The up-front
+  length cap (`token.Length > MaxTokenLength`) threw *before* the try/catch that
+  records `pqjwt.validations{outcome=failure}`, so a flood of oversized
+  adversarial tokens — a DoS signal — produced no telemetry. The cap now lives
+  inside the recorded path (still the first check, before any split/decode/
+  verify), so it emits `outcome=failure, reason=malformed_token` like every
+  other fail-closed rejection. Regression-locked by
+  `PqJwtMetricsTests.Oversized_token_rejection_increments_outcome_failure_with_malformed_token`.
+
+### Changed
+
+- **The independent-audit gap is now a permanent, documented limitation — not a
+  release gate.** Throughout the `1.0.0-preview.*` series the `preview` suffix
+  was defined as tracking a *pending independent cryptographic audit*, named as
+  the single blocker to `1.0` in `docs/ROADMAP-TO-1.0.md`. That gate has been
+  removed deliberately. As an unfunded open-source project we are unlikely to
+  obtain a formal third-party review, and remaining in perpetual `preview`
+  served no one — it implied the gap by a version suffix instead of stating it
+  plainly. **No third party has reviewed the design or implementation.** The
+  library now ships stable with that limitation documented prominently in
+  `README.md`, `KNOWN-GAPS.md`, and `SECURITY.md`. Adopt it only in controlled
+  issuer/verifier systems where you own both ends and accept that risk with
+  eyes open.
+- **Messaging revised across the suite.** "Production-oriented preview" →
+  "production-quality library, not independently audited (a permanent,
+  documented limitation)." Package descriptions, README status block, and the
+  companion-package metadata were updated to match.
+
+### Stable commitments (carried forward from the preview series)
+
+- **Public API surface.** `PqJwtBuilder`, `PqJwtValidator`,
+  `PqJwtValidationParameters`, `PqJwtValidationResult`, `PqJwtException`,
+  `PqJwtValidationException`, `PqJwtFailureReason`, `PqJwtAlgorithms`,
+  `IPqJwtReplayCache`, `InMemoryReplayCache`. `EnablePackageValidation=true`
+  guards against accidental breaks.
+- **v1 wire format** — `alg=ML-DSA-65` for signing, `alg=X-Wing` + `enc=A256GCM`
+  for encryption — as specified in `docs/SPEC.md`.
+- **Fail-closed totality contract** — only `PqJwtException` (and subclasses) may
+  escape `PqJwtValidator.Validate(...)`.
+
+### Suite
+
+All four packages release together at `1.0.0`: `PostQuantum.Jwt`,
+`PostQuantum.Jwt.AspNetCore` (superseded by `PostQuantum.AspNetCore`),
+`PostQuantum.Jwt.Analyzers`, and `PostQuantum.Jwt.Templates`.
+
+> **Release note (transparency):** like the preview.5–preview.10 builds, the
+> `1.0.0` packages are expected to be published manually via `dotnet nuget
+> push` until the tag-based release workflow's `NUGET_API_KEY` is replaced, so
+> they may not carry the CI build-provenance attestation; nuget.org repository
+> signing still applies. The published advisory/transparency notes will record
+> whichever path was used.
+
 ## [1.0.0-preview.10] — 2026-06-06
 
 Two targeted fixes on top of preview.9's concurrency hardening: one

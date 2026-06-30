@@ -39,14 +39,15 @@ repo and why.
 
 ## Current numbers
 
-As of `1.0.0-preview.10`:
+As of `1.0.0`:
 
-- **176 tests passing in the default suite, 0 skipped** — 165 in
-  `PostQuantum.Jwt.Tests` (148 from the preview.8 ship + 5 new
-  `JoseInteropTests` + 12 new `InMemoryReplayCacheTests`) + 11 in
-  `PostQuantum.Jwt.Analyzers.Tests`. One additional opt-in
-  timing-distribution test (`ConstantTimeVerifyTests`) runs via
-  `--filter Category=Timing`.
+- **180 tests passing in the default suite, 0 skipped** — 169 in
+  `PostQuantum.Jwt.Tests` + 11 in `PostQuantum.Jwt.Analyzers.Tests`. One
+  additional opt-in timing-distribution test (`ConstantTimeVerifyTests`) runs
+  via `--filter Category=Timing`. `1.0.0` added one regression test
+  (`PqJwtMetricsTests.Oversized_token_rejection_increments_outcome_failure_…`)
+  alongside the two pre-release hardening fixes — see the `[1.0.0]` entry in
+  [`CHANGELOG.md`](../CHANGELOG.md).
 - **Mutation kill rate** (Stryker.NET, expanded scope: `PqJwtValidator` +
   `PqJwtBuilder` + `Cryptography/XWing*` + `InMemoryReplayCache` +
   `Internal/JoseHeader` + `Internal/Base64Url`): **71.43% raw** across

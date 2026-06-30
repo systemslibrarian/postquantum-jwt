@@ -4,16 +4,31 @@ This note captures the current state of the project for someone (or some
 agent) picking it up cold. **Read `CLAUDE.md` first** (project guardrails),
 then this file.
 
-## Project state (as of 2026-06-06)
+## Project state (as of 2026-06-30)
 
-- **Latest release: `1.0.0-preview.10` on nuget.org** — all four packages
-  live and indexed: `PostQuantum.Jwt`, `PostQuantum.Jwt.AspNetCore`,
-  `PostQuantum.Jwt.Analyzers`, `PostQuantum.Jwt.Templates`. Tag
-  `v1.0.0-preview.10`, GitHub Release published. preview.9 hardened
-  `InMemoryReplayCache` and `HttpPqJwtKeyRing` for concurrency / lifecycle
-  (the latter now an `IHostedService` — consumers must register it as a
-  hosted service). preview.10 then fixed two regressions on top: a
-  case-sensitive `Authorization: Bearer` check in `PqJwtBearerHandler`
+- **Releasing `1.0.0` — first stable release.** The version was bumped across
+  all four packages (`PostQuantum.Jwt`, `PostQuantum.Jwt.AspNetCore`,
+  `PostQuantum.Jwt.Analyzers`, `PostQuantum.Jwt.Templates`) from
+  `1.0.0-preview.10` → `1.0.0`. The public API and v1 wire format are
+  **unchanged** versus `preview.10`; a pre-release Gemini bug-catch added two
+  small hardening fixes (exception-safe encryption-plaintext zeroing in
+  `PqJwtBuilder`; oversized-token rejections now emit the `pqjwt.validations`
+  failure metric — both in the `[1.0.0]` CHANGELOG entry, regression test in
+  `PqJwtMetricsTests`). Otherwise this is a messaging + commitment change.
+  **Key decision
+  (2026-06-30):** the independent-audit gate to `1.0` was *removed
+  deliberately* — an unfunded project is unlikely to obtain a formal review,
+  so the missing audit is now reframed as a **permanent, documented
+  limitation** rather than a release blocker. The framing across `README.md`,
+  `KNOWN-GAPS.md`, `SECURITY.md`, and `docs/ROADMAP-TO-1.0.md` was rewritten
+  accordingly ("production-oriented preview" → "production-quality library,
+  not independently audited"). At this point the tag `v1.0.0` and the
+  nuget.org publish of all four packages still need to be cut (see
+  release steps below); the previous live release was `1.0.0-preview.10`.
+  preview.9 hardened `InMemoryReplayCache` and `HttpPqJwtKeyRing` for
+  concurrency / lifecycle (the latter now an `IHostedService` — consumers must
+  register it as a hosted service). preview.10 then fixed two regressions on
+  top: a case-sensitive `Authorization: Bearer` check in `PqJwtBearerHandler`
   (RFC 9110 §11.1) and the `VerifierDemo` sample missing the hosted-service
   registration from the preview.9 refactor.
 - **All work is on `main`** (the maintainer does **not** use feature
@@ -71,15 +86,16 @@ then this file.
 
 ## Where the gates are
 
-The `preview.*` suffix comes off when the construction has been
-independently audited. The roadmap in
-[`docs/ROADMAP-TO-1.0.md`](docs/ROADMAP-TO-1.0.md) names this as the
-single gating concern. Three concrete moves to close that gate are
-pre-written:
+**The `preview` suffix is gone as of `1.0.0`.** The independent audit is no
+longer a release gate — it is a permanent, documented limitation (see the
+decision banner in [`docs/ROADMAP-TO-1.0.md`](docs/ROADMAP-TO-1.0.md)). The
+three moves below are still worth pursuing as post-1.0 credibility work, but
+none of them blocks a release any more:
 
-1. **Audit outreach** — `docs/AUDIT-OUTREACH.md` has draft letters
-   (academic + commercial framings) and a ranked target list. Personalise
-   and send.
+1. **Audit outreach (still open, no longer gating)** — `docs/AUDIT-OUTREACH.md`
+   has draft letters (academic + commercial framings) and a ranked target
+   list. If a review ever lands, ship its response as the appropriate SemVer
+   release.
 2. **SignPath Foundation free OSS code signing** — application material
    is in `docs/SIGNPATH-APPLICATION.md`. Submit at
    <https://signpath.org/apply>. After approval, the release pipeline
@@ -89,6 +105,15 @@ pre-written:
 3. **OpenSSF Best Practices badge** — application material is in
    `docs/OPENSSF-BADGE.md` with every criterion mapped to evidence in the
    repo. Submit at <https://www.bestpractices.dev/en/projects/new>.
+
+## To actually cut the `1.0.0` release
+
+1. `bash scripts/check-version-sync.sh` — must pass (all strings at `1.0.0`).
+2. `LD_LIBRARY_PATH=/opt/conda/lib dotnet test --filter "Category!=Timing"` — green.
+3. Commit, then `git tag v1.0.0 && git push --tags`.
+4. Pack + push all four packages (manually via `./nuget.key` until the CI
+   `NUGET_API_KEY` is fixed — see the transparency note in `CHANGELOG.md`).
+5. Cut the GitHub Release from the tag with the `1.0.0` CHANGELOG section.
 
 ## Quick commands
 

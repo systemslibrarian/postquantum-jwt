@@ -1,15 +1,25 @@
 # Roadmap to 1.0
 
-What it takes for PostQuantum.Jwt to drop the `preview` suffix and ship as
-`1.0.0`. This consolidates the framing scattered across
-[`README.md`](../README.md), [`KNOWN-GAPS.md`](../KNOWN-GAPS.md), and
-[`SECURITY.md`](../SECURITY.md) so a reviewer asking "when is 1.0?" has one
-page to read.
+> **DECISION — 2026-06-30: `1.0.0` shipped without an independent audit.**
+> This document originally defined an external cryptographic audit as the
+> single gate to dropping the `preview` suffix. That gate was **removed
+> deliberately** at `1.0.0`. The reasoning: as an unfunded open-source project
+> we are unlikely to obtain a formal third-party review (outreach status in
+> [`docs/AUDIT-OUTREACH.md`](AUDIT-OUTREACH.md)), and staying in perpetual
+> `preview` hurt adoption while implying the audit gap by a version suffix
+> rather than stating it plainly. The library now ships stable, with the
+> **lack of an independent audit reframed as a permanent, documented
+> limitation** (see [`KNOWN-GAPS.md`](../KNOWN-GAPS.md) → "No external audit"
+> and [`SECURITY.md`](../SECURITY.md)). The rest of this page is kept as the
+> record of what "stable" was defined to mean and what was — and was not —
+> treated as a blocker.
 
-The honest summary: the `preview` suffix tracks the *pending independent
-audit*, not API churn. The public API and wire format are held stable across
-the `1.0.0-preview.*` series — no breaking changes are planned before `1.0.0`,
-though a security review could still force one.
+The historical framing below is preserved for context. Where it says the
+`preview` suffix "tracks the pending audit," read that as the framing that was
+in force *before* the 2026-06-30 decision above.
+
+The honest summary: the public API and wire format were held stable across
+the `1.0.0-preview.*` series — no breaking changes landed before `1.0.0`.
 
 ## What's already stable
 
@@ -42,18 +52,19 @@ for `1.0.0`:
   agility surface. We do not — and will not in 1.0 — read `jku`/`jwk`/
   `x5u`/`x5c` from the token's header to select a key. See `RedTeamScenarios.cs`.
 
-## What blocks 1.0
+## What was treated as blocking 1.0 (historical)
 
-In rough priority order:
+In rough priority order, as defined before the 2026-06-30 decision:
 
-1. **Independent cryptographic audit.** The single load-bearing blocker.
-   The construction has not been independently reviewed. The `preview`
-   suffix reflects this gap; removing the suffix without an audit would
-   misrepresent the assurance posture. See
-   [`KNOWN-GAPS.md`](../KNOWN-GAPS.md) under "Cryptography → No external
-   audit". An audit could force a one-time wire-format or API change, in
-   which case we'd cut a `1.0.0-rc.1` first and ship the audit response in
-   that release.
+1. **Independent cryptographic audit.** *Originally the single load-bearing
+   blocker — resolved by decision, not by an audit.* The construction has
+   still not been independently reviewed; rather than hold `1.0` indefinitely
+   for a review an unfunded project is unlikely to obtain, the project shipped
+   `1.0.0` stable and **reframed the missing audit as a permanent, documented
+   limitation** (see the decision banner above and
+   [`KNOWN-GAPS.md`](../KNOWN-GAPS.md) → "No external audit"). If a review
+   later happens and forces a wire-format or API change, that ships as the
+   appropriate SemVer bump (and would be MAJOR if it breaks the v1 format).
 2. **CI release-pipeline parity.** preview.7 was the first end-to-end CI
    publish since preview.3 — it surfaced (and patched) a gap in
    `release.yml` (it only pushed `PostQuantum.Jwt` and
@@ -91,20 +102,19 @@ These are deliberate non-goals and will remain so in 1.0:
 ## Release cadence pattern
 
 ```
-1.0.0-preview.N   ← preview series; API + wire stable, awaiting audit
+1.0.0-preview.N   ← preview series; API + wire stable (what actually happened)
         │
         ▼
-1.0.0-rc.1        ← cut after the audit response is incorporated
-        │
-        ▼
-1.0.0             ← independent audit complete; semver applies from here
-        │
+1.0.0             ← shipped 2026-06-30 without an audit; semver applies from here.
+        │            The no-audit gap is a permanent, documented limitation.
         ▼
 1.0.x, 1.1.x …    ← semver: PATCH for fixes, MINOR for additive surface
 ```
 
-There is no public target date for 1.0. The audit is the gate; everything
-upstream of it is honest preview maturity work.
+The originally-planned `1.0.0-rc.1` step (cut after an audit response) was
+dropped along with the audit gate. `1.0.0` shipped directly from
+`1.0.0-preview.10` with no code change. If an independent review ever happens,
+its response ships as the appropriate SemVer release.
 
 ## Tracking
 

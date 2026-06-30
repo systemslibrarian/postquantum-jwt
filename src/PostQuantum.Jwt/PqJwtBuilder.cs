@@ -228,11 +228,15 @@ public sealed class PqJwtBuilder
         var encodedHeader = Base64Url.EncodeUtf8(header.ToJsonString());
 
         var (sharedSecret, kemCiphertext) = XWing.Encapsulate(recipient);
+        // The plaintext is the inner JWS — it carries the claims. Materialise it
+        // before the try so the finally can zero it on the success path AND on any
+        // exception out of AesGcm.Encrypt alike (CLAUDE.md: "zero key material …
+        // after use"; we extend the same discipline to the sensitive plaintext).
+        var plaintext = Encoding.UTF8.GetBytes(innerJws);
         try
         {
             // AAD binds the ciphertext to the protected header (RFC 7516 §5.1).
             var aad = Encoding.ASCII.GetBytes(encodedHeader);
-            var plaintext = Encoding.UTF8.GetBytes(innerJws);
             var nonce = RandomNumberGenerator.GetBytes(AesGcm.NonceByteSizes.MaxSize);
             var ciphertext = new byte[plaintext.Length];
             var tag = new byte[AesGcm.TagByteSizes.MaxSize];
@@ -241,8 +245,6 @@ public sealed class PqJwtBuilder
             {
                 gcm.Encrypt(nonce, plaintext, ciphertext, tag, aad);
             }
-
-            CryptographicOperations.ZeroMemory(plaintext);
 
             return string.Join('.',
                 encodedHeader,
@@ -253,6 +255,7 @@ public sealed class PqJwtBuilder
         }
         finally
         {
+            CryptographicOperations.ZeroMemory(plaintext);
             CryptographicOperations.ZeroMemory(sharedSecret);
         }
     }

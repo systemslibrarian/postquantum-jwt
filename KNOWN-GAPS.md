@@ -5,18 +5,43 @@ unverified, and where the sharp edges are. Honesty over polish: if something is
 incomplete, it is listed here rather than glossed over. This file is part of the
 contract with anyone evaluating the library.
 
-Last reviewed for: `1.0.0-preview.10`. Companion views — what *is* tested in
+Last reviewed for: `1.0.0`. Companion views — what *is* tested in
 repo, by layer, with the commands to run each, lives in
 [`docs/TESTING.md`](docs/TESTING.md); how to verify a release you just
 installed (build-provenance, embedded SBOM, `SHA256SUMS`, SourceLink) lives in
-[`docs/SUPPLY-CHAIN.md`](docs/SUPPLY-CHAIN.md); and the "when does the
-`preview` suffix come off?" answer lives in
+[`docs/SUPPLY-CHAIN.md`](docs/SUPPLY-CHAIN.md); and the history of why the
+`preview` suffix was dropped at `1.0.0` — and why the lack of an audit is now
+a permanent documented limitation rather than a release gate — lives in
 [`docs/ROADMAP-TO-1.0.md`](docs/ROADMAP-TO-1.0.md).
+
+> **The single most important thing to know before adopting this library:**
+> the cryptographic construction has **not** been independently audited, and
+> **no audit is scheduled**. This is not a temporary preview caveat that will
+> be resolved in a later release — as of `1.0.0` it is a **permanent, accepted
+> limitation**. See "No external audit" immediately below.
 
 ## Cryptography
 
-- **No external audit.** No third party has reviewed the design or
-  implementation. Do not use in production.
+- **No external audit (permanent, documented limitation).** No third party has
+  reviewed the design or implementation, and **none is scheduled.** This is the
+  load-bearing caveat for the whole library. Through the preview series an
+  independent audit was framed as *the* gate to `1.0`; at `1.0.0` that framing
+  was dropped on purpose (see [`docs/ROADMAP-TO-1.0.md`](docs/ROADMAP-TO-1.0.md)):
+  an unfunded project is unlikely to secure a formal cryptographic review, and
+  staying in perpetual `preview` implied the gap by a version suffix instead of
+  stating it plainly. What stands behind the construction instead is in-repo
+  evidence, not a third-party sign-off: a fail-closed test suite (tampered
+  signature/payload, `alg: none`, expiry/`nbf` skew, wrong key/issuer/audience,
+  malformed input), property and coverage-guided fuzz testing, mutation testing
+  (Stryker), a TLA+ model of the validator, KAT coverage of the key-generation
+  and decapsulation/combiner paths, and the X-Wing draft co-authors' 2026-06-05
+  confirmation that our randomized-ML-KEM handling is sound (see
+  `docs/AUDIT-OUTREACH.md`). None of that is a substitute for an independent
+  audit. **Adopt this only where you control both issuer and verifier and you
+  accept the unaudited-construction risk with eyes open.** It is not appropriate
+  for high-risk or public-facing deployments. If you can fund or perform an
+  independent review, please reach out — outreach status is tracked in
+  `docs/AUDIT-OUTREACH.md`.
 - **ML-KEM encapsulation is not vector-KAT'd in the encaps direction (platform
   constraint — not an implementation oversight).** What *is* vector-checked:
   seed-based keygen reproduces every vector's public key; **every vector's
@@ -74,8 +99,9 @@ installed (build-provenance, embedded SBOM, `SHA256SUMS`, SourceLink) lives in
   profile that ties them together here is **not** a standardized JOSE/JWE
   profile, and there is no JWK/JWKS representation for ML-DSA keys in this
   library. Tokens will **not** validate or decrypt in generic JWT/JWE tooling
-  without custom integration, and the wire format may change before the stable
-  `1.0.0`. This is **not** a public OAuth/OIDC replacement.
+  without custom integration. The wire format is the stable v1 profile and is
+  now under SemVer (`docs/SPEC.md`). This is **not** a public OAuth/OIDC
+  replacement.
 - **Replay protection is opt-in and only as strong as the cache you provide.**
   `IPqJwtReplayCache` + the bundled `InMemoryReplayCache` enforce single-use
   `jti` when configured, but the bundled `InMemoryReplayCache` is
@@ -122,10 +148,11 @@ installed (build-provenance, embedded SBOM, `SHA256SUMS`, SourceLink) lives in
 
 ## API & lifecycle
 
-- **Preview API.** The public API and wire format are held stable across the
-  `1.0.0-preview.*` series — no breaking changes are planned before the final
-  `1.0.0`. The `preview` suffix reflects the pending independent audit, not
-  expected API churn; only a security review would force a surface change.
+- **Stable API under SemVer.** The public API and v1 wire format were held
+  stable across the entire `1.0.0-preview.*` series and are now a `1.0.x`
+  commitment: PATCH for fixes, MINOR for additive surface, MAJOR for any break.
+  (The unaudited-construction limitation above is orthogonal to API stability —
+  it is permanent and does not gate releases.)
 - **No streaming / large-payload API.** Everything operates on in-memory
   `string` / `byte[]`.
 - **The core `PostQuantum.Jwt` package has no DI / `IServiceCollection`
@@ -172,9 +199,10 @@ installed (build-provenance, embedded SBOM, `SHA256SUMS`, SourceLink) lives in
 
 A consolidated list, for quick scanning:
 
-- **No independent cryptographic audit** has been completed.
-- **Preview package** — the API and wire format may change before the stable
-  `1.0.0`.
+- **No independent cryptographic audit** has been completed, and none is
+  scheduled — a permanent, documented limitation as of `1.0.0`.
+- **Stable `1.0.x` package** — the API and v1 wire format are under SemVer and
+  will not break within the major version.
 - **Not a public OAuth/OIDC replacement** and **not guaranteed compatible with
   generic JWT/JWE libraries.**
 - The **X-Wing key-management profile is not standardized** as a JOSE/JWE
@@ -209,8 +237,8 @@ these terms about PostQuantum.Jwt:
 - "quantum-proof" in all contexts (signatures are post-quantum; confidentiality
   is hybrid — neither is an unconditional guarantee)
 
-Preferred framing: **"production-oriented preview for controlled systems; not
-independently audited."**
+Preferred framing: **"production-quality library for controlled systems; not
+independently audited (a permanent, documented limitation)."**
 
 ---
 

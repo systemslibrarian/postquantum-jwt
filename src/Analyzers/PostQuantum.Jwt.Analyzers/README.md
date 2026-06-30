@@ -5,12 +5,13 @@ fail-closed architecture. Because the library deliberately breaks classical JWT
 conventions (single ML-DSA-65 suite, header ignored for key selection), generic
 JWT linters don't fit — these analyzers encode the library's actual rules.
 
-> **Production-oriented preview for controlled systems — not independently audited.**
+> **Production-quality library for controlled systems — not independently audited
+> (a permanent, documented limitation).**
 
 ## Install
 
 ```xml
-<PackageReference Include="PostQuantum.Jwt.Analyzers" Version="1.0.0-preview.10" PrivateAssets="all" />
+<PackageReference Include="PostQuantum.Jwt.Analyzers" Version="1.0.0" PrivateAssets="all" />
 ```
 
 `PrivateAssets="all"` keeps the analyzer a build-time-only dependency (it never

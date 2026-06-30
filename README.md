@@ -1,20 +1,22 @@
 # PostQuantum.Jwt
 
-[![NuGet](https://img.shields.io/nuget/vpre/PostQuantum.Jwt?label=nuget&color=blue)](https://www.nuget.org/packages/PostQuantum.Jwt)
+[![NuGet](https://img.shields.io/nuget/v/PostQuantum.Jwt?label=nuget&color=blue)](https://www.nuget.org/packages/PostQuantum.Jwt)
 [![Downloads](https://img.shields.io/nuget/dt/PostQuantum.Jwt?color=blue)](https://www.nuget.org/packages/PostQuantum.Jwt)
 [![CI](https://github.com/systemslibrarian/postquantum-jwt/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/systemslibrarian/postquantum-jwt/actions/workflows/ci.yml)
 [![.NET](https://img.shields.io/badge/.NET-10.0-512BD4)](https://dotnet.microsoft.com/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 **Hybrid confidentiality, post-quantum signatures — JOSE-style tokens for
-.NET 10.** PostQuantum.Jwt is a production-oriented preview library for
+.NET 10.** PostQuantum.Jwt is a production-quality library for
 controlled .NET issuer/verifier systems that need JOSE-style post-quantum
 tokens. It provides ML-DSA-65 signed tokens, optional hybrid X-Wing-style
 confidentiality (X25519 + ML-KEM-768 with AES-256-GCM), strict algorithm
 handling, fail-closed validation, replay-protection support, key-rotation
 patterns, and hardened usage guidance. Built on the native .NET BCL
-post-quantum primitives. It is **not independently audited** and is **not a
-drop-in replacement for OAuth/OIDC/JWT middleware**.
+post-quantum primitives. It is **not independently audited** — treat that as a
+**permanent, documented limitation** (see [`KNOWN-GAPS.md`](KNOWN-GAPS.md)),
+not a temporary gate — and is **not a drop-in replacement for OAuth/OIDC/JWT
+middleware**.
 
 > **▶ Live playground — <https://pqjwt.systemslibrarian.dev>** — build a token
 > (claims, lifetime, optional X-Wing encryption), validate one, and *break* one
@@ -56,23 +58,27 @@ drop-in replacement for OAuth/OIDC/JWT middleware**.
 > [Compared to System.IdentityModel.Tokens.Jwt](#compared-to-systemidentitymodeltokensjwt)
 > for the side-by-side.
 
-> **Status — `1.0.0-preview.10`. Production-oriented preview for controlled
-> systems; not independently audited.** The public API and wire format are held
-> stable across the `1.0.0-preview.*` series — the `preview` suffix marks the
-> **pending independent audit**, not API churn; no breaking changes are expected
-> before the final `1.0.0` (a security review could still force one).
-> "Production-oriented" describes the hardened
-> defaults (strict validation, fail-closed, replay and key-rotation support) —
-> **not** an audit sign-off: the cryptographic construction has **not** been
-> independently reviewed. Use it only in systems where you control both issuer
-> and verifier, and read [`KNOWN-GAPS.md`](KNOWN-GAPS.md) before depending on
-> this for anything that matters.
+> **Status — `1.0.0` (stable). Production-quality for controlled systems; NOT
+> independently audited.** The public API and v1 wire format are now under
+> SemVer — held stable across the whole preview series and committed for the
+> `1.0.x` line. "Production-quality" describes the hardened defaults (strict
+> validation, fail-closed, replay and key-rotation support) — **not** an audit
+> sign-off. **No third party has reviewed the cryptographic construction, and
+> none is scheduled. As of `1.0.0` the absence of an independent audit is a
+> permanent, documented limitation, not a release gate.** This was a deliberate
+> decision: an unfunded project is unlikely to obtain a formal review, and
+> staying in perpetual `preview` served no one — so the library ships stable
+> with the limitation stated plainly rather than implied by a version suffix.
+> Use it only in systems where you control both issuer and verifier and where
+> you accept that risk with eyes open, and read [`KNOWN-GAPS.md`](KNOWN-GAPS.md)
+> before depending on this for anything that matters.
 
 ---
 
 ## Table of contents
 
 - [Why](#why)
+- [What's new in 1.0.0](#whats-new-in-100)
 - [What's new in 1.0.0-preview.10](#whats-new-in-100-preview10)
 - [What's new in 1.0.0-preview.9](#whats-new-in-100-preview9)
 - [What's new in 1.0.0-preview.8](#whats-new-in-100-preview8)
@@ -138,6 +144,31 @@ OAuth/OIDC/JWT middleware or a generic JWT/JWE library.
 | Systems behind an interop-translating gateway | Anywhere generic JWT/JWE interoperability is required |
 
 ---
+
+## What's new in 1.0.0
+
+**First stable release.** The public API and v1 wire format are unchanged from
+`1.0.0-preview.10` — builder-minted tokens round-trip identically. A pre-release
+review added two small hardening fixes (encryption-plaintext zeroing is now
+exception-safe; oversized-token rejections now emit the failure metric — see
+[`CHANGELOG.md`](CHANGELOG.md)). What else changed is the commitment and the
+messaging:
+
+- **SemVer applies from here.** The public API and v1 wire format, held stable
+  across the entire preview series, are now a `1.0.x` commitment: PATCH for
+  fixes, MINOR for additive surface, MAJOR for any break.
+- **The independent-audit gap is now permanent and documented, not a gate.**
+  The preview series treated an external cryptographic audit as the single
+  blocker to `1.0`. That gate has been removed deliberately: an unfunded
+  project is unlikely to secure a formal review, and perpetual `preview`
+  helped no one. The library ships stable with the limitation stated plainly —
+  **no third party has reviewed the construction.** See
+  [`KNOWN-GAPS.md`](KNOWN-GAPS.md) and [`SECURITY.md`](SECURITY.md).
+- **Use envelope is unchanged.** Controlled issuer/verifier systems where you
+  own both ends and accept the no-audit risk. Not generic JWT interop, not an
+  OAuth/OIDC replacement.
+- **Vulnerability reporting** runs through GitHub Security Advisories — see the
+  coordinated-disclosure policy in [`SECURITY.md`](SECURITY.md).
 
 ## What's new in 1.0.0-preview.10
 
@@ -533,13 +564,13 @@ Full notes in [`CHANGELOG.md`](CHANGELOG.md).
 ## Install
 
 ```bash
-dotnet add package PostQuantum.Jwt --version 1.0.0-preview.10
+dotnet add package PostQuantum.Jwt --version 1.0.0
 ```
 
 Or in a `.csproj`:
 
 ```xml
-<PackageReference Include="PostQuantum.Jwt" Version="1.0.0-preview.10" />
+<PackageReference Include="PostQuantum.Jwt" Version="1.0.0" />
 ```
 
 **Runtime requirement.** Native ML-KEM / ML-DSA primitives come from the OS
@@ -724,7 +755,7 @@ package and call `AddPqJwtBearer(...)` on the standard
 `ML-DSA-65`.
 
 ```bash
-dotnet add package PostQuantum.Jwt.AspNetCore --version 1.0.0-preview.10
+dotnet add package PostQuantum.Jwt.AspNetCore --version 1.0.0
 ```
 
 ```csharp

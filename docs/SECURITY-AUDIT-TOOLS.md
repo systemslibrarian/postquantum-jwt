@@ -16,7 +16,7 @@ We strongly recommend utilizing both.
 The `PostQuantum.Jwt.Analyzers` package plugs directly into the .NET compiler (Roslyn) and inspects your code as you type. It's a separate, opt-in package — add it as a build-only dependency:
 
 ```xml
-<PackageReference Include="PostQuantum.Jwt.Analyzers" Version="1.0.0-preview.10" PrivateAssets="all" />
+<PackageReference Include="PostQuantum.Jwt.Analyzers" Version="1.0.0" PrivateAssets="all" />
 ```
 
 ### What it catches
