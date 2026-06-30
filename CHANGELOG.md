@@ -8,6 +8,19 @@ the API between previews.
 
 ## [Unreleased]
 
+### Changed
+
+- **CI publishing migrated to NuGet Trusted Publishing (OIDC).** The release
+  workflow's `publish` job now mints a short-lived nuget.org key from the GitHub
+  Actions OIDC token via `NuGet/login@v1` (`id-token: write`) instead of a
+  long-lived `NUGET_API_KEY` secret. Requires a Trusted Publishing policy on
+  nuget.org (repo `systemslibrarian/postquantum-jwt`, workflow `release.yml`,
+  environment `nuget-publish`) and a `NUGET_USER` repository variable. The
+  `nuget-publish` environment still gates the push for manual review. This
+  affects future releases only — the `1.0.0` GA itself was published manually
+  and does not carry the CI build-provenance attestation. No package code
+  change.
+
 ## [1.0.0] — 2026-06-30
 
 **First stable release.** SemVer applies from here: PATCH for fixes, MINOR for

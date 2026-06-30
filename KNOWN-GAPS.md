@@ -190,6 +190,18 @@ a permanent documented limitation rather than a release gate — lives in
   [SignPath Foundation](https://signpath.org/) rather than buying a commercial
   (DigiCert/Sectigo) cert. Until then, repository signing plus the
   build-provenance attestations above remain the trust signals.
+- **Publishing auth migrated to NuGet Trusted Publishing (OIDC) — but the
+  packages on nuget.org today were pushed manually.** As of `1.0.0` the
+  release workflow's `publish` job uses NuGet Trusted Publishing: it mints a
+  short-lived nuget.org key from the GitHub Actions OIDC token (`NuGet/login`)
+  with no long-lived `NUGET_API_KEY` secret. **This applies to future releases
+  only.** Every package published so far — the `1.0.0-preview.*` series *and*
+  the `1.0.0` GA — was pushed manually with a personal API key because the old
+  CI key was invalid, so those `.nupkg`s do **not** carry the CI
+  build-provenance attestation (the per-release `CHANGELOG.md` transparency
+  notes record this). The first release cut after the OIDC switch will be the
+  first whose nuget.org artifact is CI-built and attestation-backed; this entry
+  will be updated to reflect that once it has actually happened, not before.
 - **CycloneDX SBOM is packed inside the `.nupkg`** (in addition to being
   uploaded as a release artifact and getting its own build-provenance
   attestation). Consumers can inspect `bom.json` directly from the
