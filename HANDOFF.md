@@ -51,18 +51,27 @@ then this file.
 - **Native ML-DSA/ML-KEM need OpenSSL 3.5+.** In the dev container, prefix
   test and benchmark runs with `LD_LIBRARY_PATH=/opt/conda/lib`. Without
   it, PQ tests skip (and the `linux-pq-required` CI lane fails on any skip).
-- **NuGet publish:** the CI `NUGET_API_KEY` (on the `nuget-publish` GitHub
-  environment) remains **invalid** — `preview.5` through `preview.10` were
-  pushed **manually** with the key saved in `./nuget.key` (gitignored), so
-  they lack the CI build-provenance attestation. Each affected
-  `CHANGELOG.md` entry carries a transparency-note paragraph. Tags and
-  GitHub Releases are still cut for each preview — the `release.yml` pack
-  job runs on tag push (the build-provenance attestation is generated
-  there), but the `publish` job stays gated by the `nuget-publish`
-  environment and is cancelled until a working key is provisioned. The
-  playground deploy secret (`AZURE_CREDENTIALS`) is healthy; the live demo
-  deploy uses `az login` + `samples/ProductionDeploymentDemo/azure/deploy.ps1`
-  manually.
+- **NuGet publish — migrating to Trusted Publishing (OIDC).** The old CI
+  `NUGET_API_KEY` was **invalid**, so `preview.5` through `preview.10` **and
+  the `1.0.0` GA** were pushed **manually** with the key in `./nuget.key`
+  (gitignored); those uploads lack the CI build-provenance attestation (each
+  affected `CHANGELOG.md` entry carries a transparency note). As of 2026-06-30
+  `release.yml`'s `publish` job was rewritten to use **NuGet Trusted
+  Publishing**: it requests a short-lived key via `NuGet/login@v1` over GitHub
+  OIDC (`id-token: write`), so there is no long-lived secret. **To make the
+  next tagged release publish automatically, three one-time setup items are
+  required:** (1) create the Trusted Publishing policy on nuget.org bound to
+  `repo owner = systemslibrarian`, `repo = postquantum-jwt`,
+  `workflow = release.yml`, `environment = nuget-publish`; (2) add a repo
+  **variable** `NUGET_USER` = the nuget.org account username that owns the
+  policy (Settings → Secrets and variables → Actions → Variables); (3) keep
+  the `nuget-publish` environment's required reviewers for the manual gate.
+  Until that policy + variable are in place, the `publish` job will fail at
+  the `NuGet/login` step — the `./nuget.key` manual push remains the fallback.
+  The `pack` job (build-provenance attestation + SBOM + SHA256SUMS) already
+  runs on tag push regardless. The playground deploy secret
+  (`AZURE_CREDENTIALS`) is healthy; the live demo deploy uses `az login` +
+  `samples/ProductionDeploymentDemo/azure/deploy.ps1` manually.
 
 ## What's worth knowing right now
 

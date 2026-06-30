@@ -1,9 +1,22 @@
 name: Release
 
-# Publishes the NuGet packages when a version tag (e.g. v0.3.0-preview.1) is pushed.
-# Requires the NUGET_API_KEY secret on the 'nuget-publish' environment to push to nuget.org.
-# Optional NUGET_SIGNING_CERT (+ NUGET_SIGNING_CERT_PASSWORD) on the same environment
-# enables author code signing of the .nupkg before push.
+# Publishes the NuGet packages when a version tag (e.g. v1.0.0) is pushed.
+#
+# Authentication is NuGet Trusted Publishing (OIDC): the publish job exchanges
+# the GitHub Actions OIDC token for a short-lived nuget.org API key via the
+# NuGet/login action — there is NO long-lived NUGET_API_KEY secret. A matching
+# Trusted Publishing policy must exist on nuget.org (account → Trusted Publishing)
+# bound to:
+#   repository owner = systemslibrarian
+#   repository       = postquantum-jwt
+#   workflow file    = release.yml
+#   environment      = nuget-publish   (optional, recommended)
+# The nuget.org account username that owns the policy is supplied via the
+# `NUGET_USER` repository variable (Settings → Secrets and variables → Actions →
+# Variables). It is not a secret.
+#
+# Optional NUGET_SIGNING_CERT (+ NUGET_SIGNING_CERT_PASSWORD) on the same
+# environment enables author code signing of the .nupkg before push.
 
 on:
   push:
@@ -110,14 +123,16 @@ jobs:
   publish:
     needs: pack
     # Bind to a GitHub Environment so an approver can gate the actual push to
-    # nuget.org. Configure the 'nuget-publish' environment in repo settings and
-    # add NUGET_API_KEY there (not as a plain repo secret) to enforce review.
+    # nuget.org. Configure the 'nuget-publish' environment in repo settings; with
+    # Trusted Publishing there is no API-key secret to store — review is enforced
+    # by the environment's required reviewers, and the OIDC token is scoped to
+    # this environment when the nuget.org policy includes it.
     environment: nuget-publish
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      id-token: write       # required: mint the GitHub OIDC token for NuGet/login
     env:
-      NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
       NUGET_SIGNING_CERT: ${{ secrets.NUGET_SIGNING_CERT }}
       NUGET_SIGNING_CERT_PASSWORD: ${{ secrets.NUGET_SIGNING_CERT_PASSWORD }}
     steps:
@@ -127,12 +142,20 @@ jobs:
           name: nuget-packages
           path: artifacts
 
-      - name: Verify an API key is configured
-        run: |
-          if [ -z "${NUGET_API_KEY}" ]; then
-            echo "::error::NUGET_API_KEY is not set on the 'nuget-publish' environment."
-            exit 1
-          fi
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      # Trusted Publishing: exchange the GitHub OIDC token for a short-lived
+      # nuget.org API key. Requires `id-token: write` (above) and a matching
+      # Trusted Publishing policy on nuget.org (see the header comment). The
+      # minted key is exposed to later steps as steps.nuget-login.outputs.NUGET_API_KEY.
+      - name: NuGet trusted-publishing login (OIDC)
+        id: nuget-login
+        uses: NuGet/login@v1
+        with:
+          user: ${{ vars.NUGET_USER }}
 
       # Optional: author code-sign the .nupkg files when a code-signing cert is
       # provided. If the secret is absent we log it and continue (with the
@@ -182,7 +205,7 @@ jobs:
           PKG_VERSION: ${{ needs.pack.outputs.package_version }}
         run: >
           dotnet nuget push "artifacts/PostQuantum.Jwt.${PKG_VERSION}.nupkg"
-          --api-key "$NUGET_API_KEY"
+          --api-key "${{ steps.nuget-login.outputs.NUGET_API_KEY }}"
           --source https://api.nuget.org/v3/index.json
           --skip-duplicate
 
@@ -191,7 +214,7 @@ jobs:
           PKG_VERSION: ${{ needs.pack.outputs.package_version }}
         run: >
           dotnet nuget push "artifacts/PostQuantum.Jwt.AspNetCore.${PKG_VERSION}.nupkg"
-          --api-key "$NUGET_API_KEY"
+          --api-key "${{ steps.nuget-login.outputs.NUGET_API_KEY }}"
           --source https://api.nuget.org/v3/index.json
           --skip-duplicate
 
@@ -202,7 +225,7 @@ jobs:
           PKG_VERSION: ${{ needs.pack.outputs.package_version }}
         run: >
           dotnet nuget push "artifacts/PostQuantum.Jwt.Analyzers.${PKG_VERSION}.nupkg"
-          --api-key "$NUGET_API_KEY"
+          --api-key "${{ steps.nuget-login.outputs.NUGET_API_KEY }}"
           --source https://api.nuget.org/v3/index.json
           --skip-duplicate
 
@@ -214,6 +237,6 @@ jobs:
           PKG_VERSION: ${{ needs.pack.outputs.package_version }}
         run: >
           dotnet nuget push "artifacts/PostQuantum.Jwt.Templates.${PKG_VERSION}.nupkg"
-          --api-key "$NUGET_API_KEY"
+          --api-key "${{ steps.nuget-login.outputs.NUGET_API_KEY }}"
           --source https://api.nuget.org/v3/index.json
           --skip-duplicate
