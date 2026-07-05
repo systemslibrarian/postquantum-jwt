@@ -39,7 +39,7 @@ the API between previews.
 ### Changed
 
 - **The `pqjwt-webapi` template now scaffolds against `PostQuantum.AspNetCore`**
-  (pinned at `1.0.0-preview.3`, its latest release) instead of the retired
+  (pinned at its stable `1.0.0`, published 2026-07-05) instead of the retired
   `PostQuantum.Jwt.AspNetCore`: `AddPqJwtBearer(...)` becomes
   `AddPostQuantumJwtBearer(...)` and the default scheme name is
   `PostQuantumJwtBearer`. `check-version-sync.sh` now fails if template content

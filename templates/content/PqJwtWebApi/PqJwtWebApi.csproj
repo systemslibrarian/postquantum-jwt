@@ -14,7 +14,7 @@
          from https://github.com/systemslibrarian/postquantum-aspnetcore; the
          pinned version below is its latest release and is enforced by
          scripts/check-version-sync.sh — bump both together. -->
-    <PackageReference Include="PostQuantum.AspNetCore" Version="1.0.0-preview.3" />
+    <PackageReference Include="PostQuantum.AspNetCore" Version="1.0.0" />
   </ItemGroup>
 
 </Project>

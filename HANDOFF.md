@@ -16,9 +16,9 @@ then this file.
   `Directory.Build.props`). **Do not add it back to the release pipeline.**
   Future releases push three packages: core, analyzers, templates. The
   `pqjwt-webapi` template scaffolds against `PostQuantum.AspNetCore`, pinned
-  at `1.0.0-preview.3` (its latest release — no stable yet as of 2026-07-05);
-  the pin lives in the template csproj + `check-version-sync.sh` and is bumped
-  manually when the successor repo releases.
+  at its stable `1.0.0` (published 2026-07-05 via Trusted Publishing); the
+  pin lives in the template csproj + `check-version-sync.sh` and is bumped
+  manually with the successor repo's releases.
 - **Releasing `1.0.0` — first stable release.** The version was bumped across
   all four packages (`PostQuantum.Jwt`, `PostQuantum.Jwt.AspNetCore`,
   `PostQuantum.Jwt.Analyzers`, `PostQuantum.Jwt.Templates`) from

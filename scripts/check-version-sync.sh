@@ -64,7 +64,7 @@ fi
 #     on its own cadence, so its version cannot track this repo's — instead it
 #     is pinned here and in the template csproj; bump both together when the
 #     successor releases (check https://www.nuget.org/packages/PostQuantum.AspNetCore).
-expected_pq_aspnetcore_version="1.0.0-preview.3"
+expected_pq_aspnetcore_version="1.0.0"
 templates_csproj=$repo_root/templates/PostQuantum.Jwt.Templates.csproj
 if [[ -f $templates_csproj ]]; then
   tpl_version=$(grep -oE '<Version>[^<]+</Version>' "$templates_csproj" | head -1 | sed -E 's|</?Version>||g')

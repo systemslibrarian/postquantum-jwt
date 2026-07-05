@@ -173,9 +173,8 @@ a permanent documented limitation rather than a release gate — lives in
   source. The source stays in-tree and buildable so the 1.0.0 samples and
   fail-closed tests remain exercised. The `dotnet new pqjwt-webapi` template
   scaffolds against `PostQuantum.AspNetCore` (the sync script bans template
-  references to the retired package and pins the successor's version — the
-  pin is pre-1.0 until the successor's own GA and is bumped manually with its
-  releases).
+  references to the retired package and pins the successor's version — at
+  its stable `1.0.0` since 2026-07-05, bumped manually with its releases).
 
 ## Tooling & environment
 
