@@ -136,6 +136,11 @@ jobs:
       NUGET_SIGNING_CERT: ${{ secrets.NUGET_SIGNING_CERT }}
       NUGET_SIGNING_CERT_PASSWORD: ${{ secrets.NUGET_SIGNING_CERT_PASSWORD }}
     steps:
+      # Checkout is needed so global.json exists for setup-dotnet below —
+      # this job otherwise only consumes the pack job's artifacts. Without
+      # it, the first real publish run would fail before reaching NuGet.
+      - uses: actions/checkout@v6
+
       - name: Download package artifacts
         uses: actions/download-artifact@v5
         with:
