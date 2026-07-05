@@ -171,10 +171,11 @@ a permanent documented limitation rather than a release gate — lives in
   template references to it at exactly 1.0.0, and `AddPqJwtBearer(...)` carries
   an `[Obsolete]` supersession notice (`PQJWT100`) for anyone building from
   source. The source stays in-tree and buildable so the 1.0.0 samples and
-  fail-closed tests remain exercised. Remaining follow-up: migrate the
-  `dotnet new pqjwt-webapi` template from the frozen package to
-  `PostQuantum.AspNetCore` (a real port — the entry point there is
-  `AddPostQuantumJwtBearer(...)` and the key-ring types are renamed).
+  fail-closed tests remain exercised. The `dotnet new pqjwt-webapi` template
+  scaffolds against `PostQuantum.AspNetCore` (the sync script bans template
+  references to the retired package and pins the successor's version — the
+  pin is pre-1.0 until the successor's own GA and is bumped manually with its
+  releases).
 
 ## Tooling & environment
 

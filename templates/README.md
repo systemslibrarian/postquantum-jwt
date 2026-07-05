@@ -18,7 +18,7 @@ dotnet new install PostQuantum.Jwt.Templates
 
 | Short name      | What you get |
 | --------------- | ------------ |
-| `pqjwt-webapi`  | A minimal ASP.NET Core API that issues and validates post-quantum JWTs via `AddPqJwtBearer`, with a JWKS-equivalent key directory. |
+| `pqjwt-webapi`  | A minimal ASP.NET Core API that issues and validates post-quantum JWTs via `AddPostQuantumJwtBearer`, with a JWKS-equivalent key directory. |
 | `pqjwt-console` | A console app that signs a token and validates it fail-closed. |
 
 ## Use
@@ -33,7 +33,11 @@ dotnet new pqjwt-console -n MyApp
 cd MyApp && dotnet run
 ```
 
-The scaffolded projects reference the published `PostQuantum.Jwt` NuGet package.
+The scaffolded projects reference the published `PostQuantum.Jwt` NuGet package;
+`pqjwt-webapi` additionally references
+[`PostQuantum.AspNetCore`](https://github.com/systemslibrarian/postquantum-aspnetcore)
+for the authentication handler (it replaced the retired
+`PostQuantum.Jwt.AspNetCore` companion).
 
 > **Runtime note.** The native ML-DSA / ML-KEM primitives require **OpenSSL 3.5+**
 > at runtime. The projects *compile* anywhere; they *run* where a recent OpenSSL

@@ -11,12 +11,14 @@ then this file.
   (its own repo, `repos/postquantum-aspnetcore`). The nuget.org package was
   deprecated + unlisted on 2026-07-05. Repo-side enforcement: `IsPackable=false`
   in its csproj, no pack/push steps in `release.yml` / `ci.yml`,
-  `check-version-sync.sh` pins template refs to it at exactly 1.0.0, and
+  `check-version-sync.sh` fails if template content references it at all, and
   `AddPqJwtBearer(...)` is `[Obsolete]` (`PQJWT100`, suppressed repo-wide in
   `Directory.Build.props`). **Do not add it back to the release pipeline.**
-  Future releases push three packages: core, analyzers, templates. Open
-  follow-up: migrate `templates/content/PqJwtWebApi` to `PostQuantum.AspNetCore`
-  (entry point there is `AddPostQuantumJwtBearer(...)`; key-ring types renamed).
+  Future releases push three packages: core, analyzers, templates. The
+  `pqjwt-webapi` template scaffolds against `PostQuantum.AspNetCore`, pinned
+  at `1.0.0-preview.3` (its latest release — no stable yet as of 2026-07-05);
+  the pin lives in the template csproj + `check-version-sync.sh` and is bumped
+  manually when the successor repo releases.
 - **Releasing `1.0.0` — first stable release.** The version was bumped across
   all four packages (`PostQuantum.Jwt`, `PostQuantum.Jwt.AspNetCore`,
   `PostQuantum.Jwt.Analyzers`, `PostQuantum.Jwt.Templates`) from

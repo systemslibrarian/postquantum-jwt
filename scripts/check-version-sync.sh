@@ -57,12 +57,14 @@ fi
 # the scaffolded template content, reference the PUBLISHED library version. Keep
 # them in lockstep so `dotnet new pqjwt-*` never scaffolds against a stale version.
 #
-# Exception: PostQuantum.Jwt.AspNetCore is FROZEN at 1.0.0 — deprecated and
-# unlisted on nuget.org, superseded by PostQuantum.AspNetCore (its own repo).
-# No later version will ever exist, so template refs to it must stay pinned at
-# exactly 1.0.0 rather than tracking the core version. (The real fix is to
-# migrate the templates to PostQuantum.AspNetCore — see KNOWN-GAPS.md.)
-frozen_aspnetcore_version="1.0.0"
+# Two AspNetCore-related rules on top of that:
+#   * PostQuantum.Jwt.AspNetCore is retired (frozen at 1.0.0, deprecated and
+#     unlisted on nuget.org). Templates must NOT reference it at all.
+#   * Its successor PostQuantum.AspNetCore lives in its own repo and releases
+#     on its own cadence, so its version cannot track this repo's — instead it
+#     is pinned here and in the template csproj; bump both together when the
+#     successor releases (check https://www.nuget.org/packages/PostQuantum.AspNetCore).
+expected_pq_aspnetcore_version="1.0.0-preview.3"
 templates_csproj=$repo_root/templates/PostQuantum.Jwt.Templates.csproj
 if [[ -f $templates_csproj ]]; then
   tpl_version=$(grep -oE '<Version>[^<]+</Version>' "$templates_csproj" | head -1 | sed -E 's|</?Version>||g')
@@ -88,19 +90,33 @@ if [[ -f $templates_csproj ]]; then
     echo "Template content refs: all PostQuantum.Jwt references at $csproj_version OK"
   fi
 
-  frozen_mismatch=0
+  retired_refs=$(grep -rlE 'PackageReference Include="PostQuantum\.Jwt\.AspNetCore"' "$repo_root/templates/content" || true)
+  if [[ -n $retired_refs ]]; then
+    echo "::error::Template content references the retired PostQuantum.Jwt.AspNetCore (frozen at 1.0.0, unlisted). Use PostQuantum.AspNetCore instead. Found in:"
+    echo "$retired_refs"
+    errors=$((errors + 1))
+  else
+    echo "Template content refs: no references to retired PostQuantum.Jwt.AspNetCore OK"
+  fi
+
+  successor_mismatch=0
+  successor_found=0
   while IFS= read -r ref_version; do
     [[ -z $ref_version ]] && continue
-    if [[ $ref_version != "$frozen_aspnetcore_version" ]]; then
-      echo "::error::Template content references PostQuantum.Jwt.AspNetCore at $ref_version, but the package is frozen at $frozen_aspnetcore_version (no later version exists on nuget.org)"
-      frozen_mismatch=$((frozen_mismatch + 1))
+    successor_found=$((successor_found + 1))
+    if [[ $ref_version != "$expected_pq_aspnetcore_version" ]]; then
+      echo "::error::Template content references PostQuantum.AspNetCore at $ref_version, expected the pinned $expected_pq_aspnetcore_version (update expected_pq_aspnetcore_version here if the successor released)"
+      successor_mismatch=$((successor_mismatch + 1))
     fi
-  done < <(grep -rhoE 'PackageReference Include="PostQuantum\.Jwt\.AspNetCore" Version="[^"]+"' "$repo_root/templates/content" \
+  done < <(grep -rhoE 'PackageReference Include="PostQuantum\.AspNetCore" Version="[^"]+"' "$repo_root/templates/content" \
              | sed -E 's|.*Version="([^"]+)".*|\1|')
-  if [[ $frozen_mismatch -gt 0 ]]; then
-    errors=$((errors + frozen_mismatch))
+  if [[ $successor_found -eq 0 ]]; then
+    echo "::error::Template content has no PostQuantum.AspNetCore reference — pqjwt-webapi should scaffold the successor authentication package"
+    errors=$((errors + 1))
+  elif [[ $successor_mismatch -gt 0 ]]; then
+    errors=$((errors + successor_mismatch))
   else
-    echo "Template content refs: PostQuantum.Jwt.AspNetCore pinned at frozen $frozen_aspnetcore_version OK"
+    echo "Template content refs: PostQuantum.AspNetCore pinned at $expected_pq_aspnetcore_version OK"
   fi
 fi
 

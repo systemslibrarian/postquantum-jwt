@@ -219,9 +219,9 @@ jobs:
           --skip-duplicate
 
       # The dotnet-new template package scaffolds projects that PackageReference
-      # the core at the release version plus the frozen PostQuantum.Jwt.AspNetCore
-      # pinned at 1.0.0 (both enforced by scripts/check-version-sync.sh), so it's
-      # pushed last after the core has indexed.
+      # the core at the release version plus PostQuantum.AspNetCore at a pinned
+      # version from its own repo (both enforced by scripts/check-version-sync.sh),
+      # so it's pushed last after the core has indexed.
       - name: Push dotnet new templates
         env:
           PKG_VERSION: ${{ needs.pack.outputs.package_version }}

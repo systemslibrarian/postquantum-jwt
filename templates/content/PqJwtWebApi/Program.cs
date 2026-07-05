@@ -11,8 +11,8 @@
 // NOTE: the native ML-DSA / ML-KEM primitives require OpenSSL 3.5+ at runtime.
 
 using System.Security.Cryptography;
+using PostQuantum.AspNetCore;
 using PostQuantum.Jwt;
-using PostQuantum.Jwt.AspNetCore;
 
 const string Issuer = "https://issuer.example";
 const string Audience = "https://api.example";
@@ -28,8 +28,8 @@ var publicKeyBytes = signingKey.ExportMLDsaPublicKey();
 var verificationKey = MLDsa.ImportMLDsaPublicKey(MLDsaAlgorithm.MLDsa65, publicKeyBytes);
 
 builder.Services
-    .AddAuthentication(PqJwtBearerDefaults.AuthenticationScheme)
-    .AddPqJwtBearer(options =>
+    .AddAuthentication(PostQuantumJwtBearerDefaults.AuthenticationScheme)
+    .AddPostQuantumJwtBearer(options =>
     {
         options.ValidationParameters = new PqJwtValidationParameters
         {
@@ -67,7 +67,12 @@ app.MapPost("/token", (string? sub, string? role) =>
     if (!string.IsNullOrEmpty(role))
         b = b.WithClaim("role", role);
 
-    return Results.Ok(new { token = b.Build(), token_type = "PqJwtBearer", expires_in = 900 });
+    return Results.Ok(new
+    {
+        token = b.Build(),
+        token_type = PostQuantumJwtBearerDefaults.AuthenticationScheme,
+        expires_in = 900,
+    });
 });
 
 // Protected: requires a valid PQ JWT.

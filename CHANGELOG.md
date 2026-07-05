@@ -23,6 +23,13 @@ the API between previews.
 
 ### Changed
 
+- **The `pqjwt-webapi` template now scaffolds against `PostQuantum.AspNetCore`**
+  (pinned at `1.0.0-preview.3`, its latest release) instead of the retired
+  `PostQuantum.Jwt.AspNetCore`: `AddPqJwtBearer(...)` becomes
+  `AddPostQuantumJwtBearer(...)` and the default scheme name is
+  `PostQuantumJwtBearer`. `check-version-sync.sh` now fails if template content
+  references the retired package and pins the successor's version. Ships with
+  the next `PostQuantum.Jwt.Templates` release.
 - **CI publishing migrated to NuGet Trusted Publishing (OIDC).** The release
   workflow's `publish` job now mints a short-lived nuget.org key from the GitHub
   Actions OIDC token via `NuGet/login@v1` (`id-token: write`) instead of a
