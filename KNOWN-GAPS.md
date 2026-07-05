@@ -162,6 +162,19 @@ a permanent documented limitation rather than a release gate — lives in
   for `kid`-based rotation) ship in `PostQuantum.Jwt.AspNetCore`, now superseded
   by [`PostQuantum.AspNetCore`](https://github.com/systemslibrarian/postquantum-aspnetcore).
   Adding DI to the core package itself remains a deliberate non-goal.
+- **`PostQuantum.Jwt.AspNetCore` is frozen at 1.0.0 — no further version will
+  ever be published** (decision of 2026-07-05). The nuget.org package is
+  deprecated and unlisted; existing 1.0.0 consumers keep restoring, new
+  consumers should use `PostQuantum.AspNetCore`. The freeze is enforced in the
+  repo, not by memory: the project is `IsPackable=false`, the release and CI
+  workflows no longer pack or push it, `scripts/check-version-sync.sh` pins
+  template references to it at exactly 1.0.0, and `AddPqJwtBearer(...)` carries
+  an `[Obsolete]` supersession notice (`PQJWT100`) for anyone building from
+  source. The source stays in-tree and buildable so the 1.0.0 samples and
+  fail-closed tests remain exercised. Remaining follow-up: migrate the
+  `dotnet new pqjwt-webapi` template from the frozen package to
+  `PostQuantum.AspNetCore` (a real port — the entry point there is
+  `AddPostQuantumJwtBearer(...)` and the key-ring types are renamed).
 
 ## Tooling & environment
 

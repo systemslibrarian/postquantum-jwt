@@ -9,8 +9,20 @@ namespace PostQuantum.Jwt.AspNetCore;
 /// <c>Microsoft.AspNetCore.Authentication.JwtBearer</c> so it slots into
 /// existing auth-pipeline configuration the same way.
 /// </summary>
+/// <remarks>
+/// This package is superseded by <c>PostQuantum.AspNetCore</c>, where this
+/// entry point continues as <c>AddPostQuantumJwtBearer(…)</c>. Tokens minted
+/// under either package validate in the other. See the migration guide:
+/// <see href="https://github.com/systemslibrarian/postquantum-aspnetcore/blob/main/docs/MIGRATION.md"/>.
+/// </remarks>
 public static class PqJwtBearerExtensions
 {
+    private const string SupersededMessage =
+        "PostQuantum.Jwt.AspNetCore is superseded by PostQuantum.AspNetCore, where this " +
+        "entry point continues as AddPostQuantumJwtBearer(). This package is frozen at " +
+        "1.0.0 (critical fixes only). Migration guide: " +
+        "https://github.com/systemslibrarian/postquantum-aspnetcore/blob/main/docs/MIGRATION.md";
+
     /// <summary>
     /// Adds post-quantum JWT bearer authentication under
     /// <see cref="PqJwtBearerDefaults.AuthenticationScheme"/> with default options.
@@ -18,6 +30,7 @@ public static class PqJwtBearerExtensions
     /// <param name="builder">The <see cref="AuthenticationBuilder"/>.</param>
     /// <param name="configure">Callback to configure <see cref="PqJwtBearerOptions"/>.</param>
     /// <returns>The same <see cref="AuthenticationBuilder"/>.</returns>
+    [Obsolete(SupersededMessage, DiagnosticId = "PQJWT100")]
     public static AuthenticationBuilder AddPqJwtBearer(
         this AuthenticationBuilder builder,
         Action<PqJwtBearerOptions> configure)
@@ -30,6 +43,7 @@ public static class PqJwtBearerExtensions
     /// <param name="authenticationScheme">The scheme name (e.g. <c>"PqJwtBearer"</c>).</param>
     /// <param name="configure">Callback to configure <see cref="PqJwtBearerOptions"/>.</param>
     /// <returns>The same <see cref="AuthenticationBuilder"/>.</returns>
+    [Obsolete(SupersededMessage, DiagnosticId = "PQJWT100")]
     public static AuthenticationBuilder AddPqJwtBearer(
         this AuthenticationBuilder builder,
         string authenticationScheme,
@@ -45,6 +59,7 @@ public static class PqJwtBearerExtensions
     /// <param name="displayName">An optional human-readable display name.</param>
     /// <param name="configure">Callback to configure <see cref="PqJwtBearerOptions"/>.</param>
     /// <returns>The same <see cref="AuthenticationBuilder"/>.</returns>
+    [Obsolete(SupersededMessage, DiagnosticId = "PQJWT100")]
     public static AuthenticationBuilder AddPqJwtBearer(
         this AuthenticationBuilder builder,
         string authenticationScheme,

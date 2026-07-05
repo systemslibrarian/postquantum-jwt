@@ -6,6 +6,14 @@
     <AssemblyName>PostQuantum.Jwt.AspNetCore</AssemblyName>
     <IsTrimmable>true</IsTrimmable>
     <IsAotCompatible>true</IsAotCompatible>
+    <!-- FROZEN at 1.0.0: superseded by PostQuantum.AspNetCore (its own repo,
+         https://github.com/systemslibrarian/postquantum-aspnetcore). The
+         nuget.org package is deprecated + unlisted; no further version is ever
+         pushed. IsPackable=false makes `dotnet pack` produce nothing even if a
+         pipeline globs this project — do not flip it back without deciding to
+         un-supersede the package. Source stays buildable so in-repo samples,
+         tests, and consumers on 1.0.0 keep working. -->
+    <IsPackable>false</IsPackable>
   </PropertyGroup>
 
   <!-- NuGet package metadata -->

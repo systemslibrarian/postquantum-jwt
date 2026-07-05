@@ -66,11 +66,11 @@ jobs:
       - name: Test (Release)
         run: dotnet test -c Release --no-build
 
+      # PostQuantum.Jwt.AspNetCore is deliberately absent: frozen at 1.0.0,
+      # superseded by PostQuantum.AspNetCore (its own repo). Its csproj is
+      # IsPackable=false, so re-adding a pack line here would produce nothing.
       - name: Pack — main library
         run: dotnet pack src/PostQuantum.Jwt/PostQuantum.Jwt.csproj -c Release --no-build -o artifacts
-
-      - name: Pack — AspNetCore companion
-        run: dotnet pack src/PostQuantum.Jwt.AspNetCore/PostQuantum.Jwt.AspNetCore.csproj -c Release --no-build -o artifacts
 
       # The template package compiles nothing of its own (it bundles content), so
       # it is not part of the solution `dotnet build` above — pack it directly.
@@ -191,29 +191,18 @@ jobs:
       # signal — anyone can verify with `gh attestation verify <file>
       # --repo systemslibrarian/postquantum-jwt`.
       #
-      # The push is split into two explicit, sequential steps so the ordering
-      # is a contract, not a coincidence of alphabetical glob expansion:
-      # PostQuantum.Jwt must be uploaded BEFORE PostQuantum.Jwt.AspNetCore,
-      # because the AspNetCore sibling's .nuspec lists the core as a runtime
-      # dependency. NuGet.org accepts the upload either way, but consumers
-      # who hit the sibling before the core finishes indexing will see a
-      # transient restore failure — sequencing the uploads narrows that
-      # window. `dotnet nuget push` uploads each .nupkg's adjacent .snupkg
+      # Pushes are explicit per-package steps (never a glob) so the ordering is
+      # a contract and nothing publishes by accident: the core must index
+      # before the packages that depend on its identity. In particular,
+      # PostQuantum.Jwt.AspNetCore is frozen at 1.0.0 (superseded by
+      # PostQuantum.AspNetCore, its own repo) and must never gain a push step
+      # again. `dotnet nuget push` uploads each .nupkg's adjacent .snupkg
       # automatically. `--skip-duplicate` keeps re-runs idempotent.
       - name: Push core (PostQuantum.Jwt) first
         env:
           PKG_VERSION: ${{ needs.pack.outputs.package_version }}
         run: >
           dotnet nuget push "artifacts/PostQuantum.Jwt.${PKG_VERSION}.nupkg"
-          --api-key "${{ steps.nuget-login.outputs.NUGET_API_KEY }}"
-          --source https://api.nuget.org/v3/index.json
-          --skip-duplicate
-
-      - name: Push AspNetCore sibling (depends on core)
-        env:
-          PKG_VERSION: ${{ needs.pack.outputs.package_version }}
-        run: >
-          dotnet nuget push "artifacts/PostQuantum.Jwt.AspNetCore.${PKG_VERSION}.nupkg"
           --api-key "${{ steps.nuget-login.outputs.NUGET_API_KEY }}"
           --source https://api.nuget.org/v3/index.json
           --skip-duplicate
@@ -230,8 +219,9 @@ jobs:
           --skip-duplicate
 
       # The dotnet-new template package scaffolds projects that PackageReference
-      # both core + AspNetCore at the same version (enforced by
-      # scripts/check-version-sync.sh), so it's pushed last after both have indexed.
+      # the core at the release version plus the frozen PostQuantum.Jwt.AspNetCore
+      # pinned at 1.0.0 (both enforced by scripts/check-version-sync.sh), so it's
+      # pushed last after the core has indexed.
       - name: Push dotnet new templates
         env:
           PKG_VERSION: ${{ needs.pack.outputs.package_version }}

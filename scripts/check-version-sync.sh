@@ -53,9 +53,16 @@ else
   echo "CHANGELOG entry:   $csproj_version OK"
 fi
 
-# The dotnet-new template package, and the PostQuantum.Jwt* PackageReferences in
+# The dotnet-new template package, and the PostQuantum.Jwt PackageReferences in
 # the scaffolded template content, reference the PUBLISHED library version. Keep
 # them in lockstep so `dotnet new pqjwt-*` never scaffolds against a stale version.
+#
+# Exception: PostQuantum.Jwt.AspNetCore is FROZEN at 1.0.0 — deprecated and
+# unlisted on nuget.org, superseded by PostQuantum.AspNetCore (its own repo).
+# No later version will ever exist, so template refs to it must stay pinned at
+# exactly 1.0.0 rather than tracking the core version. (The real fix is to
+# migrate the templates to PostQuantum.AspNetCore — see KNOWN-GAPS.md.)
+frozen_aspnetcore_version="1.0.0"
 templates_csproj=$repo_root/templates/PostQuantum.Jwt.Templates.csproj
 if [[ -f $templates_csproj ]]; then
   tpl_version=$(grep -oE '<Version>[^<]+</Version>' "$templates_csproj" | head -1 | sed -E 's|</?Version>||g')
@@ -73,12 +80,27 @@ if [[ -f $templates_csproj ]]; then
       echo "::error::Template content has a PostQuantum.Jwt PackageReference at $ref_version, expected $csproj_version"
       ref_mismatch=$((ref_mismatch + 1))
     fi
-  done < <(grep -rhoE 'PackageReference Include="PostQuantum\.Jwt[^"]*" Version="[^"]+"' "$repo_root/templates/content" \
+  done < <(grep -rhoE 'PackageReference Include="PostQuantum\.Jwt" Version="[^"]+"' "$repo_root/templates/content" \
              | sed -E 's|.*Version="([^"]+)".*|\1|')
   if [[ $ref_mismatch -gt 0 ]]; then
     errors=$((errors + ref_mismatch))
   else
     echo "Template content refs: all PostQuantum.Jwt references at $csproj_version OK"
+  fi
+
+  frozen_mismatch=0
+  while IFS= read -r ref_version; do
+    [[ -z $ref_version ]] && continue
+    if [[ $ref_version != "$frozen_aspnetcore_version" ]]; then
+      echo "::error::Template content references PostQuantum.Jwt.AspNetCore at $ref_version, but the package is frozen at $frozen_aspnetcore_version (no later version exists on nuget.org)"
+      frozen_mismatch=$((frozen_mismatch + 1))
+    fi
+  done < <(grep -rhoE 'PackageReference Include="PostQuantum\.Jwt\.AspNetCore" Version="[^"]+"' "$repo_root/templates/content" \
+             | sed -E 's|.*Version="([^"]+)".*|\1|')
+  if [[ $frozen_mismatch -gt 0 ]]; then
+    errors=$((errors + frozen_mismatch))
+  else
+    echo "Template content refs: PostQuantum.Jwt.AspNetCore pinned at frozen $frozen_aspnetcore_version OK"
   fi
 fi
 

@@ -161,10 +161,11 @@ jobs:
       - name: Install CycloneDX SBOM tool
         run: dotnet tool install --global CycloneDX
 
-      - name: Pack (Release) — libraries + templates + analyzers
+      # PostQuantum.Jwt.AspNetCore is not packed: frozen at 1.0.0 and superseded
+      # by PostQuantum.AspNetCore (its own repo); its csproj is IsPackable=false.
+      - name: Pack (Release) — library + templates + analyzers
         run: |
           dotnet pack src/PostQuantum.Jwt/PostQuantum.Jwt.csproj -c Release -o artifacts
-          dotnet pack src/PostQuantum.Jwt.AspNetCore/PostQuantum.Jwt.AspNetCore.csproj -c Release -o artifacts
           dotnet pack templates/PostQuantum.Jwt.Templates.csproj -c Release -o artifacts
           dotnet pack src/Analyzers/PostQuantum.Jwt.Analyzers/PostQuantum.Jwt.Analyzers.csproj -c Release -o artifacts
 

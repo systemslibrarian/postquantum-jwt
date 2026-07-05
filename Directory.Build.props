@@ -18,6 +18,13 @@
     <AnalysisLevel>latest-recommended</AnalysisLevel>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- PQJWT100 = the [Obsolete] supersession notice on AddPqJwtBearer
+         (PostQuantum.Jwt.AspNetCore is frozen at 1.0.0, superseded by
+         PostQuantum.AspNetCore). In-repo samples and tests exercise the frozen
+         package on purpose, so the notice is suppressed here; external
+         source-builders still see it. Only this ID is suppressed — plain
+         CS0618 obsoletions still fail the build. -->
+    <NoWarn>$(NoWarn);PQJWT100</NoWarn>
   </PropertyGroup>
 
   <!-- Deterministic, reproducible builds -->

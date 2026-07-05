@@ -4,8 +4,19 @@ This note captures the current state of the project for someone (or some
 agent) picking it up cold. **Read `CLAUDE.md` first** (project guardrails),
 then this file.
 
-## Project state (as of 2026-06-30)
+## Project state (as of 2026-07-05)
 
+- **`PostQuantum.Jwt.AspNetCore` is frozen at 1.0.0** — superseded by
+  [`PostQuantum.AspNetCore`](https://github.com/systemslibrarian/postquantum-aspnetcore)
+  (its own repo, `repos/postquantum-aspnetcore`). The nuget.org package was
+  deprecated + unlisted on 2026-07-05. Repo-side enforcement: `IsPackable=false`
+  in its csproj, no pack/push steps in `release.yml` / `ci.yml`,
+  `check-version-sync.sh` pins template refs to it at exactly 1.0.0, and
+  `AddPqJwtBearer(...)` is `[Obsolete]` (`PQJWT100`, suppressed repo-wide in
+  `Directory.Build.props`). **Do not add it back to the release pipeline.**
+  Future releases push three packages: core, analyzers, templates. Open
+  follow-up: migrate `templates/content/PqJwtWebApi` to `PostQuantum.AspNetCore`
+  (entry point there is `AddPostQuantumJwtBearer(...)`; key-ring types renamed).
 - **Releasing `1.0.0` — first stable release.** The version was bumped across
   all four packages (`PostQuantum.Jwt`, `PostQuantum.Jwt.AspNetCore`,
   `PostQuantum.Jwt.Analyzers`, `PostQuantum.Jwt.Templates`) from

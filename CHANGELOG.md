@@ -8,6 +8,19 @@ the API between previews.
 
 ## [Unreleased]
 
+### Deprecated
+
+- **`PostQuantum.Jwt.AspNetCore` is frozen at 1.0.0**, superseded by
+  [`PostQuantum.AspNetCore`](https://github.com/systemslibrarian/postquantum-aspnetcore)
+  (deprecated + unlisted on nuget.org on 2026-07-05; existing installs keep
+  working). The repo now enforces the freeze: the project is
+  `IsPackable=false`, the release/CI workflows no longer pack or push it,
+  `check-version-sync.sh` pins template references to it at exactly 1.0.0, and
+  `AddPqJwtBearer(...)` is `[Obsolete]` with diagnostic `PQJWT100` (suppressed
+  in-repo only). Tokens minted under either package validate in the other;
+  migration guide:
+  <https://github.com/systemslibrarian/postquantum-aspnetcore/blob/main/docs/MIGRATION.md>.
+
 ### Changed
 
 - **CI publishing migrated to NuGet Trusted Publishing (OIDC).** The release
