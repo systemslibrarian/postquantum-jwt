@@ -187,7 +187,14 @@ a permanent documented limitation rather than a release gate — lives in
   OpenSSL 3.5+ via `conda-forge` and points `LD_LIBRARY_PATH` at it before
   testing. Both lanes fail the run on any skipped test, so the
   ML-KEM / ML-DSA / X-Wing paths are proven to execute on every push on
-  both platforms.
+  both platforms. **Disclosure:** for a window in mid-2026 (until
+  2026-07-05) the Linux lane silently skipped its PQ tests while showing
+  green — conda-forge began resolving `openssl>=3.5` to OpenSSL 4.x, whose
+  `libcrypto.so.4` the .NET 10 runtime does not probe, and the zero-skip
+  gate read only the *last* per-project summary line (the analyzers
+  project, which has no PQ tests). Both bugs are fixed: the conda spec is
+  pinned `<4` and the gate now sums skips across every summary line. The
+  Windows lane was unaffected throughout.
 - **Packages are not author-signed by default.** The release workflow has
   an optional author-signing hook: if a `NUGET_SIGNING_CERT` secret is
   present on the `nuget-publish` GitHub Environment, packages are signed

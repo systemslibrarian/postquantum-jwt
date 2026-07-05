@@ -8,6 +8,21 @@ the API between previews.
 
 ## [Unreleased]
 
+### Fixed
+
+- **The Linux PQ-required CI lane was silently skipping its PQ tests while
+  reporting green** (a window in mid-2026, caught 2026-07-05). Two stacked
+  causes: conda-forge began resolving the lane's `openssl>=3.5` spec to
+  OpenSSL 4.x, which ships `libcrypto.so.4` — a soname the .NET 10 runtime
+  does not probe, so `MLDsa.IsSupported` was false and every `[PqcFact]`
+  test skipped; and the zero-skip gate read only the last per-project
+  summary line, which is the analyzers project (no PQ tests, 0 skipped),
+  so the gate never fired. The conda spec is now pinned `>=3.5,<4` and
+  both gates (Windows + Linux) sum skips across every summary line. The
+  Windows PQ lane ran natively and was unaffected throughout — no release
+  shipped without PQ paths proven on at least one platform. Recorded in
+  `KNOWN-GAPS.md` as a disclosure.
+
 ### Deprecated
 
 - **`PostQuantum.Jwt.AspNetCore` is frozen at 1.0.0**, superseded by
