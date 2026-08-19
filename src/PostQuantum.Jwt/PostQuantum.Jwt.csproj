@@ -53,7 +53,7 @@
          X-Wing) and SHA3-256 (the X-Wing combiner). ML-KEM-768 and ML-DSA come
          from the native .NET BCL. See SECURITY.md for the full posture. -->
     <PackageReference Include="BouncyCastle.Cryptography" Version="2.6.2" />
-    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="10.0.300" PrivateAssets="All" />
   </ItemGroup>
 
   <ItemGroup>
