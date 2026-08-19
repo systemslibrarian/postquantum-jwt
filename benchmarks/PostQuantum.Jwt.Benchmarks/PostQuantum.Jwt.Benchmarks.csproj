@@ -23,7 +23,7 @@
          JwtSecurityTokenHandler, so the baseline is the fastest reasonable
          classical path and the comparison never flatters this library by racing
          it against a deprecated one. Dev-tool dependency only; never shipped. -->
-    <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" Version="8.19.1" />
+    <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" Version="8.22.0" />
   </ItemGroup>
 
   <ItemGroup>
