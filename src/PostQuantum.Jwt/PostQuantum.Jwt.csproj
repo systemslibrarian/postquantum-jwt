@@ -52,7 +52,7 @@
     <!-- Only dependency: BouncyCastle, used solely for X25519 (classical half of
          X-Wing) and SHA3-256 (the X-Wing combiner). ML-KEM-768 and ML-DSA come
          from the native .NET BCL. See SECURITY.md for the full posture. -->
-    <PackageReference Include="BouncyCastle.Cryptography" Version="2.6.2" />
+    <PackageReference Include="BouncyCastle.Cryptography" Version="2.7.0" />
     <PackageReference Include="Microsoft.SourceLink.GitHub" Version="10.0.300" PrivateAssets="All" />
   </ItemGroup>
 
