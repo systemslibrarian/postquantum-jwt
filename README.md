@@ -570,7 +570,7 @@ dotnet add package PostQuantum.Jwt --version 1.0.1
 Or in a `.csproj`:
 
 ```xml
-<PackageReference Include="PostQuantum.Jwt" Version="1.0.0" />
+<PackageReference Include="PostQuantum.Jwt" Version="1.0.1" />
 ```
 
 **Runtime requirement.** Native ML-KEM / ML-DSA primitives come from the OS
