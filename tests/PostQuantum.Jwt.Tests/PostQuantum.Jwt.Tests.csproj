@@ -27,7 +27,7 @@
          implementation. It cannot verify ML-DSA-65, but it can prove the
          token's header + claim shape is wire-compatible with the canonical
          .NET JOSE parser. -->
-    <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" Version="8.19.1" />
+    <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" Version="8.22.0" />
   </ItemGroup>
 
   <ItemGroup>
