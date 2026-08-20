@@ -8,7 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="PostQuantum.Jwt" Version="1.0.0" />
+    <PackageReference Include="PostQuantum.Jwt" Version="1.0.1" />
     <!-- ASP.NET Core integration comes from PostQuantum.AspNetCore (which
          superseded PostQuantum.Jwt.AspNetCore). It releases on its own cadence
          from https://github.com/systemslibrarian/postquantum-aspnetcore; the

@@ -11,7 +11,7 @@
   <PropertyGroup>
     <PackageType>Template</PackageType>
     <PackageId>PostQuantum.Jwt.Templates</PackageId>
-    <Version>1.0.0</Version>
+    <Version>1.0.1</Version>
     <Title>PostQuantum.Jwt templates (dotnet new)</Title>
     <Authors>Paul Clark</Authors>
     <Description>`dotnet new` templates for PostQuantum.Jwt: scaffold a JOSE-style post-quantum token ASP.NET Core API (pqjwt-webapi) or a console app (pqjwt-console) that signs with ML-DSA-65 and validates fail-closed. Production-quality library for controlled issuer/verifier systems — NOT independently audited (a permanent, documented limitation — see KNOWN-GAPS.md), not a drop-in OAuth/OIDC/JWT replacement.</Description>

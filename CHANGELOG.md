@@ -8,6 +8,18 @@ the API between previews.
 
 ## [Unreleased]
 
+## [1.0.1] — 2026-08-20
+
+Patch: dependency maintenance. No public API change and no behavioural change; a drop-in over 1.0.0.
+
+### Changed
+
+- `Microsoft.IdentityModel.JsonWebTokens` 8.22.0 and `Microsoft.AspNetCore.TestHost` 10.0.11 in the
+  benchmark and test projects, `Microsoft.CodeAnalysis.Analyzers` and `.CSharp`, `FsCheck.Xunit`
+  3.3.4, and the GitHub Actions used by CI and release. `Microsoft.SourceLink.GitHub` and the
+  analyzers are `PrivateAssets`, so the published packages have no consumer-visible dependency
+  change in this release.
+
 ### Fixed
 
 - **The Linux PQ-required CI lane was silently skipping its PQ tests while
