@@ -52,7 +52,7 @@ jobs:
 
       - name: Image metadata (issuer)
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ${{ env.REGISTRY }}/${{ env.ISSUER_IMAGE }}
           tags: |
@@ -100,7 +100,7 @@ jobs:
 
       - name: Image metadata (orders)
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ${{ env.REGISTRY }}/${{ env.ORDERS_IMAGE }}
           tags: |
