@@ -62,7 +62,7 @@ jobs:
 
       - name: Build & push (issuer)
         id: push
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: samples/ProductionDeploymentDemo/IssuerApi/Dockerfile
@@ -110,7 +110,7 @@ jobs:
 
       - name: Build & push (orders)
         id: push
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: samples/ProductionDeploymentDemo/OrdersApi/Dockerfile
