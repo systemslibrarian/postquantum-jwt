@@ -17,7 +17,7 @@
   <!-- NuGet package metadata -->
   <PropertyGroup>
     <PackageId>PostQuantum.Jwt</PackageId>
-    <Version>1.0.0</Version>
+    <Version>1.0.1</Version>
     <Title>PostQuantum.Jwt — JOSE-style post-quantum tokens for .NET</Title>
     <Authors>Paul Clark</Authors>
     <Description>Production-quality library for JOSE-style post-quantum tokens in controlled .NET issuer/verifier systems. Provides ML-DSA-65 signatures (FIPS 204), optional hybrid X-Wing-style confidentiality (X25519 + ML-KEM-768 with AES-256-GCM), strict algorithm handling, fail-closed validation, replay-protection support, and key-rotation patterns. Built on the native .NET BCL post-quantum primitives. NOT independently audited — treat that as a permanent, documented limitation (see KNOWN-GAPS.md), not a temporary gate. Suitable where you control both issuer and verifier; not a drop-in OAuth/OIDC/JWT replacement and not interoperable with generic JWT tooling.</Description>

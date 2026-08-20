@@ -564,7 +564,7 @@ Full notes in [`CHANGELOG.md`](CHANGELOG.md).
 ## Install
 
 ```bash
-dotnet add package PostQuantum.Jwt --version 1.0.0
+dotnet add package PostQuantum.Jwt --version 1.0.1
 ```
 
 Or in a `.csproj`:
@@ -755,7 +755,7 @@ package and call `AddPqJwtBearer(...)` on the standard
 `ML-DSA-65`.
 
 ```bash
-dotnet add package PostQuantum.Jwt.AspNetCore --version 1.0.0
+dotnet add package PostQuantum.Jwt.AspNetCore --version 1.0.1
 ```
 
 ```csharp
